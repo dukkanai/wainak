@@ -94,6 +94,7 @@ class IdentityClient {
     int epoch, {
     Map<String, dynamic>? body,
     String? session,
+    String? idempotencyKey,
   }) async {
     _current(epoch);
     final encoded = method == 'GET'
@@ -111,6 +112,7 @@ class IdentityClient {
         'Accept': 'application/json',
         if (method != 'GET') 'Content-Type': 'application/json',
         if (session != null) 'X-Session-Token': session,
+        if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey,
       }, encoded);
     } catch (_) {
       _current(epoch);
@@ -132,32 +134,44 @@ class IdentityClient {
     }
   }
 
-  Never _reject(_Reply reply, int epoch, {bool expire = true}) {
+  Never _reject(
+    _Reply reply,
+    int epoch, {
+    bool expire = true,
+    bool domainError = false,
+  }) {
     _current(epoch);
     final raw = reply.body['error'];
     final code = raw is Map ? raw['code'] : null;
-    if (expire && (reply.status == 401 || reply.status == 410))
+    if (expire &&
+        (reply.status == 401 || (reply.status == 410 && !domainError)))
       forgetLocalSession();
     throw IdentityFailure(
       switch (code) {
         'consent_required' => 'consent_required',
+        'report_no_longer_available' => 'report_no_longer_available',
         'reauthentication_required' => 'reauthentication_required',
         'reauthentication_failed' => 'reauthentication_failed',
         _ => switch (reply.status) {
           401 => 'session_expired',
-          410 => 'flow_expired',
+          410 => domainError ? 'request_unavailable' : 'flow_expired',
           429 => 'rate_limited',
           _ => 'request_rejected',
         },
       },
       switch (code) {
+        'report_no_longer_available' =>
+          'لم يعد سجل هذا البلاغ متاحًا؛ لم نُنشئ بلاغًا جديدًا ولم نمسح الجلسة.',
         'consent_required' =>
-          'يلزم تحديث الموافقات من الخادم. هذه الواجهة لا تجددها تلقائيًا؛ تبقى إدارة الجلسة والحذف متاحة.',
+          'يلزم تحديث الموافقات من الخادم. هذه الواجهة لا تجددها تلقائيًا؛ تبقى الطلبات وإجراءات السلامة وإدارة الجلسة متاحة دون تجديد تلقائي.',
         'reauthentication_required' =>
           'يلزم إثبات كلمة المرور حديثًا قبل هذا الإجراء.',
         _ => switch (reply.status) {
           401 => 'لم يثبت الدخول أو انتهت الجلسة؛ ابدأ تسجيل الدخول من جديد.',
-          410 => 'انتهى مسار التحقق؛ أعد تسجيل الدخول للحصول على مسار حالي.',
+          410 =>
+            domainError
+                ? 'لم يعد هذا الإجراء متاحًا؛ حدّث الحالة دون تكرار تلقائي.'
+                : 'انتهى مسار التحقق؛ أعد تسجيل الدخول للحصول على مسار حالي.',
           429 => 'طلبات كثيرة؛ انتظر قبل المحاولة. لا توجد إعادة تلقائية.',
           403 => 'لم يؤكد الخادم صلاحية هذا الإجراء أو كلمة المرور.',
           _ => 'لم تكتمل العملية. راجع مدخلات الاختبار دون تكرار تلقائي.',
@@ -441,6 +455,7 @@ class IdentityClient {
     String method,
     String path, {
     Map<String, dynamic>? body,
+    String? idempotencyKey,
   }) async {
     const allowed = {
       'GET /v1/me',
@@ -449,18 +464,55 @@ class IdentityClient {
       'GET /v1/me/assessment',
       'POST /v1/me/assessment/answers',
       'GET /v1/candidates',
+      'GET /v1/relationships',
+      'POST /v1/relationships',
+      'POST /v1/blocks',
+      'POST /v1/reports',
     };
-    if (!allowed.contains('$method $path'))
-      throw ArgumentError('Unsupported identity profile operation');
+    final relationshipRead =
+        method == 'GET' &&
+        RegExp(r'^/v1/relationships/rel_[0-9a-f]{32}$').hasMatch(path);
+    final relationshipAction =
+        method == 'POST' &&
+        RegExp(
+          r'^/v1/relationships/rel_[0-9a-f]{32}/(respond|cancel|end)$',
+        ).hasMatch(path);
+    if (!allowed.contains('$method $path') &&
+        !relationshipRead &&
+        !relationshipAction)
+      throw ArgumentError('Unsupported identity domain operation');
+    final needsKey =
+        method == 'POST' &&
+        (path == '/v1/relationships' || path == '/v1/reports');
+    final maxKeyLength = path == '/v1/reports' ? 128 : 64;
+    if (needsKey &&
+        (idempotencyKey == null ||
+            idempotencyKey.length < 8 ||
+            idempotencyKey.length > maxKeyLength ||
+            !RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(idempotencyKey)))
+      throw const IdentityFailure(
+        'idempotency_key_required',
+        'يلزم مرجع ثابت لهذا الطلب؛ لم نرسل شيئًا.',
+      );
+    if (!needsKey && idempotencyKey != null)
+      throw ArgumentError('Idempotency header is not supported for this route');
     if (!authenticated)
       throw const IdentityFailure(
         'authenticated_required',
         'أكمل إثبات البريد وتسجيل الدخول أولًا.',
       );
     final epoch = _epoch;
-    final reply = await _send(method, path, epoch, body: body, session: _token);
+    final reply = await _send(
+      method,
+      path,
+      epoch,
+      body: body,
+      session: _token,
+      idempotencyKey: idempotencyKey,
+    );
     _current(epoch);
-    if (reply.status < 200 || reply.status >= 300) _reject(reply, epoch);
+    if (reply.status < 200 || reply.status >= 300)
+      _reject(reply, epoch, domainError: true);
     return reply.body;
   }
 

@@ -4,6 +4,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import '../app.dart' show Notice, Panel, Choice, ActionButton;
 import '../theme.dart';
 import 'client.dart';
+import 'matching_repository.dart';
+import 'matching_pane.dart';
 
 class IdentityApp extends StatefulWidget {
   const IdentityApp({super.key, required this.client});
@@ -85,9 +87,20 @@ class _IdentityJourneyState extends State<IdentityJourney> {
     'marital_statuses': ['single', 'divorced', 'widowed'],
   };
   int _generation = 0;
+  String section = 'profile';
+  IdentityMatchingRepository? _matching;
+  IdentityMatchingRepository get matching {
+    if (_matching == null || !_matching!.current) {
+      _matching?.close();
+      _matching = IdentityMatchingRepository(client);
+    }
+    return _matching!;
+  }
+
   @override
   void dispose() {
     _generation++;
+    _matching?.close();
     for (final field in [email, password, code]) {
       field.clear();
       field.dispose();
@@ -98,6 +111,9 @@ class _IdentityJourneyState extends State<IdentityJourney> {
   }
 
   void resetFields() {
+    section = 'profile';
+    _matching?.close();
+    _matching = null;
     for (final field in [email, password, code]) {
       field.clear();
     }
@@ -240,7 +256,11 @@ class _IdentityJourneyState extends State<IdentityJourney> {
     IdentityStage.signedOut =>
       creating ? 'إنشاء حساب اختبار' : 'تسجيل دخول الاختبار',
     IdentityStage.pendingVerification => 'بانتظار إثبات البريد',
-    IdentityStage.authenticated => 'حسابك وملفك الاختباري',
+    IdentityStage.authenticated => switch (section) {
+      'candidates' => 'ترشيحات الاختبار',
+      'requests' => 'طلبات التعارف',
+      _ => 'حسابك وملفك الاختباري',
+    },
   };
   Widget check(
     String id,
@@ -474,7 +494,64 @@ class _IdentityJourneyState extends State<IdentityJourney> {
     ),
     ...sessionActions(pending: true),
   ];
-  List<Widget> signedIn() {
+  void matchingSessionChanged() {
+    if (!mounted) return;
+    setState(() {
+      if (!client.authenticated || (_matching != null && !_matching!.current))
+        resetFields();
+    });
+  }
+
+  void changeSection(String value) {
+    setState(() {
+      section = value;
+      error = null;
+      notice = '';
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (scroll.hasClients) scroll.jumpTo(0);
+      heading.requestFocus();
+    });
+  }
+
+  List<Widget> signedIn() => [
+    Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: [
+        for (final item in const {
+          'profile': 'الملف',
+          'candidates': 'الترشيحات',
+          'requests': 'الطلبات',
+        }.entries)
+          Semantics(
+            selected: section == item.key,
+            child: ActionButton(
+              item.value,
+              'identity-section-${item.key}',
+              () => changeSection(item.key),
+              secondary: section != item.key,
+            ),
+          ),
+      ],
+    ),
+    const SizedBox(height: 16),
+    if (section == 'profile')
+      ...profileContent()
+    else
+      IdentityMatchingPane(
+        key: ValueKey('matching-${client.sessionGeneration}-$section'),
+        repository: matching,
+        view: section == 'candidates'
+            ? MatchingView.candidates
+            : MatchingView.requests,
+        onSessionChanged: matchingSessionChanged,
+        onRequestCreated: () => changeSection('requests'),
+      ),
+    ...sessionActions(pending: false),
+  ];
+  List<Widget> profileContent() {
     if (!profileLoaded)
       return [
         const Notice(
@@ -485,15 +562,34 @@ class _IdentityJourneyState extends State<IdentityJourney> {
           'identity-load-profile',
           () => run(hydrateProfile),
         ),
-        ...sessionActions(pending: false),
       ];
     return [
       const Notice(
         'أُثبت الوصول لبريد الاختبار فقط؛ ليس توثيق هوية قانونية أو عمر أو مفاتيح محادثة. لا تفعيل علاقات أو اشتراك أو قناة رسائل في هذا الوضع.',
       ),
       const Text(
-        'محرر محدود لبلد الملف والتفضيلات. للحساب الجديد عينة أنثى غير متزوجة؛ عند الدخول نحتفظ بالجنس والحالة والهدف المخزنة دون تغيير صامت.',
+        'محرر اختباري للجنس المعلن والبلد والتفضيلات. القيم المخزنة لا تتغير إلا باختيارك؛ الحالة الزوجية والهدف الحاليان محفوظان. البيانات إقرار اصطناعي وليست توثيقًا.',
       ),
+      DropdownButtonFormField<String>(
+        key: const Key('identity-gender'),
+        initialValue: profileData['gender'] as String,
+        isExpanded: true,
+        decoration: const InputDecoration(labelText: 'جنس الشخصية الاصطناعية'),
+        items: [
+          const DropdownMenuItem(value: 'female', child: Text('أنثى')),
+          const DropdownMenuItem(value: 'male', child: Text('ذكر')),
+          if (!['female', 'male'].contains(profileData['gender']))
+            DropdownMenuItem(
+              value: profileData['gender'] as String,
+              child: const Text('قيمة محفوظة غير معروفة'),
+            ),
+        ],
+        onChanged: (value) {
+          if (value != null)
+            setState(() => profileData = {...profileData, 'gender': value});
+        },
+      ),
+      const SizedBox(height: 16),
       DropdownButtonFormField<String>(
         key: const Key('identity-country'),
         initialValue: country,
@@ -580,7 +676,6 @@ class _IdentityJourneyState extends State<IdentityJourney> {
         () => run(client.refreshSession),
         secondary: true,
       ),
-      ...sessionActions(pending: false),
     ];
   }
 
@@ -588,7 +683,7 @@ class _IdentityJourneyState extends State<IdentityJourney> {
     if (assessment?['complete'] == true)
       return [
         const Notice(
-          'اكتملت أسئلة التأمل الذاتي من الخادم. ليست تشخيصًا أو درجة توافق. واجهة العلاقات غير موصولة بهذا الوضع بعد.',
+          'اكتملت أسئلة التأمل الذاتي من الخادم. ليست تشخيصًا أو درجة توافق. يمكنك فتح الترشيحات وإرسال طلب تعارف؛ تبقى المحادثة والتفعيل غير متاحين.',
         ),
       ];
     final question = assessment?['next_question'];
