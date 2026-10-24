@@ -1,10 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'transport.dart';
 
 /// Bounded, redirect-free native development transport. No credential logs.
 class NativeApiTransport implements ApiTransport {
+  NativeApiTransport({this.timeout = const Duration(seconds: 15)}) {
+    if (timeout <= Duration.zero || timeout > const Duration(seconds: 35)) {
+      throw ArgumentError('Bounded native timeout must be 1–35 seconds');
+    }
+  }
+  final Duration timeout;
   final Set<HttpClient> _active = {};
   bool _closed = false;
   @override
@@ -16,7 +23,8 @@ class NativeApiTransport implements ApiTransport {
   ) async {
     if (_closed) throw StateError('Transport closed');
     final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 10);
+      ..connectionTimeout = const Duration(seconds: 10)
+      ..findProxy = (_) => 'DIRECT';
     _active.add(client);
     Future<ApiResponse> perform() async {
       final request = await client.openUrl(method, uri);
@@ -37,7 +45,7 @@ class NativeApiTransport implements ApiTransport {
 
     try {
       return await perform().timeout(
-        const Duration(seconds: 15),
+        timeout,
         onTimeout: () {
           client.close(force: true);
           throw TimeoutException('Development request timeout');

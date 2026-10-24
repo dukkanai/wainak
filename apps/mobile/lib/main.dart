@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+
 import 'src/app.dart';
 import 'src/repository.dart';
 import 'src/theme.dart';
@@ -7,6 +8,8 @@ import 'src/connected_app.dart';
 import 'src/api/client.dart';
 import 'src/api/http_repository.dart';
 import 'src/api/native_factory.dart';
+import 'src/identity/client.dart';
+import 'src/identity/app.dart';
 
 void main() {
   const devEnabled = bool.fromEnvironment('WAINAK_DEV_MODE');
@@ -21,6 +24,23 @@ void main() {
   }
   if (mode == 'fake') {
     runApp(WainakApp(repository: DevJourneyRepository()));
+    return;
+  }
+  if (mode == 'identity') {
+    try {
+      final client = IdentityClient(
+        baseUri: Uri.parse(baseUrl),
+        transport: createNativeTransport(timeout: const Duration(seconds: 35)),
+      );
+      runApp(IdentityApp(client: client));
+    } catch (_) {
+      runApp(
+        const DisabledBuild(
+          message:
+              'وضع الهوية الاختباري يتطلب عنوان loopback صريحًا ومنصة أصلية. الويب غير مدعوم، ولم نتحول إلى بيانات وهمية.',
+        ),
+      );
+    }
     return;
   }
   if (mode == 'api') {
