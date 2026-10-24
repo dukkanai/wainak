@@ -11,6 +11,11 @@ automatically. A client never supplies its acting user ID: it is derived from th
 ephemeral bearer session. Fake email verification is explicitly `dev_email_verified`,
 never `identity_verified`.
 
+The default preview is volatile memory. An optional repository now persists the same
+synthetic domain in a uniquely named disposable PostgreSQL database; migrations never
+run at API startup. `/health.durable_storage` is a boolean reflecting the injected
+repository, not a claim of production readiness. No other DTO/state contract changes.
+
 ## Common conventions
 
 - JSON `snake_case`; opaque `usr_…`, `rel_…`, `rpt_…` identifiers.
@@ -117,7 +122,7 @@ storage, reviewer authorization and retention/deletion are implemented. The API
 rejects free text, screenshots, conversation bodies and unknown evidence fields.
 
 `DELETE /v1/me {confirmation:"DELETE"}` erases this synthetic account's private
-in-memory data/reports and invalidates its session immediately. Other participants
+repository data/reports and invalidates its session immediately. Other participants
 keep a minimal ended relationship with a null peer. This is not production deletion,
 legal retention policy, store-subscription cancellation, or a statement that a real
 marriage ended. No partner approval or payment is required.

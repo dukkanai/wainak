@@ -56,7 +56,8 @@ class DevelopmentApplication:
         if environ.get("QUERY_STRING"):
             fail(400, "query_not_supported", "This version does not accept query parameters.")
         if method == "GET" and path == "/health":
-            return 200, {"status": "ok", "mode": "synthetic_development_only", "durable_storage": False}
+            return 200, {"status": "ok", "mode": "synthetic_development_only",
+                         "durable_storage": self.service.repository.durable}
         data = self._body(environ) if method in ("POST", "PUT", "DELETE") else None
         if method == "POST" and path == "/v1/dev/accounts":
             return 201, self.service.register(data)

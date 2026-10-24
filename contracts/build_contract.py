@@ -88,7 +88,7 @@ def build():
         "Deleted": obj({"deleted": yes, "mode": mode, "notice": string}),
         "Cards": obj({"items": array(obj({"id": string, "title_ar": string, "prompt_ar": string, "options": array(string), "free": yes})),
                       "answers_transport": enum("not_implemented"), "server_stores_dialogue_answers": no}),
-        "Health": obj({"status": enum("ok"), "mode": mode, "durable_storage": no}),
+        "Health": obj({"status": enum("ok"), "mode": mode, "durable_storage": boolean}),
     }
     paths = {}
     def route(method, path, operation, response, request=None, status=200, public=False, parameters=()):
@@ -134,7 +134,7 @@ def build():
     route("POST", "/v1/blocks", "block_account_without_payment", "Blocked", "Block")
     route("POST", "/v1/reports", "record_metadata_only_development_report", "ReportReceipt", "Report", status=201)
     return {"openapi": "3.1.0", "info": {"title": "Wainak phase-one synthetic development contract", "version": "0.1.0-dev",
-            "description": "NOT PRODUCTION. Loopback only; volatile memory; synthetic @example.invalid accounts; no real email, authentication, payments, chat transport, medical data, moderation team, evidence upload, or durable deletion pipeline. Current permissions override stale UI state. Unknown fields are rejected. JSON body limit: 16384 bytes. No query parameters or browser Origin headers."},
+            "description": "NOT PRODUCTION. Loopback only; default volatile memory, optional marked disposable PostgreSQL repository; synthetic @example.invalid accounts; no real email, authentication, payments, chat transport, medical data, moderation team, evidence upload, or production deletion pipeline. Current permissions override stale UI state. Unknown fields are rejected. JSON body limit: 16384 bytes. No query parameters or browser Origin headers."},
             "servers": [{"url": "http://127.0.0.1:8089", "description": "Manual loopback-only preview, never auto-started"}],
             "security": [{"developmentBearer": []}], "paths": paths,
             "components": {"securitySchemes": {"developmentBearer": {"type": "http", "scheme": "bearer",

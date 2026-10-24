@@ -2,8 +2,10 @@
 
 **Synthetic development only. Do not use real personal data or expose this server.**
 
-Python 3.11+ standard library; no package installation, mail provider, external API,
-database connection, payment service or persistent credential is required. Server
+The default Python 3.11+ memory mode uses only the standard library; no package
+installation, mail provider, external API, database connection, payment service or
+persistent credential is required. The optional PostgreSQL test adapter below is
+separate and explicitly opt-in. Server
 checks were performed on Python 3.14.4. The domain rules and JSON contract are the
 deliverable; WSGI is only a bounded local preview adapter, not a production server.
 
@@ -29,7 +31,24 @@ It binds **127.0.0.1 only**, rejects untrusted Host and any browser Origin, disa
 access logs and returns `Cache-Control: no-store`. It has no production mode,
 cross-origin API, reverse-proxy configuration, container, systemd service or startup
 integration. It is not started automatically by tests or installation. Stopping
-the process loses every synthetic account and session.
+the process loses every synthetic account and session in this default memory mode.
+
+## Optional disposable PostgreSQL verification
+
+[`integration/README.md`](integration/README.md) describes the opt-in repository,
+pinned driver and harness. `repository.py` defines the transaction seam;
+`postgres.py` persists normalized synthetic records; `migrations.py` contains the
+explicit initial migration artifact. Nothing migrates or connects at API startup.
+
+The harness creates its own uniquely named PostgreSQL container/database using an
+already-present pinned official image, a temporary Unix socket and temporary secret.
+It publishes no ports, has no network and removes only its labeled container/volume
+and temporary directory. It **does not accept a DSN or existing database**.
+
+The first real PostgreSQL run passed all 12 integration tests on PostgreSQL 17.11,
+including an actual container restart and an independent-process exclusivity race.
+That establishes isolated persistence, not deployment to the project's existing DB.
+The final commit's independent QA evidence remains the acceptance reference.
 
 ## Read before integrating
 

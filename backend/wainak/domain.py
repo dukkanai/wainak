@@ -1,8 +1,8 @@
-"""Pure, isolated domain slice. Never connect this in-memory store to real users.
+"""Isolated synthetic domain slice. Never connect this development API to real users.
 
-All reads and writes are serialized under one lock, including eligibility checks.
-This is a test oracle for a future transactional PostgreSQL adapter, not durable
-storage and not a claim that database concurrency has been verified.
+All reads and writes use one repository transaction, including eligibility checks.
+The default repository is volatile memory. An optional PostgreSQL adapter is limited
+to explicitly marked disposable databases; it is not production infrastructure.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ import threading
 import uuid
 from datetime import date, datetime, timezone
 from functools import wraps
+
+from .repository import MemoryRepository
 
 POLICY_VERSION = "dev-2026-10-24"
 MARITAL = {"single", "married", "divorced", "widowed"}
@@ -69,17 +71,30 @@ def locked(method):
     @wraps(method)
     def wrapped(self, *args, **kwargs):
         with self._lock:
-            # Callers cannot mutate stored data through returned nested objects.
-            return copy.deepcopy(method(self, *args, **kwargs))
+            if self._transaction_depth:
+                return copy.deepcopy(method(self, *args, **kwargs))
+            with self.repository.transaction() as state:
+                for name in state.__dataclass_fields__:
+                    setattr(self, name, getattr(state, name))
+                self._transaction_depth = 1
+                try:
+                    result = copy.deepcopy(method(self, *args, **kwargs))
+                    for name in state.__dataclass_fields__:
+                        setattr(state, name, getattr(self, name))
+                finally:
+                    self._transaction_depth = 0
+            return result
     return wrapped
 
 
 class DevelopmentService:
-    """Synthetic accounts only. Instances own independent, ephemeral state."""
+    """Synthetic accounts only, with explicit transactional repository injection."""
 
-    def __init__(self, today=None):
+    def __init__(self, today=None, repository=None):
         self.today = today or date.today
         self._lock = threading.RLock()
+        self._transaction_depth = 0
+        self.repository = repository or MemoryRepository()
         self.accounts = {}
         self.sessions = {}
         self.relationships = {}
@@ -498,7 +513,7 @@ class DevelopmentService:
         account.clear()
         account.update({"id": actor, "deleted": True, "exclusive_relationship_id": None})
         return {"deleted": True, "mode": "synthetic_development_only",
-                "notice": "In-memory profile/session erased. This does not change a real marital status or cancel a store subscription."}
+                "notice": "Synthetic profile/session erased from this repository. This does not change a real marital status or cancel a store subscription."}
 
     @locked
     def content(self, actor, identifier):
