@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source:
+    name: Source checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Check published file boundaries and known secret patterns
+        run: python3 scripts/check_publication.py
+      - name: Check Python syntax
+        run: python3 -m compileall -q ops scripts prototype/package_preview.py
+      - name: Check JavaScript syntax
+        run: node --check prototype/dist/app.js
+
+  unit:
+    name: Operations unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - run: python3 -m unittest discover -s ops -p test_manage.py -v
+
+  recovery:
+    name: Isolated database recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Restore synthetic data in a disposable Docker project
+        run: python3 ops/test_recovery.py
+
+  browser:
+    name: Prototype browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Install locked test dependencies
+        working-directory: prototype
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Package the offline preview
+        run: python3 prototype/package_preview.py
+      - name: Test the delivered HTML and accessibility samples
+        working-directory: prototype
+        env:
+          WAINAK_PREVIEW_URL: file://${{ github.workspace }}/prototype/releases/wainak-preview.html
+          WAINAK_CHROME: /usr/bin/google-chrome
+        run: npm test

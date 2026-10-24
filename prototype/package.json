@@ -1,0 +1,15 @@
+{
+  "name": "wainak-prototype-review",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local browser QA for the synthetic Wainak prototype; no production backend.",
+  "scripts": {
+    "test": "node qa/browser.mjs",
+    "package": "python3 package_preview.py"
+  },
+  "devDependencies": {
+    "axe-core": "4.14.0",
+    "playwright-core": "1.64.1"
+  }
+}

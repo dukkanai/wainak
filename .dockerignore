@@ -1,0 +1,9 @@
+.runtime
+backups
+.git
+__pycache__
+.env
+.env.*
+node_modules
+prototype/qa/results
+prototype/releases

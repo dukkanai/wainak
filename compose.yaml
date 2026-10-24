@@ -1,0 +1,59 @@
+name: wainak
+
+services:
+  db:
+    # PostgreSQL 17; deliberately pinned for reproducible migration.
+    image: postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wainak
+      POSTGRES_USER: wainak_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    secrets:
+      - db_password
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - database
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - max_connections=50
+      - -c
+      - log_statement=none
+      - -c
+      - log_min_error_statement=panic
+      - -c
+      - log_parameter_max_length_on_error=0
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 150
+    shm_size: 128m
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    stop_grace_period: 60s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+
+networks:
+  database:
+    internal: true
+
+volumes:
+  db_data:
+
+secrets:
+  db_password:
+    file: ./.runtime/db_password
