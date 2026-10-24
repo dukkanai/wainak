@@ -25,6 +25,9 @@ Future<void> main(List<String> args) async {
   var successful = false;
   try {
     bridge = await IdentityFixtureBridge.start();
+    stdout.writeln(
+      'TEST_FIXTURE_PROVENANCE ' + jsonEncode(bridge.testProvenance),
+    );
     first = IdentityClient(
       baseUri: bridge.baseUri,
       transport: NativeApiTransport(timeout: const Duration(seconds: 35)),

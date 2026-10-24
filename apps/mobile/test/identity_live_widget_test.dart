@@ -107,6 +107,9 @@ void main() {
         if (bridge == null)
           fail('Owned identity fixture failed before readiness');
         final active = bridge;
+        debugPrint(
+          'TEST_FIXTURE_PROVENANCE ' + jsonEncode(active.testProvenance),
+        );
         client = IdentityClient(
           baseUri: active.baseUri,
           transport: NativeApiTransport(timeout: const Duration(seconds: 35)),
