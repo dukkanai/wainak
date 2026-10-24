@@ -36,37 +36,40 @@ void main() {
     'candidate request is explicit outgoing and never recipient acceptance',
     (t) async {
       final handle = t.ensureSemantics();
-      addTearDown(handle.dispose);
-      final f = MatchingFixture();
-      await openMatch(t, f);
-      final labeled = find.bySemanticsLabel(
-        'طلب تعارف مع طرف اختبار، الترشيح 1',
-      );
-      expect(labeled, findsOneWidget);
-      expect(t.getSize(labeled).height >= 48, isTrue);
-      await tapMatch(t, 'matching-request-${f.targetId}');
-      await tapMatch(t, 'matching-dialog-cancel');
-      expect(f.requestCreates, 0);
-      await tapMatch(t, 'matching-request-${f.targetId}');
-      await tapMatch(t, 'matching-dialog-confirm');
-      expect(f.requestCreates, 1);
-      expect(find.text('طلب صادر'), findsOneWidget);
-      expect(
-        find.byKey(const Key('matching-cancel-$relationId')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('matching-accept-$relationId')),
-        findsNothing,
-      );
-      expect(
-        f.matchingCalls.any(
-          (v) =>
-              (v['path'] as String).contains('/activate') ||
-              (v['path'] as String).contains('/cards'),
-        ),
-        isFalse,
-      );
+      try {
+        final f = MatchingFixture();
+        await openMatch(t, f);
+        final labeled = find.bySemanticsLabel(
+          'طلب تعارف مع طرف اختبار، الترشيح 1',
+        );
+        expect(labeled, findsOneWidget);
+        expect(t.getSize(labeled).height >= 48, isTrue);
+        await tapMatch(t, 'matching-request-${f.targetId}');
+        await tapMatch(t, 'matching-dialog-cancel');
+        expect(f.requestCreates, 0);
+        await tapMatch(t, 'matching-request-${f.targetId}');
+        await tapMatch(t, 'matching-dialog-confirm');
+        expect(f.requestCreates, 1);
+        expect(find.text('طلب صادر'), findsOneWidget);
+        expect(
+          find.byKey(const Key('matching-cancel-$relationId')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('matching-accept-$relationId')),
+          findsNothing,
+        );
+        expect(
+          f.matchingCalls.any(
+            (v) =>
+                (v['path'] as String).contains('/activate') ||
+                (v['path'] as String).contains('/cards'),
+          ),
+          isFalse,
+        );
+      } finally {
+        handle.dispose();
+      }
     },
   );
   testWidgets(
