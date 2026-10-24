@@ -1,8 +1,9 @@
-# Identity API 0.2.1-sandbox — native and local deletion contract
+# Identity API 0.3.0-sandbox — native and local deletion contract
 
 This is a separate sandbox adapter, not a replacement for phase1.openapi.json.
 Only the disposable test harness configures it. There is no persistent server,
-real mailbox, Flutter auth adapter or production deployment. The additive local
+real mailbox or production deployment. A separately tested native Flutter auth
+adapter exists; the phase3 matching extension is described in `phase3-matching.md`. The additive local
 web deletion surface is described in `../docs/phase2-deletion-web.md`.
 
 ## Transport and errors
@@ -89,7 +90,9 @@ labels; a successful email proof comes from the framework flow, not a client fla
   than recreating it. Report receipts contain metadata only; no D25 upload.
 - Relationship request keys keep the phase1 8–64-character contract.
 - Current persisted policy acceptance is checked before profile/preferences/
-  assessment/candidate actions and matching relationship mutations. Reading
+  assessment/candidate actions and positive matching relationship mutations. Strict
+recipient decline, cancellation and termination remain safety actions without
+requiring renewed consent; see the exact phase3 payload/path rules. Reading
 relationship lists/details remains available for safety/termination; cards and
 communication permissions still fail closed from current eligibility. Missing/stale consent gives403
   `consent_required`. Re-consent UI is not implemented. Safety, termination and
@@ -122,6 +125,8 @@ through the boundary, invalid after it); reset links likewise use the framework'
 600-second timeout. Session idle30min/absolute24h and reauth5min fail at the exact
 boundary. Restart tests preserve harness-parent keys in RAM, not production KMS.
 
-Auth client UI and mobile secure token storage are not part of this backend-only
-milestone. Existing Flutter phase1 dev bearer clients cannot silently switch to
-this API: an explicit future adapter/onboarding change is required.
+The native identity client/UI was tested separately and integrated in phase2;
+tokens remain in memory, not production mobile secure storage. The separate legacy
+phase1 Bearer mode must not silently switch to this framework-session API. Phase3
+adds auth-backed matching views and current-state direction/action hints; its
+acceptance requires the exact phase3 backend/mobile test evidence.
