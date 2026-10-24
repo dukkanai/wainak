@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'src/app.dart';
@@ -10,6 +11,8 @@ import 'src/api/http_repository.dart';
 import 'src/api/native_factory.dart';
 import 'src/identity/client.dart';
 import 'src/identity/app.dart';
+import 'src/local_cards/app.dart';
+import 'src/local_cards/controller.dart' show localCardsModeAllowed;
 
 void main() {
   const devEnabled = bool.fromEnvironment('WAINAK_DEV_MODE');
@@ -20,6 +23,22 @@ void main() {
   const baseUrl = String.fromEnvironment('WAINAK_API_BASE_URL');
   if (!devEnabled) {
     runApp(const DisabledBuild());
+    return;
+  }
+  if (mode == 'local_cards') {
+    if (localCardsModeAllowed(
+      developmentEnabled: devEnabled,
+      releaseMode: kReleaseMode,
+      mode: mode,
+    )) {
+      runApp(const LocalCardsApp());
+    } else {
+      runApp(
+        const DisabledBuild(
+          message: 'معاينة البطاقات المحلية متاحة للتطوير فقط، وليست مفعّلة في إصدار النشر.',
+        ),
+      );
+    }
     return;
   }
   if (mode == 'fake') {
@@ -36,8 +55,7 @@ void main() {
     } catch (_) {
       runApp(
         const DisabledBuild(
-          message:
-              'وضع الهوية الاختباري يتطلب عنوان loopback صريحًا ومنصة أصلية. الويب غير مدعوم، ولم نتحول إلى بيانات وهمية.',
+          message: 'وضع الهوية الاختباري يتطلب عنوان loopback صريحًا ومنصة أصلية. الويب غير مدعوم، ولم نتحول إلى بيانات وهمية.',
         ),
       );
     }
@@ -58,8 +76,7 @@ void main() {
     } catch (_) {
       runApp(
         const DisabledBuild(
-          message:
-              'تعذر تهيئة اتصال التطوير. يلزم عنوان loopback صريح ومنصة أصلية؛ الويب غير مدعوم لهذا الوضع. لم نتحول إلى بيانات وهمية بصمت.',
+          message: 'تعذر تهيئة اتصال التطوير. يلزم عنوان loopback صريح ومنصة أصلية؛ الويب غير مدعوم لهذا الوضع. لم نتحول إلى بيانات وهمية بصمت.',
         ),
       );
       return;
@@ -72,8 +89,7 @@ void main() {
 class DisabledBuild extends StatelessWidget {
   const DisabledBuild({
     super.key,
-    this.message =
-        'وينك قيد التطوير. الخدمات الفعلية غير متصلة. هذه النسخة لا تنشئ حسابًا ولا ترسل بيانات.',
+    this.message = 'وينك قيد التطوير. الخدمات الفعلية غير متصلة. هذه النسخة لا تنشئ حسابًا ولا ترسل بيانات.',
   });
   final String message;
   @override
