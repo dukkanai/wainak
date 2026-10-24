@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 enum RelationshipState {
@@ -5,6 +6,8 @@ enum RelationshipState {
   requested,
   acceptedPendingActivation,
   activeCards,
+  exclusiveCards,
+  frozen,
   declined,
   cancelled,
   ended,
@@ -16,9 +19,38 @@ class JourneyFailure implements Exception {
   final String message;
 }
 
-/// Development-only, synchronous seam. A future API adapter must enforce all
+/// Async-capable repository seam. The backend must enforce all
 /// eligibility, authorization and transitions on the server, not trust this UI.
 abstract class JourneyRepository extends ChangeNotifier {
+  bool get isRemote => false;
+  bool get incomingRequest => false;
+  bool get canActivate =>
+      !incomingRequest &&
+      relationship == RelationshipState.acceptedPendingActivation;
+  FutureOr<void> respondToIncoming(bool accept) =>
+      throw const JourneyFailure('لا يوجد طلب وارد متاح.');
+  bool get canReport => hasCandidate || relationship != RelationshipState.none;
+  bool get emailVerified => registered;
+  bool get hasCandidate => profileSaved;
+  String get candidateName => 'عمر · ملف اصطناعي';
+  String get candidateDetails => '32 سنة · السعودية · غير متزوج';
+  String get assessmentPrompt => 'اختر أولوية لتبدأ بها.';
+  List<String> get assessmentOptions => [
+    'القيم والأهداف',
+    'الأسرة والحدود',
+    'التواصل وحل الخلاف',
+  ];
+  String labelForOption(String option) => option;
+  String get dialoguePrompt => 'كيف تفضلان مناقشة اختلاف مهم؟';
+  List<String> get dialogueOptions => [
+    'نحدد وقتًا هادئًا للحوار',
+    'أحتاج وقتًا للتفكير أولًا',
+    'نستعين بشخص موثوق عند الحاجة',
+  ];
+  bool get dialogueTransportAvailable => !isRemote;
+  FutureOr<void> verifyDevelopmentEmail() {}
+  FutureOr<void> refreshCandidate() {}
+  FutureOr<void> refreshRelationship() {}
   bool get registered;
   bool get profileSaved;
   bool get assessmentSaved;
@@ -29,25 +61,31 @@ abstract class JourneyRepository extends ChangeNotifier {
   String? get answer;
   bool get answerPending;
   int get reports;
-  void register({
+  FutureOr<void> register({
     required int age,
     required bool adult,
     required bool muslim,
     required bool terms,
     required bool privacy,
   });
-  void saveProfile({required String country, required String goal});
-  void saveAssessment(String priority);
-  void requestRelationship();
-  void simulateDecision({required bool accepted});
-  void simulateActivation();
-  void cancelRequest();
-  void sendAnswer(String answer);
-  void retryAnswer();
-  void setOnline(bool value);
-  void block();
-  void report(String reason);
-  void deleteDemoAccount();
+  FutureOr<void> saveProfile({
+    required String country,
+    required String goal,
+    required bool discoverable,
+    int minAge = 18,
+    int maxAge = 60,
+  });
+  FutureOr<void> saveAssessment(String priority);
+  FutureOr<void> requestRelationship();
+  FutureOr<void> simulateDecision({required bool accepted});
+  FutureOr<void> simulateActivation();
+  FutureOr<void> cancelRequest();
+  FutureOr<void> sendAnswer(String answer);
+  FutureOr<void> retryAnswer();
+  FutureOr<void> setOnline(bool value);
+  FutureOr<void> block();
+  FutureOr<void> report(String reason);
+  FutureOr<void> deleteDemoAccount();
 }
 
 class DevJourneyRepository extends JourneyRepository {
@@ -71,6 +109,11 @@ class DevJourneyRepository extends JourneyRepository {
   bool answerPending = false;
   @override
   int reports = 0;
+  bool discoverable = false;
+  int minAge = 18, maxAge = 60;
+  @override
+  bool get hasCandidate =>
+      profileSaved && discoverable && minAge <= 32 && maxAge >= 32;
   String? country;
   String? goal;
   String? priority;
@@ -102,9 +145,22 @@ class DevJourneyRepository extends JourneyRepository {
   }
 
   @override
-  void saveProfile({required String country, required String goal}) {
+  void saveProfile({
+    required String country,
+    required String goal,
+    required bool discoverable,
+    int minAge = 18,
+    int maxAge = 60,
+  }) {
     _require(registered, 'ابدأ بإقرارات الأهلية.');
     _require(country.isNotEmpty && goal.isNotEmpty, 'اختر البلد والهدف.');
+    _require(
+      minAge >= 18 && maxAge >= minAge && maxAge <= 120,
+      'راجع حدود العمر المفضلة.',
+    );
+    this.discoverable = discoverable;
+    this.minAge = minAge;
+    this.maxAge = maxAge;
     this.country = country;
     this.goal = goal;
     profileSaved = true;
@@ -123,6 +179,7 @@ class DevJourneyRepository extends JourneyRepository {
   @override
   void requestRelationship() {
     _require(assessmentSaved, 'أكمل خطوة فهم الاحتياج.');
+    _require(hasCandidate, 'لا يوجد مرشح متاح لهذه التفضيلات.');
     _require(
       relationship == RelationshipState.none,
       'هذا الطلب غير متاح في الحالة الحالية.',
@@ -223,6 +280,9 @@ class DevJourneyRepository extends JourneyRepository {
     assessmentSaved = false;
     online = true;
     age = 29;
+    discoverable = false;
+    minAge = 18;
+    maxAge = 60;
     relationship = RelationshipState.none;
     answer = null;
     answerPending = false;

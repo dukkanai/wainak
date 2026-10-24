@@ -44,6 +44,8 @@ Map<String, dynamic> relation({
   bool nullPeer = false,
 }) => {
   'id': relId,
+  'initiator_id': userId,
+  'recipient_id': 'usr_22222222222222222222222222222222',
   'status': status,
   'peer': nullPeer ? null : candidate(),
   'activation_mode': 'development_simulation_only',

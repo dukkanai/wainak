@@ -1,45 +1,59 @@
 # Wainak mobile — phase 1 development slice
 
-Arabic/RTL Flutter foundation for Android and iOS, plus a **local-review web target**. This is not a store-ready app. Native application identifiers are deliberately `invalid.example.wainak` placeholders, not a confirmed publisher identity. No deployment or distribution is authorized by this directory.
+Arabic/RTL Flutter foundation for Android and iOS, with a local-review web target. Development only, not a store-ready application. App identifiers remain `invalid.example.wainak`; no production deployment, purchase or identity verification is configured.
 
-## Explicit development gate
+## Explicit modes — no silent fallback
 
-Without `--dart-define=WAINAK_DEV_MODE=true`, the entry point is inert and explains that real services are not connected. The flag enables a clearly labelled, memory-only synthetic journey. There is **no production authentication, connected UI networking, real purchase, image/identity reveal, persistence, analytics, notification service or live moderation** in this slice. A new repository/process starts empty; browser refresh and app restart discard its data.
+Without `--dart-define=WAINAK_DEV_MODE=true`, the entry point is inert.
 
-Do not enter personal information. The persona is synthetic. Ages 17/18/29/45 permit eligibility boundary review, not production age verification. The profile is female, unmarried, and limited to a small sample of countries; it is not the complete profile/preference model or global launch scope.
+- `WAINAK_REPOSITORY=fake` (default): offline in-memory synthetic journey, one reflection/card, local peer/activation simulation. No server or administrator receives its actions. Data disappears when the repository/process ends.
+- `WAINAK_REPOSITORY=api`: `ConnectedWainakApp` → `JourneyRepository` → `HttpJourneyRepository` → `WainakApiClient` → `NativeApiTransport`. Requires explicit `WAINAK_API_BASE_URL` with loopback hostname `127.0.0.1`, `localhost` or `::1`. The app refuses other origins in this phase. Unsupported configurations and web API mode fail closed; they never substitute fake data.
 
-## Run and check
-
-Use the Flutter stable SDK recorded in the verification report. From `apps/mobile`:
+Native development example (requires a suitable device/desktop target whose loopback reaches the separately authorized development backend):
 
 ```sh
-flutter pub get
-dart format --output=none --set-exit-if-changed lib test
-flutter analyze
-flutter test --concurrency=1
-flutter run --dart-define=WAINAK_DEV_MODE=true
-# Compile only, not deploy:
-flutter build web --no-web-resources-cdn --dart-define=WAINAK_DEV_MODE=true
+flutter run --dart-define=WAINAK_DEV_MODE=true \
+  --dart-define=WAINAK_REPOSITORY=api \
+  --dart-define=WAINAK_API_BASE_URL=http://127.0.0.1:8089
 ```
 
-An installed Android SDK is required for Android device/build validation. iOS build, signing and VoiceOver testing require a Mac/Xcode and a suitable device. Linux widget tests do not replace those checks. NVDA web review is also independent of widget semantics assertions.
+No server is started by the app. No token is embedded or persisted. An Android emulator's localhost is not the host computer; this example does not configure networking or expose ports. Web has no API transport implementation.
 
-## Repository seam and states
+## Connected development journey
 
-`JourneyRepository` in `lib/src/repository.dart` isolates the UI from `DevJourneyRepository`. The mock must **never** become a trusted authorization source. Backend authorization, idempotency, age checks and privacy projection remain server responsibilities.
+Declarations (18+, Muslim, terms and privacy) → generated `@example.invalid` account → explicit development email-verification simulation → synthetic female/unmarried profile, sample country, preferred age range and opt-in discoverability → three adaptive backend reflection questions → actual eligible candidate projection → outgoing request or incoming accept/decline → independent initiator activation simulation → backend card catalogue.
 
-Development flow: eligibility declarations → sample profile → one self-reflection question (no psychological score) → synthetic candidate → `requested` → `acceptedPendingActivation` → separate simulated activation → `activeCards`.
+Acceptance must come from the recipient's independent session. The sender cannot simulate their decision in API mode. The recipient waits/refreshes for initiator activation. Changing preferences or navigating back cannot retarget an existing relationship's report/block actions to a different candidate.
 
-Decline/cancellation do not open a conversation. Selection is separate from sending. Going online does not automatically claim delivery. Blocking disables further sends and deletes pending outbound answers. Reporting is separate and available before activation and after block. It records a local counter only. D25 evidence preview, explicit consent, upload, retention, moderation and appeal workflows are **not implemented**; no chat evidence is attached.
+The current backend **does not implement exchange/storage of dialogue answers**. API mode therefore has no send button and labels selected card answers as local previews, never delivered messages. Photo/identity disclosure remains unavailable, regardless of acceptance or activation. No purchase occurs.
 
-Account deletion clears this mock session, not server data or store subscriptions. Terms/privacy shown here are a development explanation, not final legal documents.
+Report and block are independent and free, including a known target after block. API reports are metadata recorded in a development backend, not evidence uploads or notifications to a live moderation team. Deletion calls the backend, invalidates the session and clears declarations before new registration; it does not cancel store subscriptions or imply a marriage ended.
 
-## UI guarantees to verify, not infer
+Do not enter personal information. The sample female/single profile and three countries are not the complete global product. Terms/privacy are development explanations, not approved legal documents. Backend authorization remains authoritative; UI guards never replace it.
 
-Noto Sans Arabic is bundled with its OFL license from the existing prototype. Theme tokens use 18 logical pixel body text, 16 helper text, minimum 48 interaction targets and distinct light/dark colors. Text scaling is not clamped. Layout is scrollable, with directional alignment and framework Arabic localizations. The tests cover a 320-wide view at 200% scaling, errors, repeated navigation, offline delivery, cancellation, block/report and deletion. No test result should be claimed until it is recorded against the actual commit.
+## Transport and interruption handling
 
-Still required before release: real API integration and concurrency tests, approved policies and age assurance, store-specific billing/restore flows, account deletion web resource, production report operations, platform screen-reader trials, keyboard focus review, full contrast-state review, and independent security review of the exact integrated build.
+Tokens live only in the API client. Session epochs reject stale registration/401/delete responses. Busy screens suppress double actions; close disposes the client, while network uncertainty is shown without automatic retries or fabricated receipts. Relationship creation reuses its request idempotency key. Native requests use UTF-8 byte Content-Length, disallow redirects, cap responses at 64 KiB, and have a total 15-second deadline. Each request's client is closed on completion/timeout. HTTP 401 returns to unchecked declarations.
 
-## API contract preparation (not UI integration)
+## Checks and accessibility
 
-`lib/src/api/client.dart` and `transport_io.dart` provide an explicit native-development HTTP client for the backend phase-one contract. They are not instantiated by the app entry point and do not replace the fake screen repository. The client keeps tokens in memory, sends idempotency keys for relationship creation, clears sessions on HTTP 401, does not follow redirects or automatically retry, and rejects unsupported media/identity permissions. Its injected-transport tests are not a live backend integration test. Web has no transport implementation. Connect the UI only after replacing synchronous mock actions with loading/error/stale-state handling and validating real contract scenarios.
+```sh
+flutter pub get --offline
+dart format --output=none --set-exit-if-changed lib test
+flutter analyze --no-pub
+flutter test --no-pub --concurrency=1
+# Opt-in real native HTTP integration; launches and cleans a 127.0.0.1 ephemeral server:
+WAINAK_BACKEND_ROOT=/absolute/authorized/backend-checkout \
+  flutter test --no-pub --concurrency=1 test/native_backend_integration_test.dart
+```
+
+The native integration test is skipped unless explicitly supplied an authorized checkout or an authorized loopback fixture URL. It creates two synthetic sessions, exercises actual adaptive questions/request/recipient acceptance/activation/cards/report/block/delete, and terminates the temporary memory-only WSGI server in finally. It does not exercise the optional PostgreSQL adapter.
+
+Noto Sans Arabic/OFL is bundled. Light/dark tokens use body 18, helpers 16 and targets at least 48 logical pixels. Text scale is not clamped; layouts scroll with Arabic framework localizations. Tests include 320-wide / 200% text and cancellation/repeated/late-response flows. See `VERIFICATION.md` for exact executed results and cold-build memory limitations; source test presence alone is not proof of a pass.
+
+Not yet validated: Android APK/device (SDK/Java absent), iOS (Mac/Xcode absent), VoiceOver/TalkBack/NVDA, manual visual review or store acceptance. Not implemented: production authentication/age assurance, real email, billing/restoration, dialogue transport, media/disclosure, complete exclusivity/marriage UI, evidence retention/moderation, durable mobile sessions or production security operations. Independent exact-build security and accessibility review remain release blockers.
+
+
+## Disposable persistence integration fixture
+
+The optional reviewed backend harness may set WAINAK_TEST_BASE_URL and WAINAK_TEST_CONTROL_DIR instead of WAINAK_BACKEND_ROOT. The native test does not start/own that server. It checks the exact loopback origin, retains tokens only in memory and uses constant active/blocked marker files to coordinate two harness-owned server/DB restarts. The harness must create a fresh private directory and remove all temporary resources in finally. No administrative restart endpoint is added to the API. Results must be recorded separately from the already executed memory-backend journey.

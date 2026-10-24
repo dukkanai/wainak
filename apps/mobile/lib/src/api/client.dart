@@ -38,8 +38,18 @@ class CandidateDto {
 }
 
 class RelationshipDto {
+  /// Clear peer projection after acknowledged block, without a second request.
+  RelationshipDto.blocked(RelationshipDto source)
+    : id = source.id,
+      initiatorId = source.initiatorId,
+      recipientId = source.recipientId,
+      status = 'blocked',
+      peer = null,
+      canSendCards = false;
   RelationshipDto.fromJson(Map<String, dynamic> json)
     : id = json['id'] as String,
+      initiatorId = json['initiator_id'] as String,
+      recipientId = json['recipient_id'] as String,
       status = json['status'] as String,
       peer = json['peer'] == null
           ? null
@@ -48,7 +58,18 @@ class RelationshipDto {
           (json['permissions'] as Map<String, dynamic>)['can_send_cards'] ==
           true {
     final p = json['permissions'] as Map<String, dynamic>;
-    if (p['can_send_text'] != false ||
+    if (![
+          'requested',
+          'accepted_pending_activation',
+          'active_cards',
+          'exclusive_cards',
+          'frozen',
+          'declined',
+          'cancelled',
+          'ended',
+          'blocked',
+        ].contains(status) ||
+        p['can_send_text'] != false ||
         p['can_send_media'] != false ||
         p['can_disclose_identity'] != false ||
         json['activation_mode'] != 'development_simulation_only' ||
@@ -58,12 +79,12 @@ class RelationshipDto {
       throw const FormatException('Unsupported relationship permissions');
     }
   }
-  final String id, status;
+  final String id, status, initiatorId, recipientId;
   final CandidateDto? peer;
   final bool canSendCards;
 }
 
-/// Phase-one contract client, not yet wired to the synthetic screen repository.
+/// Phase-one contract client used by the explicit native development repository.
 /// Tokens exist only in this object; no automatic retries, persistence or logging.
 class WainakApiClient {
   WainakApiClient({required this.baseUri, required this.transport}) {
@@ -237,6 +258,8 @@ class WainakApiClient {
     '/v1/me/assessment/answers',
     body: {'question_id': questionId, 'option_id': optionId},
   );
+  Future<Map<String, dynamic>> relationships() =>
+      _request('GET', '/v1/relationships');
   Future<Map<String, dynamic>> candidates() =>
       _request('GET', '/v1/candidates');
   Future<RelationshipDto> requestRelationship(
@@ -267,6 +290,11 @@ class WainakApiClient {
           body: {'decision': accept ? 'accept' : 'decline'},
         ),
       );
+  Future<RelationshipDto> cancelRelationship(String id) async =>
+      RelationshipDto.fromJson(
+        await _request('POST', '/v1/relationships/${_id(id, 'rel')}/cancel'),
+      );
+
   Future<RelationshipDto> activateSimulation(String id) async =>
       RelationshipDto.fromJson(
         await _request(

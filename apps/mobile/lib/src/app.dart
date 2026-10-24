@@ -348,7 +348,8 @@ class _JourneyState extends State<Journey> {
       'حفظ ومتابعة',
       'save-profile',
       () => act(
-        () => repo.saveProfile(country: country, goal: goal),
+        () =>
+            repo.saveProfile(country: country, goal: goal, discoverable: true),
         next: JourneyPage.assessment,
       ),
     ),
@@ -460,6 +461,12 @@ class _JourneyState extends State<Journey> {
     ],
     RelationshipState.cancelled => [
       const Notice('أُلغي طلب التعارف. لا يوجد حوار مفتوح.'),
+    ],
+    RelationshipState.exclusiveCards => [
+      const Notice('حصرية مستقلة؛ لا كشف للصورة أو الهوية.'),
+    ],
+    RelationshipState.frozen => [
+      const Notice('العلاقة مجمدة ولا تسمح بإرسال البطاقات.'),
     ],
     RelationshipState.ended => [const Notice('انتهى التعارف.')],
     RelationshipState.blocked => [

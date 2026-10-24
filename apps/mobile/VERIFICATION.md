@@ -1,58 +1,60 @@
-# Mobile foundation verification — 2026-10-24
+# Mobile development verification — 2026-10-24
 
-## Scope and exact state
+## Exact scope
 
-The handoff identifies the final Git commit; rerun commands below against that commit. This is a development foundation, not store/release acceptance. Only apps/mobile and docs/mobile-design-tokens.md are owned by this slice; main, the existing HTML prototype, database and live services were not modified.
+Branch: dev/phase1-mobile-api-20261024. The handoff records the final commit.
+Base: 67434304e5c8a7134f3397fee5e8db332dfea87c, preserved clean in mobile-phase1.
+Native memory-backend checkout tested: 944e8b9a13275809c8fd0caa007056edf95c5533.
+Only apps/mobile changed in this integration delta; main, prototype, live databases and production services were not part of the application change.
 
-- Flutter 3.47.8 stable, framework 737ba8f885dc774b53b442759999a312c9461e4e; Dart 3.13.7.
-- Source: official https://github.com/flutter/flutter.git stable checkout. The official archive manifest returned HTTP 404, so installation used the official repository and its standard artifact bootstrap.
-- SDK/HOME/package cache are isolated below /home/chatbot/wainak-dev/mobile-tools, outside Git.
-- pubspec.lock is committed. Only Flutter SDK/localizations and Flutter test SDK are direct dependencies.
-- Android/iOS/web scaffolds exist. Android release signing is deliberately unconfigured; identifiers remain invalid.example.wainak placeholders.
+Flutter 3.47.8 stable / Dart 3.13.7, official framework 737ba8f885dc774b53b442759999a312c9461e4e. SDK/HOME/pub cache are isolated under /home/chatbot/wainak-dev/mobile-tools, outside Git. SDK came from official flutter/flutter stable and standard artifact bootstrap after the archive manifest returned404. pubspec.lock is committed; direct dependencies are Flutter SDK/localizations/test only. Android/iOS identifiers remain invalid.example.wainak; release signing is not configured.
 
-## Checks actually completed before final handoff rerun
+## Executed integration results
 
-- dart format: all authored Dart source/test files formatted.
-- flutter analyze: no issues at the initial full-source pass; rerun on final commit required and reported in handoff.
-- flutter test --concurrency=1: **29 passed**, including seven UI/theme checks, ten repository checks, eight contract-client checks and four deferred-response session races.
-- flutter build web --debug --no-web-resources-cdn --no-wasm-dry-run --dart-define=WAINAK_DEV_MODE=true: **passed**. Local build artifact only, not served, uploaded or deployed.
-- 320 logical pixel width / 200% text scaling covers onboarding, profile, reflection, candidate, activation, dialogue, report/block dialogs, account and delete dialog. This is widget-layout evidence, not device rendering or visual aesthetic acceptance.
-- Automated labeled tap-target and Android 48-target guideline pass is sampled on the eligibility screen only, not a comprehensive accessibility certification.
-- Static color-pair tests cover the documented core light/dark pairs, not every composed/disabled/focused color.
+- dart format check: 19 Dart source/test files, zero changes at final check.
+- flutter analyze --no-pub: **no issues**.
+- **Cold test compilation and 38/38 tests passed**, exit0 at 05:37:45 UTC, job 2ea3421b-4724-40b1-b73d-529740cab360. build/test_cache was absent before invocation; the earlier failed/seeded cache was renamed and preserved, not reused. Official SDK and package cache remained installed, so this is a cold project test compile, not a fresh SDK install.
+- Of the38: baseline29; seven connected-widget tests using an injected HTTP fixture; one actual native UTF-8 Content-Length loopback test; one HttpJourneyRepository/client → actual Python memory HTTP backend journey with two independent sessions.
+- The native journey covered declarations/verification/profile/preferences, three adaptive questions, discovery/request, authenticated recipient acceptance, separate activation, card catalogue, report/block/report and deletion. Temporary WSGI server termination is awaited in finally; subsequent process inspection verified it absent.
+- **Web debug build passed**, exit0 at05:39:21, 46.9seconds, job6e94ff43-c652-4b8a-89c4-984c8a502f31. Local compile artifact only, never served/uploaded/deployed. API mode intentionally fails closed on web.
+- Native network tests drive the repository/client, **not widget taps against a live server**. Widget-to-repository/client behavior is tested with an injected fixture. These two evidence layers are not a device end-to-end claim.
+- Connected regressions cover target pinning after back/preferences/refresh, recipient waiting rather than unauthorized activation, unchecked declarations after delete/401, double submission/disposal, candidate network failure with no fake fallback, cleared peer projection after block, and 320-wide/200% text scaling.
+- Baseline coverage includes required declarations/minor rejection, lifecycle races, offline fake answers, cancel/block/report, sampled48-target semantics and static contrast pairs. This is not comprehensive accessibility/security certification.
 
-## Resource recovery, transparent limits
+## Resource limits and failed attempts
 
-The owner connector's service cgroup is approximately 1 GiB although the host has more free RAM. Initial bootstrap and a test compiler attempt were OOM-killed; these attempts were not counted as passes. No service resource limit, security isolation, OS package or live process configuration was changed.
+The owner connector originally had a1GiB cgroup. Bootstrap/earlier compiler failures are not passes. The integration cold frontend at448MiB and a384MiB attempt seeded with baseline ignored cache both exhausted their own heaps before assertions.
 
-Bootstrap succeeded with FLUTTER_TOOL_ARGS="--old_gen_heap_size=384 --new_gen_semi_max_size=16". AOT frontend subprocesses do not inherit that setting. The isolated SDK's dartaotruntime launcher therefore adds "--old_gen_heap_size=384 --new_gen_semi_max_size=8" before invoking the unchanged official binary dartaotruntime.official. Official binary SHA-256: 3599c987228070f342c80d29353f496c8efc72c620c75fc4d59e5671666b2f72. A 256 MiB attempt exhausted its own heap and was discarded; the 384 MiB run passed. This wrapper lowers memory demand; it does not change compiler source or disable tests/checks. Reproduce on an adequately resourced unmodified SDK as well before release.
+The owner explicitly authorized a **temporary runtime2GiB limit** at05:34:25; the backend worker verified actual2147483648 at05:36:21, with no service restart. Application developers did not alter OS/security/network settings. A single compiler ran at a time. During the successful cold run/build window the observed service cgroup peak was1745375232bytes (~1.63GiB); oom/oom_kill counters were0. This is a service-level observation, not an isolated compiler RSS measurement.
 
-One test-harness SemanticsHandle lifecycle failure was fixed by disposing in try/finally before test return. Independent preliminary review identified session-response races; client epochs/closed guards and four regression tests now reject late registration after close, stale 401, stale delete, and malformed registration account before installing a token.
+FLUTTER_TOOL_ARGS remains --old_gen_heap_size=384 --new_gen_semi_max_size=16 for flutter_tools. The isolated SDK AOT launcher used --old_gen_heap_size=768 --new_gen_semi_max_size=16 for the successful frontend, wrapping unchanged dartaotruntime.official (SHA2563599c987228070f342c80d29353f496c8efc72c620c75fc4d59e5671666b2f72). The frozen baseline had passed warm at384/8. Do not use768 after rollback to1GiB; coordinate the resource window and restore the bounded launcher before rollback. Reproduce with a suitably resourced standard SDK before release.
 
-## Reproduction on this isolated host
+All project/Git/build writes now run as chatbot, following a separately approved ownership repair preserving bytes/modes. No ownership/security repair is an application feature.
 
-Set HOME=/home/chatbot/wainak-dev/mobile-tools/home,
-PUB_CACHE=/home/chatbot/wainak-dev/mobile-tools/pub-cache,
-PATH=/home/chatbot/wainak-dev/mobile-tools/flutter/bin:$PATH,
-CI=true, FLUTTER_SUPPRESS_ANALYTICS=true, DART_SUPPRESS_ANALYTICS=true,
-FLUTTER_TOOL_ARGS="--old_gen_heap_size=384 --new_gen_semi_max_size=16".
+## Reproduction
 
-From apps/mobile, run:
+As chatbot, set:
+    HOME=/home/chatbot/wainak-dev/mobile-tools/home
+    PUB_CACHE=/home/chatbot/wainak-dev/mobile-tools/pub-cache
+    PATH=/home/chatbot/wainak-dev/mobile-tools/flutter/bin:$PATH
+    CI=true FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true
+    FLUTTER_TOOL_ARGS="--old_gen_heap_size=384 --new_gen_semi_max_size=16"
+
+Within the agreed2GiB/one-compiler window, with frontend launcher768/16, from apps/mobile:
     flutter pub get --offline
     dart format --output=none --set-exit-if-changed lib test
     flutter analyze --no-pub
-    flutter test --no-pub --concurrency=1 --reporter=expanded
+    WAINAK_BACKEND_ROOT=/home/chatbot/wainak-dev/backend-phase1 flutter test --no-pub --concurrency=1 --reporter=expanded
     flutter build web --debug --no-pub --no-web-resources-cdn --no-wasm-dry-run --dart-define=WAINAK_DEV_MODE=true
 
-Do not run heavy compiler jobs concurrently in the constrained connector service.
+Without WAINAK_BACKEND_ROOT or WAINAK_TEST_BASE_URL the native backend test is explicitly skipped (37 runnable tests). The UTF-8 loopback test remains enabled.
 
-## Explicitly NOT verified / NOT implemented
+The same native journey can be driven by an independently reviewed disposable PostgreSQL harness using WAINAK_TEST_BASE_URL=http://127.0.0.1:<ephemeral> and WAINAK_TEST_CONTROL_DIR=<private-tempdir>. The test writes only constant active.ready / blocked.ready markers and waits for corresponding .resumed files containing 'resumed'. The harness, not Dart, owns DB credentials/restart/WSGI cleanup. Same in-memory client sessions verify active state and blocked state across server/DB restart. **PostgreSQL unified run is pending in this commit; do not infer its result from memory-backend success.**
 
-- No Android APK/device build: Java/Android SDK absent.
-- No iOS build/signing/device tests: Linux host, no Mac/Xcode.
-- No VoiceOver, TalkBack, NVDA or manual screenshot review of this Flutter build.
-- No release-mode build, store submission, store compliance approval or deployment.
-- No live UI-to-backend integration: screens use DevJourneyRepository. WainakApiClient/native transport are independent preparation with injected transport tests only; no HTTP integration success is claimed.
-- UI currently has one synthetic female unmarried profile, sample country input, stated starting preference, one reflection question and one dialogue card. It is not the complete preferences/adaptive assessment/global product.
-- No real identity/age assurance, authentication/email, encrypted messaging, payments/restoration, media, exclusivity workflow, marriage spaces, evidence upload or live report operations.
-- Session data and reports are in memory only. A report confirmation explicitly states that no administrator received it.
-- Full independent security review and full platform accessibility review remain release blockers.
+## Not verified / not implemented
+
+No Android APK/device build (Java/SDK absent); no iOS/Xcode/Mac/signing/device run; no VoiceOver, TalkBack, NVDA or manual Flutter visual review. No release build/store submission/compliance approval/deployment.
+
+No production auth/age or identity assurance/email, payments/restoration, media/disclosure, full exclusivity or marriage UI, evidence upload/retention/live moderation, durable mobile tokens, or production security operations. Dialogue answer exchange/storage is unavailable in the backend: connected UI has no send/delivered action and labels choices as local previews. API reports are development metadata, not notifications to real moderators. Account deletion is distinct from store subscription cancellation.
+
+Independent exact-build security and platform accessibility review remain release blockers.

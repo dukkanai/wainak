@@ -5,7 +5,7 @@ void register(DevJourneyRepository r) =>
     r.register(age: 29, adult: true, muslim: true, terms: true, privacy: true);
 void ready(DevJourneyRepository r) {
   register(r);
-  r.saveProfile(country: 'السعودية', goal: 'زواج');
+  r.saveProfile(country: 'السعودية', goal: 'زواج', discoverable: true);
   r.saveAssessment('القيم');
 }
 
