@@ -174,17 +174,22 @@ void main() {
         actor = ValueNotifier(0);
         final active = actor;
         await t.pumpWidget(
-          ValueListenableBuilder<int>(
-            valueListenable: active,
-            builder: (_, index, child) => IndexedStack(
-              index: index,
-              children: [
-                IdentityApp(key: const Key('matching-actor-a'), client: a),
-                IdentityApp(key: const Key('matching-actor-b'), client: b),
-              ],
+          Directionality(
+            textDirection: TextDirection.rtl,
+            child: ValueListenableBuilder<int>(
+              valueListenable: active,
+              builder: (_, index, child) => IndexedStack(
+                index: index,
+                children: [
+                  IdentityApp(key: const Key('matching-actor-a'), client: a),
+                  IdentityApp(key: const Key('matching-actor-b'), client: b),
+                ],
+              ),
             ),
           ),
         );
+        await settleMatchLive(t);
+        debugPrint('MATCHING_LIVE_STAGE actors_mounted');
         await matchLive(t, 'identity-section-candidates');
         dropped.armed = true;
         await matchLive(t, 'matching-request-$target');
@@ -194,6 +199,7 @@ void main() {
         await matchLive(t, 'matching-dialog-confirm');
         expect(dropped.keys.length, 2);
         expect(dropped.keys.first == dropped.keys.last, isTrue);
+        debugPrint('MATCHING_LIVE_STAGE same_intent_retry_acknowledged');
         final own = await t.runAsync(
           () => a.domain('GET', '/v1/relationships'),
         );
@@ -233,6 +239,7 @@ void main() {
           find.text('اكتملت الموافقة المتبادلة؛ لم تُفتح محادثة'),
           findsOneWidget,
         );
+        debugPrint('MATCHING_LIVE_STAGE recipient_acceptance_acknowledged');
         active.value = 0;
         await t.pumpAndSettle();
         await matchLive(t, 'matching-refresh');
@@ -275,6 +282,7 @@ void main() {
           hidden?['peer'] == null && hidden?['status'] == 'blocked',
           isTrue,
         );
+        debugPrint('MATCHING_LIVE_STAGE blocked_peer_report_acknowledged');
         await t.pumpWidget(const SizedBox());
         await t.runAsync(() async {
           await fixture.shutdown();
