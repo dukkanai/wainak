@@ -57,3 +57,7 @@ Not yet validated: Android APK/device (SDK/Java absent), iOS (Mac/Xcode absent),
 ## Disposable persistence integration fixture
 
 The optional reviewed backend harness may set WAINAK_TEST_BASE_URL and WAINAK_TEST_CONTROL_DIR instead of WAINAK_BACKEND_ROOT. The native test does not start/own that server. It checks the exact loopback origin, retains tokens only in memory and uses constant active/blocked marker files to coordinate two harness-owned server/DB restarts. The harness must create a fresh private directory and remove all temporary resources in finally. No administrative restart endpoint is added to the API. Results must be recorded separately from the already executed memory-backend journey.
+
+## Synthetic native archive spike
+
+See ../../docs/phase6-mobile-native-archive.md. Explicit native_archive development mode is Android-only and fail-closed without its verified Go AAR. This branch is configured UNSIGNED, including debug. Android SDK download404 blocks Kotlin/JNI/AAR/APK checks; Dart fixture tests are not native execution. No picker, user recovery key or real history is implemented.

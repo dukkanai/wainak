@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -10,6 +11,8 @@ import 'src/api/http_repository.dart';
 import 'src/api/native_factory.dart';
 import 'src/identity/client.dart';
 import 'src/identity/app.dart';
+import 'src/native_archive/app.dart';
+import 'src/native_archive/channel.dart';
 
 void main() {
   const devEnabled = bool.fromEnvironment('WAINAK_DEV_MODE');
@@ -20,6 +23,21 @@ void main() {
   const baseUrl = String.fromEnvironment('WAINAK_API_BASE_URL');
   if (!devEnabled) {
     runApp(const DisabledBuild());
+    return;
+  }
+  if (mode == 'native_archive') {
+    if (!archiveProbeEnabled(optedIn: devEnabled, release: kReleaseMode) ||
+        kIsWeb ||
+        defaultTargetPlatform != TargetPlatform.android) {
+      runApp(
+        const DisabledBuild(
+          message:
+              'اختبار الأرشيف متاح للتطوير على Android فقط. لا محاكاة ناجحة بديلة ولا حفظ أو إرسال.',
+        ),
+      );
+      return;
+    }
+    runApp(NativeArchiveApp(port: MethodChannelArchiveProbe()));
     return;
   }
   if (mode == 'fake') {
