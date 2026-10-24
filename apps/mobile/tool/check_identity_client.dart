@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import '../lib/src/api/transport.dart';
-import '../lib/src/identity/client.dart';
+import 'package:wainak_mobile/src/api/transport.dart';
+import 'package:wainak_mobile/src/identity/client.dart';
 import '../test/support/identity_fixture.dart';
 
 void check(bool condition, String label) {
