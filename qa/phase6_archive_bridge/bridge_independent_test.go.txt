@@ -447,7 +447,7 @@ func TestQACrossOwnerAndCatalogDespiteSameKey(t *testing.T) {
 	r.sessions[b].key = r.sessions[a].key
 	r.sessions[c].key = r.sessions[a].key
 	r.sessions[c].owner = r.sessions[a].owner
-	other, e := history.NewCatalog(sampleVersion, map[string][]string{"sample_card": {"other_option"}})
+	other, e := history.NewCatalog(sampleVersion, map[string][]string{"sample_card": {"other_option", "other_defer"}})
 	if e != nil {
 		t.Fatal("fixture catalog")
 	}
