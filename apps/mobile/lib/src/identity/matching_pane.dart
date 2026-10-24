@@ -387,7 +387,12 @@ class _IdentityMatchingPaneState extends State<IdentityMatchingPane> {
       Text(
         relation.direction == MatchDirection.incoming ? 'طلب وارد' : 'طلب صادر',
       ),
-      Text(status(relation.status)),
+      Text(
+        relation.status == 'requested' &&
+                relation.direction == MatchDirection.incoming
+            ? 'بانتظار قرارك'
+            : status(relation.status),
+      ),
       if ({
         'accepted_pending_activation',
         'active_cards',

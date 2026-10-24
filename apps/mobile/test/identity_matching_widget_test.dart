@@ -80,6 +80,7 @@ void main() {
         ..hasRelation = true;
       await openMatch(t, f, view: 'requests');
       expect(find.text('طلب وارد'), findsOneWidget);
+      expect(find.text('بانتظار قرارك'), findsOneWidget);
       await tapMatch(t, 'matching-accept-$relationId');
       await tapMatch(t, 'matching-dialog-confirm');
       expect(f.relationStatus, 'accepted_pending_activation');
