@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'file:///home/chatbot/wainak-dev/mobile-auth-phase2/apps/mobile/lib/src/api/transport.dart';
-import 'file:///home/chatbot/wainak-dev/mobile-auth-phase2/apps/mobile/lib/src/identity/client.dart';
+import '../../apps/mobile/lib/src/api/transport.dart';
+import '../../apps/mobile/lib/src/identity/client.dart';
 
 const pending = 'qa-pending-fixture-not-a-real-token';
 const verified = 'qa-verified-fixture-not-a-real-token';
