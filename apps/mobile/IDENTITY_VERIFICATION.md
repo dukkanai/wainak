@@ -4,6 +4,13 @@ Candidate branch: `dev/phase2-mobile-auth-20261024`, based on phase1 `efd0421d55
 
 ## Passed on the candidate source
 
+The executable acceptance snapshot is `d69ad71bfee61e3a8ec73c0e282a7856e2c36934`. A subsequent evidence-only commit may update this report without changing tested code. Final independent QA is recorded separately.
+
+- Fresh cold `git archive` snapshot (no project `.dart_tool` or `build` cache), offline dependency resolution, then `flutter test --no-pub --concurrency=1 --reporter=expanded`: **47 passed, 2 deliberately opt-in tests skipped**, job `c2cefc34-5c11-4e14-b264-d13c80be66bc`, 11:02:58–11:03:49, exit0. Includes38 retained phase1 tests and9 identity tests (one aggregates the21 client checks; eight exercise widgets).
+- Identity widget checks now PASS: signup/verification/profile/three questions/login/logout/verified deletion, owned pending deletion, expiry clears declarations, cancellation, busy keyboard/late close, preserving stored profile fields, old deletion confirmation, Arabic RTL at320px and200% scale.
+- **Actual widget taps → native HTTP → Django/allauth → fresh PostgreSQL PASS**, job `578c8afd-0fff-471e-9fe6-61ee30d1e576`, 11:04:24–11:05:10, one journey43s. Private mailbox code stays in anonymous pipes/RAM. Covers registration, verification, profile/questions, independent peer session, global revocation and401 UI, logout/login, recent-password verified deletion, and fresh owned pending deletion. Fixture starts only after test compilation. Normal cleanup fields, stdout/stderr EOF and child exit0 are required; separate11:06:30 audit found no fixture containers/volumes/tmpdirs or Flutter test process. This is not a DB/app-process restart test.
+- Client21 and analyzer reran successfully after the import-only correction in d69ad71. No app library logic changed in that correction.
+
 - 21 standalone client checks, Dart heap128: pending versus authenticated state, server identity projection, token rotation, 401 logout success, current-session expiry, reauthentication/deletion, global revocation, rejected real addresses, no request for missing eligibility, closed/old generation guards, and leap-day date clamp. Run 09:37:49–09:37:53, job `081abe83-9621-445b-b572-1683746b1a8d`.
 - 5 private protocol checks in the same run: fragmented UTF-8, 4096-byte incremental bound before newline, trailing records after closed, nonempty stderr rejection, and EOF requirements. No private protocol contents are printed.
 - Analyzer: no issues at 09:38:10, job `f80b53e6-cbda-4c4e-bdb8-a72375e4c597`. The first analyzer pass found an opt-in test skip type error and two redundant assertions/import; those were corrected before this clean result.
@@ -19,14 +26,18 @@ Final source hashes for the above candidate checks:
 f555cd131b221845f411f8466eb20428af8723687b3c0dc14d20a32fe24ea4cf  test/identity_live_widget_test.dart
 ```
 
-## Blocked / not run
+## Web compilation: mixed result, not a clean all-target pass
 
-- One bounded Flutter injected-widget compile attempt at09:20, job `120684cf-ed23-4ec6-80ea-d24c4c737939`, failed in the compiler at the384MiB Dart heap before any application assertions. It was cancelled; no remaining compiler was found at09:20:49. Owner cgroup remained1GiB, kernel OOM counters0. This is not a passing widget suite or an application assertion failure. No second heavy attempt or resource adjustment was made without further approval.
-- The new injected widget suite (Arabic/RTL,320px at200%, busy keyboard, pending/verified deletion, cancel, account switch, profile preservation) is NOT RUN successfully.
-- `test/identity_live_widget_test.dart` is analyzer-checked and opt-in only (`WAINAK_RUN_IDENTITY_WIDGET=1`). Actual widget-driven Django signup/verify/profile/revoke/expiry/logout/verified and pending deletion is NOT RUN. It starts the private fixture only inside the test body, after compilation; no environment flag contains a secret.
-- Phase1's39 tests and prior actual live-widget PostgreSQL evidence belong to phase1 `efd0421`; they are not silently transferred to phase2. Phase2 full regression, web debug compile, Android/iOS builds, real devices, VoiceOver/TalkBack/NVDA evaluation and release/security gates are NOT RUN here.
-- Native web identity is deliberately unsupported; no weakening of Origin/Cookie controls is used to make web pass. Password-reset/change UI, relationship activation/discovery/chat/payment integration, secure token persistence, real SMTP and production HTTPS are not implemented in this mode.
-- Backend103/103 and private fixture68+5 independent results are backend evidence only, not mobile UI results. Live401 evidence here uses actual global revocation; it does not simulate passage of30-minute/24-hour expiry or claim an app-process/DB-restart test.
+Job `1b5fec9d-ffda-4ed4-a5bc-57c06e7a476f`,11:06:30–11:07:49, ran `flutter build web --debug --no-pub` with explicit development identity mode and loopback URL. Exit0 produced `build/web` (JavaScript debug), but the optional wasm dry-run exited255 with Dart heap exhaustion. **Wasm preflight FAILED** and was not retried; there is no blanket web-build/all-target success claim. Owner current usage briefly approached2GiB, without observed kernel OOM kill. Identity mode on web deliberately shows unsupported status, and no browser or real web authentication was exercised.
+
+## Failure history and remaining limits
+
+- At09:20 a single bounded Flutter attempt (job `120684cf-ed23-4ec6-80ea-d24c4c737939`) exhausted the384MiB frontend heap before assertions under the1GiB owner cgroup. It was stopped and no repeat occurred until explicit user approval at10:40:25 for a temporary2GiB service /768MiB compiler window. No kernel OOM kill was observed.
+- First cold compile under the approved window (job `f43344e4-bf99-48ba-9645-78ebea1479d1`) cleared the memory barrier and passed38 baseline tests, but the new widget fixture could not load because relative and package imports created distinct ApiTransport library identities. This was a test-harness error, not an app authorization bypass. Canonical package imports in fixture/standalone runners fixed it in d69ad71, followed by the fresh cold47-test PASS above. Analyzer alone had not detected this compiler issue.
+- The two skipped opt-ins in the default suite are phase1 live backend and phase2 live identity. Phase2 live identity subsequently passed separately. The historical phase1 live backend journey was NOT rerun against its old backend in this phase; its original evidence remains tied to efd0421.
+- Native web identity is deliberately unsupported; no weakening of Origin/Cookie controls is used to make web pass. A web compilation result does not establish web login usability.
+- Android/iOS builds, real devices, VoiceOver/TalkBack/NVDA evaluation, full release/security assessment and store acceptance remain NOT RUN. Password-reset/change UI, identity-mode relationship activation/discovery/chat/payment integration, secure token persistence, real SMTP and production HTTPS are not implemented.
+- Backend103/103 and private fixture68+5 independent results are backend evidence only. Live401 evidence uses actual revocation, not simulated passage of30-minute/24-hour expiry. No real email or identity/age assurance is claimed.
 
 ## Reproduction and resource discipline
 
@@ -39,6 +50,8 @@ PATH=/home/chatbot/wainak-dev/mobile-tools/flutter/bin:$PATH
 CI=true FLUTTER_SUPPRESS_ANALYTICS=true DART_SUPPRESS_ANALYTICS=true
 FLUTTER_TOOL_ARGS='--old_gen_heap_size=384 --new_gen_semi_max_size=16'
 ```
+
+The compiler wrapper was temporarily changed from384/8 (SHA a5117daa0261dc7e3f3daec2c26796f425d192fa937e2e44288798d7ccda1063) to768/16 (SHA677f6121ffa3b9145e10aca3b3b9054fd87ae7781c5f19486892e1572baff07c), after the backend coordinator verified owner MemoryMax2147483648. FLUTTER_TOOL_ARGS stayed384/16. One compiler/test job at a time; no separate PG job during compilation. Observed owner current usage during cold testing was about1.65GiB; OOM/oom_kill counters0. Restoration to384/8 and1GiB is required after independent QA; the coordinator records that actual rollback separately. Mailcow remains stopped at the user’s explicit request.
 
 Use the direct SDK Dart executable for lightweight checks:
 
