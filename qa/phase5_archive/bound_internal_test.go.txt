@@ -1,0 +1,16 @@
+package historyarchive
+
+import (
+	"bytes"
+	"io"
+	"testing"
+)
+
+func TestQABoundedCopyProbe(t *testing.T) {
+	out := &boundedOutput{max: 4}
+	source := struct{ io.Reader }{bytes.NewReader(bytes.Repeat([]byte("x"), 128))}
+	n, err := io.Copy(out, source)
+	if n > 4 || err == nil || len(out.Bytes()) > 4 {
+		t.Fatal("child output bound bypass")
+	}
+}
