@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'file:///home/chatbot/wainak-dev/mobile-auth-phase2/apps/mobile/lib/src/identity/client.dart';
-import 'file:///home/chatbot/wainak-dev/mobile-auth-phase2/apps/mobile/lib/src/api/transport_io.dart';
-import 'file:///home/chatbot/wainak-dev/mobile-auth-phase2/apps/mobile/tool/identity_fixture_bridge.dart';
+import '../../apps/mobile/lib/src/identity/client.dart';
+import '../../apps/mobile/lib/src/api/transport_io.dart';
+import '../../apps/mobile/tool/identity_fixture_bridge.dart';
 
 void check(bool value){if(!value)throw StateError('independent live lifecycle assertion failed');}
 String nonce()=>base64UrlEncode(List<int>.generate(18,(_)=>Random.secure().nextInt(256))).replaceAll('=','');
@@ -20,6 +20,7 @@ Future<void> main(List<String> args) async {
   var passed=false;
   try{
     fixture=await IdentityFixtureBridge.start();
+    stdout.writeln('QA_TEST_FIXTURE_PROVENANCE='+jsonEncode(fixture.testProvenance));
     IdentityClient fresh(){final c=IdentityClient(baseUri:fixture!.baseUri,transport:NativeApiTransport(timeout:const Duration(seconds:35)));clients.add(c);return c;}
 
     // Actual current pending flow, not a forged email-only deletion request.
