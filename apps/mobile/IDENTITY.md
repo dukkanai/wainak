@@ -49,3 +49,9 @@ That explicit command may create a fresh192MiB isolated PostgreSQL container/vol
 Live evidence, independent race probes, source SHAs and any compile/resource blockers belong in `IDENTITY_VERIFICATION.md`. Tests existing in source are not passed tests. Native Android/iOS builds, real screen readers, full security/release approval and store acceptance remain separate unexecuted gates.
 
 The optional live widget journey uses WAINAK_RUN_IDENTITY_WIDGET=1 with flutter test --no-pub --concurrency=1 test/identity_live_widget_test.dart. This is a nonsecret opt-in, not authorization by itself. Its actual execution status is recorded separately.
+
+## Integrated fixture selection (test-only)
+
+Live tests now require either an explicit bridge script argument or WAINAK_IDENTITY_FIXTURE_SCRIPT=/absolute/owned/checkout/backend/integration/serve_identity_fixture.py. There is no fallback to another branch. For integration acceptance, set this to the integration checkout being tested, not backend-auth-phase2. The path must be canonical, nonsymlink, a regular file owned by the current OS UID, not group/world writable, and at most1MiB. A fixed local metadata/hash probe checks the file without importing/executing it; missing/invalid selection fails before starting the fixture or PostgreSQL. This is a trusted test capability, never imported by app lib code.
+
+The live driver/widget test writes only nonsecret TEST_FIXTURE_PROVENANCE path+SHA256 to test evidence. No email/password/code/token is logged. Keep the selected fixture source frozen during a run. Run dart --old_gen_heap_size=128 tool/check_identity_fixture_selection.dart for seven path-selection checks without any fixture or DB execution. Existing non-live tests do not need the variable.

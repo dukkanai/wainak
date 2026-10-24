@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'private_fixture_protocol.dart';
+import 'identity_fixture_path.dart';
 
 class FixtureFailure implements Exception {
   const FixtureFailure(this.code);
@@ -13,7 +14,9 @@ class FixtureFailure implements Exception {
 /// Test-only private PIPE capability. Never imported by lib/ or an app build.
 /// No secrets are placed in argv, environment, files, URLs or diagnostic output.
 class IdentityFixtureBridge {
-  IdentityFixtureBridge._(this._process);
+  IdentityFixtureBridge._(this._process, this.scriptSelection);
+  final FixtureScriptSelection scriptSelection;
+  Map<String, String> get testProvenance => scriptSelection.provenance;
   final Process _process;
   final _ready = Completer<Map<String, dynamic>>();
   final _closed = Completer<Map<String, dynamic>>();
@@ -28,15 +31,15 @@ class IdentityFixtureBridge {
   static Future<IdentityFixtureBridge> start({
     String python =
         '/home/chatbot/wainak-dev/auth-tools-phase2/venv/bin/python',
-    String script =
-        '/home/chatbot/wainak-dev/backend-auth-phase2/backend/integration/serve_identity_fixture.py',
+    String? script,
     String home = '/home/chatbot/wainak-dev/mobile-tools/home',
   }) async {
+    final selectedScript = await resolveFixtureScript(explicit: script);
     final Process process;
     try {
       process = await Process.start(
         python,
-        [script, '--run-disposable-identity-fixture'],
+        [selectedScript.path, '--run-disposable-identity-fixture'],
         includeParentEnvironment: false,
         environment: {
           'HOME': home,
@@ -49,7 +52,7 @@ class IdentityFixtureBridge {
     } catch (_) {
       throw const FixtureFailure('start_failed');
     }
-    final bridge = IdentityFixtureBridge._(process);
+    final bridge = IdentityFixtureBridge._(process, selectedScript);
     bridge._listen();
     try {
       final ready = await bridge._ready.future.timeout(
