@@ -41,10 +41,10 @@ def metadata(kind,name):
     return json.loads(result.stdout)[0]
 
 
-def main():
+def main(extra_test_factory=None, argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-disposable-postgres",action="store_true")
-    args=parser.parse_args()
+    args=parser.parse_args(argv)
     if not args.run_disposable_postgres:
         parser.error("Explicit --run-disposable-postgres is required; no existing DB is accepted")
     import psycopg
@@ -111,6 +111,10 @@ def main():
             module.CONNECT_WRONG_DATABASE=lambda:connect("postgres")
             module.RESTART_CONTAINER=restart
             suite=unittest.defaultTestLoader.loadTestsFromModule(module)
+            if extra_test_factory is not None:
+                # Only a reviewed Python test hook receives the private connection
+                # factory; no DSN/password is exported to Flutter or HTTP clients.
+                suite.addTests(extra_test_factory(connect,restart,temporary))
             result=unittest.TextTestRunner(verbosity=2).run(suite)
             success=result.wasSuccessful()
             with connect() as connection:
