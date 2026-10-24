@@ -1,0 +1,22 @@
+name: wainak_mobile
+description: Development-only accessible Arabic Wainak journey. Not a production app.
+publish_to: none
+version: 0.1.0+1
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: NotoSansArabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic.ttf
+  assets:
+    - assets/fonts/NotoSansArabic-OFL.txt
