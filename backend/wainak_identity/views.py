@@ -108,10 +108,13 @@ def dispatch(request):
                 return response
         # Internal actor comes ONLY from the framework-authenticated User; never JSON/header actor input.
         actor, domain = user.domain_id, service()
+        safety_decline = (method == "POST"
+            and re.fullmatch(r"/v1/relationships/rel_[0-9a-f]{32}/respond", path) is not None
+            and data == {"decision": "decline"})
         protected = (path.startswith("/v1/candidates") or path in {
             "/v1/me/profile", "/v1/me/preferences", "/v1/me/assessment", "/v1/me/assessment/answers"}
             or method == "POST" and path.startswith("/v1/relationships")
-            and not path.endswith(("/end", "/cancel")))
+            and not path.endswith(("/end", "/cancel")) and not safety_decline)
         if protected:
             domain.require_current_consents(actor)
         routes = {

@@ -32,6 +32,11 @@ def main(extra_test_factory=None, argv=None):
         sys.modules[addition_spec.name] = addition
         addition_spec.loader.exec_module(addition)
         suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(addition))
+        matching_spec = importlib.util.spec_from_file_location("matching_integration", Path(__file__).with_name("test_matching.py"))
+        matching = importlib.util.module_from_spec(matching_spec)
+        sys.modules[matching_spec.name] = matching
+        matching_spec.loader.exec_module(matching)
+        suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(matching))
         if extra_test_factory is not None:
             # Trusted Python-only QA seam, never a HTTP route/CLI DSN/key argument.
             # Appended cases run after the built-in class has lazily migrated.

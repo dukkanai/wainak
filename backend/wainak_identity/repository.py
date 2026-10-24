@@ -57,6 +57,12 @@ class SharedDomainRepository(PostgresRepository):
 
 
 class IdentityDomainService(DevelopmentService):
+    def __init__(self, *args, verified_domain_ids=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        # Request-local snapshot taken under the outer auth transaction/lock,
+        # before the domain adapter narrows PostgreSQL's search_path.
+        self.verified_domain_ids = frozenset(verified_domain_ids)
+
     @staticmethod
     def current_consents(account):
         consent = account.get("consents") or {}
@@ -65,13 +71,36 @@ class IdentityDomainService(DevelopmentService):
                 and bool(consent.get("accepted_at")))
 
     def _eligible(self, account, allow_exclusive=None):
-        return self.current_consents(account) and super()._eligible(account, allow_exclusive)
+        return (account["id"] in self.verified_domain_ids and self.current_consents(account)
+                and super()._eligible(account, allow_exclusive))
+
+    def _may_project_peer(self, account):
+        return (not account["deleted"] and account.get("profile") is not None
+                and account["id"] in self.verified_domain_ids
+                and account.get("dev_email_verified") is True
+                and self.current_consents(account) and self._age(account) >= 18)
 
     def _view_relationship(self, actor, rel):
         result = super()._view_relationship(actor, rel)
         peer = rel["recipient_id"] if actor == rel["initiator_id"] else rel["initiator_id"]
-        if not self.current_consents(self.accounts[peer]):
+        if not self._may_project_peer(self.accounts[peer]):
             result["peer"] = None
+        incoming = actor == rel["recipient_id"]
+        result["direction"] = "incoming" if incoming else "outgoing"
+        actions = []
+        if rel["status"] == "requested":
+            if incoming:
+                if self._discoverable(rel["initiator_id"], rel["recipient_id"]):
+                    actions.append("accept")
+                actions.append("decline")
+            else:
+                actions.append("cancel")
+        if rel["status"] in {"accepted_pending_activation", "active_cards", "exclusive_cards"}:
+            actions.append("end")
+        if self._can_address(actor, peer):
+            actions.extend(("block", "report"))
+        # Hints are recomputed, not persisted or accepted as authority by routes.
+        result["available_actions"] = actions
         return result
 
     @locked
@@ -81,4 +110,10 @@ class IdentityDomainService(DevelopmentService):
 
 
 def service():
-    return IdentityDomainService(repository=SharedDomainRepository())
+    from django.db.models import F
+    from allauth.account.models import EmailAddress
+    if not connection.in_atomic_block:
+        raise RuntimeError("Identity service requires the outer auth transaction")
+    verified = EmailAddress.objects.filter(verified=True, user__is_active=True,
+        email__iexact=F("user__email")).exclude(user__domain_id__isnull=True).values_list("user__domain_id", flat=True)
+    return IdentityDomainService(repository=SharedDomainRepository(), verified_domain_ids=tuple(verified))
