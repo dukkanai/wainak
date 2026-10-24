@@ -225,18 +225,21 @@ class _ConnectedJourneyState extends State<ConnectedJourney> {
                         live: true,
                         key: Key('api-busy'),
                       ),
-                    AbsorbPointer(
-                      absorbing: busy,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: switch (step) {
-                          _Step.eligibility => eligibility(),
-                          _Step.profile => profile(),
-                          _Step.assessment => assessment(),
-                          _Step.candidate => candidate(),
-                          _Step.dialogue => dialogue(),
-                          _Step.account => account(),
-                        },
+                    ExcludeFocus(
+                      excluding: busy,
+                      child: AbsorbPointer(
+                        absorbing: busy,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: switch (step) {
+                            _Step.eligibility => eligibility(),
+                            _Step.profile => profile(),
+                            _Step.assessment => assessment(),
+                            _Step.candidate => candidate(),
+                            _Step.dialogue => dialogue(),
+                            _Step.account => account(),
+                          },
+                        ),
                       ),
                     ),
                     if (error != null)
@@ -575,7 +578,9 @@ class _ConnectedJourneyState extends State<ConnectedJourney> {
           const Notice('العلاقة محظورة. لا حوار أو كشف. يبقى البلاغ متاحًا.'),
         ],
         RelationshipState.declined => [
-          const Notice('رفض الطرف الآخر الطلب. لا إعادة طلب ضاغطة.'),
+          const Notice(
+            'رُفض طلب التعارف؛ لم تُفتح البطاقات. لا إعادة طلب ضاغطة.',
+          ),
         ],
         RelationshipState.cancelled => [const Notice('أُلغي الطلب.')],
         RelationshipState.ended => [

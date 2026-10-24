@@ -9,7 +9,7 @@ Only apps/mobile changed in this integration delta; main, prototype, live databa
 
 Flutter 3.47.8 stable / Dart 3.13.7, official framework 737ba8f885dc774b53b442759999a312c9461e4e. SDK/HOME/pub cache are isolated under /home/chatbot/wainak-dev/mobile-tools, outside Git. SDK came from official flutter/flutter stable and standard artifact bootstrap after the archive manifest returned404. pubspec.lock is committed; direct dependencies are Flutter SDK/localizations/test only. Android/iOS identifiers remain invalid.example.wainak; release signing is not configured.
 
-## Executed integration results
+## Initial connected snapshot results (863b4d5)
 
 - dart format check: 19 Dart source/test files, zero changes at final check.
 - flutter analyze --no-pub: **no issues**.
@@ -49,7 +49,7 @@ Within the agreed2GiB/one-compiler window, with frontend launcher768/16, from ap
 
 Without WAINAK_BACKEND_ROOT or WAINAK_TEST_BASE_URL the native backend test is explicitly skipped (37 runnable tests). The UTF-8 loopback test remains enabled.
 
-The same native journey can be driven by an independently reviewed disposable PostgreSQL harness using WAINAK_TEST_BASE_URL=http://127.0.0.1:<ephemeral> and WAINAK_TEST_CONTROL_DIR=<private-tempdir>. The test writes only constant active.ready / blocked.ready markers and waits for corresponding .resumed files containing 'resumed'. The harness, not Dart, owns DB credentials/restart/WSGI cleanup. Same in-memory client sessions verify active state and blocked state across server/DB restart. **PostgreSQL unified run is pending in this commit; do not infer its result from memory-backend success.**
+The same native journey can be driven by an independently reviewed disposable PostgreSQL harness using WAINAK_TEST_BASE_URL=http://127.0.0.1:<ephemeral> and WAINAK_TEST_CONTROL_DIR=<private-tempdir>. The test writes only constant active.ready / blocked.ready markers and waits for corresponding .resumed files containing 'resumed'. The harness, not Dart, owns DB credentials/restart/WSGI cleanup. Same in-memory client sessions verify active state and blocked state across server/DB restart. The initial snapshot 863b4d5 subsequently passed the native PostgreSQL harness (14 PG regressions + one native journey), and independent real headless widget taps → native HTTP → PostgreSQL (14 PG regressions + one live widget journey) against backend59a79ea. Both tested two DB restarts and three WSGI processes with the same client sessions; cleanup was independently verified. These results belong to that initial snapshot, not automatically to later changes.
 
 ## Not verified / not implemented
 
@@ -58,3 +58,19 @@ No Android APK/device build (Java/SDK absent); no iOS/Xcode/Mac/signing/device r
 No production auth/age or identity assurance/email, payments/restoration, media/disclosure, full exclusivity or marriage UI, evidence upload/retention/live moderation, durable mobile tokens, or production security operations. Dialogue answer exchange/storage is unavailable in the backend: connected UI has no send/delivered action and labels choices as local previews. API reports are development metadata, not notifications to real moderators. Account deletion is distinct from store subscription cancellation.
 
 Independent exact-build security and platform accessibility review remain release blockers.
+
+
+## Narrow keyboard/consent correction — final source rerun
+
+Independent QA proved a P2 on863b4d5: with registration pending, real Tab/Space could change the adult declaration true→false even though only one request was sent. Backend authorization was not bypassed, but visible consent diverged from the in-flight request. The connected form now uses ExcludeFocus while busy in addition to AbsorbPointer. A regression includes a positive idle keyboard control, then verifies pending declarations remain checked. Declined text is now neutral about which party refused.
+
+The corrected source was rerun with a fresh absent build/test_cache (previous successful cache preserved):
+- **39/39 tests PASS**, including the new keyboard regression and actual memory HTTP journey.
+- **20 Dart files formatted; analyzer no issues.**
+- **Web debug build PASS**,43.8seconds.
+- Combined command job5b3c3206-4498-46e2-a20f-e63854af04a4 exited0 at05:55:46 UTC.
+- Memory-backend checkout for this rerun:59a79ea. Full backend commit is recorded in the backend handoff.
+- Observed service-wide peak by05:55:31 was2032345088bytes (~1.89GiB), below the temporary2GiB cap; oom/oom_kill stayed0. This peak spans the verification window, not just one process.
+- With the opt-in backend fixture omitted,38 tests run and the native backend journey is skipped.
+
+The final corrected commit is frozen for independent native-PG and live-widget-PG reruns; their exact-pair results are recorded in the QA/backend handoff, not assumed here. No release/platform accessibility claims change.
