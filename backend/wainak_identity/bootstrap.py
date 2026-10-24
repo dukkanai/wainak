@@ -41,6 +41,9 @@ def configure(connect=None, *, keys=None, schema_artifact_only=False):
         AUTHENTICATION_BACKENDS=["allauth.account.auth_backends.AuthenticationBackend"],
         SESSION_ENGINE="wainak_identity.sessions", SESSION_COOKIE_SECURE=True,
         SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Strict", SESSION_SAVE_EVERY_REQUEST=False,
+        CSRF_COOKIE_NAME="wainak_deletion_csrf", CSRF_COOKIE_HTTPONLY=True,
+        CSRF_COOKIE_SAMESITE="Strict", CSRF_COOKIE_SECURE=False,  # ONLY loopback HTTP fixture; no public mode.
+        CSRF_COOKIE_AGE=1800,
         SESSION_COOKIE_AGE=86400, WAINAK_SESSION_ABSOLUTE_SECONDS=86400,
         WAINAK_SESSION_IDLE_SECONDS=1800, WAINAK_REAUTH_SECONDS=300,
         WAINAK_SESSION_ENCRYPTION_KEY=keys["sessions"], WAINAK_RATE_KEY=keys["rate"],

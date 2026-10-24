@@ -32,10 +32,11 @@ Primary framework references: [Django support](https://www.djangoproject.com/dow
 ## Boundary and transaction
 
 The harness alone configures settings from a private Python connection factory.
-The API accepts loopback Host, no Origin/cookie/Bearer/query credentials, bounded
+The native API accepts loopback Host, no Origin/cookie/Bearer/query credentials, bounded
 JSON and an explicit endpoint allowlist. Only synthetic `@example.invalid`
 addresses are accepted, with lower-case normalization and database uniqueness.
-Email verification proves access to a fake mailbox in this test, **not** identity,
+The additive local deletion web exception is separately CSRF/Origin checked;
+see `phase2-deletion-web.md`. Email verification proves access to a fake mailbox in this test, **not** identity,
 age, marital status, suitability, device trust or E2EE-key ownership. Adult and
 current-policy declarations remain server-validated; they are not document checks.
 

@@ -1,15 +1,17 @@
-# Identity API 0.2.0-sandbox — native test contract
+# Identity API 0.2.1-sandbox — native and local deletion contract
 
 This is a separate sandbox adapter, not a replacement for phase1.openapi.json.
 Only the disposable test harness configures it. There is no persistent server,
-browser login, real mailbox, Flutter auth adapter or production deployment.
+real mailbox, Flutter auth adapter or production deployment. The additive local
+web deletion surface is described in `../docs/phase2-deletion-web.md`.
 
 ## Transport and errors
 
 Loopback HTTP is permitted **only for this owned test fixture**. A real deployment
 would require HTTPS and separately approved infrastructure. Send JSON (at most
 16,384 bytes); unknown authentication fields are rejected. Do not send cookies,
-Origin, query credentials, Authorization/Bearer, real email addresses or user IDs
+Origin (except the strictly CSRF-checked deletion web branch), query credentials,
+Authorization/Bearer, real email addresses or user IDs
 as authority. Native sessions use `X-Session-Token` and are never put in URLs.
 Every response is `Cache-Control: no-store`. Fake messages exist only in Python
 test memory, never through an HTTP mailbox endpoint.
@@ -60,6 +62,7 @@ the phase1 policy version and adult/Muslim declarations, not document checks.
 | GET `/identity/v1/me` | id (auth UUID), domain_id (usr_*), email, email_verified=true, sandbox mode, email_is_identity_verification=false |
 | POST `/identity/v1/reauthenticate` | `{password}`; recent-auth timestamp refreshed by server, never client |
 | POST `/identity/v1/logout-all` | empty object; revokes authenticated and account-bound pending sessions/challenges |
+| DELETE `/identity/v1/pending-account` | `{password, confirmation:"DELETE"}` plus a current owned unverified framework flow; never arbitrary email deletion |
 | DELETE `/identity/v1/me` | `{confirmation:"DELETE"}`; requires auth within5minutes or password reauth |
 
 Deletion returns the phase1 deletion result plus `identity_erased:true`,
@@ -91,6 +94,19 @@ relationship lists/details remains available for safety/termination; cards and
 communication permissions still fail closed from current eligibility. Missing/stale consent gives403
   `consent_required`. Re-consent UI is not implemented. Safety, termination and
   deletion remain available. Permission checks still run on every current state.
+
+## Local web deletion exception
+
+GET `/account-deletion` renders the unpublished Arabic/English fixture page.
+`X-Wainak-Deletion-Web:1` selects only login, email verify/resend, sign-out,
+reauthenticate and the two deletion routes. Every mutation requires matching
+Origin, the HttpOnly/SameSiteStrict `wainak_deletion_csrf` cookie and a valid
+`X-CSRFToken`; other cookies and routes are refused. The initial masked token is
+in `meta[name=csrf-token]`. Read refreshed `X-CSRFToken` response headers after
+login/verification rotates the secret. This marker is not authentication.
+Bearers remain only in page RAM, with pagehide/late-response invalidation; no
+URL/localStorage/sessionStorage token persistence. This is not browser E2E,
+public HTTPS hosting, password recovery UI, or store-policy acceptance.
 
 ## Development limits and deferred integration
 

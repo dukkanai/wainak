@@ -27,14 +27,23 @@ def error(status, code):
 
 class SyntheticBoundary:
     def __init__(self, get_response):
+        from django.middleware.csrf import CsrfViewMiddleware
         self.get_response = get_response
+        self.csrf = CsrfViewMiddleware(get_response)
 
     def __call__(self, request):
         response = self.handle(request)
+        if getattr(request, "_wainak_deletion_web", False):
+            if getattr(request, "_wainak_deletion_web_api", False):
+                from django.middleware.csrf import get_token
+                # Django rotates its CSRF secret on login. Refresh the masked
+                # token without putting it in a URL or readable cookie.
+                response["X-CSRFToken"] = get_token(request)
+            response = self.csrf.process_response(request, response)
         response["Cache-Control"] = "no-store"
         response["Referrer-Policy"] = "no-referrer"
         response["X-Content-Type-Options"] = "nosniff"
-        response["Content-Security-Policy"] = "default-src 'none'"
+        response.setdefault("Content-Security-Policy", "default-src 'none'")
         return response
 
     def handle(self, request):
@@ -42,11 +51,34 @@ class SyntheticBoundary:
             return error(503, "sandbox_not_configured")
         if not re.fullmatch(r"(?:localhost|127\.0\.0\.1)(?::[0-9]{1,5})?", request.META.get("HTTP_HOST", "")):
             return error(403, "local_only")
-        if request.META.get("HTTP_ORIGIN") or request.META.get("HTTP_COOKIE"):
+        from .web_deletion import WEB_PATH, WEB_OPERATIONS, csrf_protected_callback
+        web_page = request.path.rstrip("/") == WEB_PATH and request.method == "GET"
+        marker = request.META.get("HTTP_X_WAINAK_DELETION_WEB")
+        if marker is not None and marker != "1":
+            return error(403, "unsupported_transport")
+        web_api = marker == "1"
+        if web_api and (request.method, request.path) not in WEB_OPERATIONS:
+            return error(404, "web_operation_not_available")
+        if web_page or web_api:
+            if set(request.COOKIES) - {settings.CSRF_COOKIE_NAME}:
+                return error(403, "unsupported_cookies")
+            request._wainak_deletion_web = True
+            request._wainak_deletion_web_api = web_api
+            self.csrf.process_request(request)
+            if web_api:
+                if not request.META.get("HTTP_ORIGIN"):
+                    return error(403, "csrf_required")
+                # The sentinel is NOT csrf_exempt; downstream allauth app views
+                # cannot opt this browser-specific boundary out of CSRF checking.
+                if self.csrf.process_view(request, csrf_protected_callback, (), {}) is not None:
+                    return error(403, "csrf_failed")
+        elif request.META.get("HTTP_ORIGIN") or request.META.get("HTTP_COOKIE"):
             return error(403, "native_sandbox_only")
         if request.META.get("QUERY_STRING") or request.META.get("HTTP_AUTHORIZATION"):
             return error(400, "unsupported_credentials_or_query")
         path = request.path
+        if web_page:
+            return self.get_response(request)
         if path.startswith(AUTH_PREFIX) and (request.method, path[len(AUTH_PREFIX):]) not in ALLOWED_AUTH:
             return error(404, "not_found")
         if path.startswith("/v1/dev/") or path.startswith("/_allauth/") and not path.startswith(AUTH_PREFIX):
@@ -104,7 +136,7 @@ class SyntheticBoundary:
 
     def limit(self, request, data):
         path = request.path
-        if not path.startswith(AUTH_PREFIX) and path != "/identity/v1/reauthenticate":
+        if not path.startswith(AUTH_PREFIX) and path not in {"/identity/v1/reauthenticate", "/identity/v1/pending-account"}:
             return None
         action = path
         ip = request.META.get("REMOTE_ADDR", "unknown")

@@ -26,7 +26,8 @@ temporary synthetic DB credentials, and checks ownership before cleanup.
 Authentication keys remain only in the Python harness parent's RAM; the temporary
 DB password file is inside a private temporary directory removed at exit.
 
-The unchanged phase1 PostgreSQL14-case suite runs first. Only afterward does the
+The unchanged phase1 PostgreSQL14-case suite runs first. The additive pending
+deletion/web cases run after the identity class, before any independent QA hook. Only afterward does the
 identity class apply its migrations to this new disposable database. Tests use
 real default-cost Argon2, sequential account operations, and limited database-only
 counter concurrency. No Flutter compiler or service-memory adjustment is needed.
@@ -55,3 +56,16 @@ unchanged. No merge, publication or store/security-readiness claim follows.
 
 Runtime result inventory is recorded in the phase2 architecture/QA report after
 the final frozen commit is tested; draft source alone is not passing evidence.
+
+For the additive inline script regression (mock DOM/network, not a browser),
+use an existing Node runtime. The observed local verifier was Node24.19.0; the
+server user PATH had no Node, and no server installation was performed. Compare
+the template/test Git blob hashes when using a separate verification workspace:
+
+```sh
+node backend/tests/test_web_deletion_script.mjs
+```
+
+See `../docs/phase2-deletion-web.md` for the pending-account ownership contract,
+explicit dry-run/apply orphan utility and internal keyset continuation. No cleanup
+job is scheduled automatically and its24-hour rule is synthetic-only.

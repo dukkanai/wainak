@@ -8,7 +8,7 @@ from allauth.account.models import EmailAddress
 from allauth.headless.internal.sessionkit import authenticate_by_x_session_token
 from wainak.domain import DomainError, fail, fields
 from .middleware import error
-from .models import DeletionReceipt, DigestSession, MutationReceipt
+from .models import DigestSession, MutationReceipt
 from .repository import service
 from . import rate_limits
 
@@ -35,18 +35,11 @@ def recent_auth(session):
 
 def delete_identity(user, session, data):
     recent_auth(session)
-    result = service().delete_account(user.domain_id, data)
-    DeletionReceipt.objects.create(account_id=user.pk, domain_id=user.domain_id, deleted_at=timezone.now())
-    from .sessions import email_fingerprint
-    DigestSession.objects.filter(subject_email_digest=email_fingerprint(user.email)).delete()
-    user.delete()  # Auth profile, password, emails, sessions and own mutation receipts cascade.
-    session.flush()
-    return {**result, "identity_erased": True,
-            "retained_synthetic_records": ["minimal_relationship_account_tombstones", "deletion_receipt",
-                                           "other_accounts_idempotency_receipt_tombstones", "expiring_rate_counters",
-                                           "fake_mailbox_snapshots_until_fixture_exit"],
-            "retention_policy": "synthetic-purge-v1-not-production-retention",
-            "limits": "No live backups, billing, E2EE history, evidence store or production retention is managed by this fixture."}
+    fields(data, {"confirmation"})
+    if data["confirmation"] != "DELETE":
+        fail(400, "confirmation_required", "Confirm account deletion explicitly.")
+    from .deletion import erase_identity
+    return erase_identity(user, session)
 
 
 def report(user, data, key):
@@ -80,6 +73,9 @@ def dispatch(request):
         return JsonResponse({"mode": "synthetic_identity_sandbox", "durable_storage": True,
                              "real_email": False, "production_ready": False})
     try:
+        if path == "/identity/v1/pending-account" and method == "DELETE":
+            from .deletion import delete_pending
+            return JsonResponse(delete_pending(request, request.identity_data))
         user, session = authenticated(request)
         data = request.identity_data
         if path == "/identity/v1/reauthenticate" and method == "POST":

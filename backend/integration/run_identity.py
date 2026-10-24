@@ -27,6 +27,11 @@ def main(extra_test_factory=None, argv=None):
         specification.loader.exec_module(module)
         module.CONNECT, module.RESTART_DATABASE, module.FIXTURE_KEYS = connect, restart, keys
         suite = unittest.defaultTestLoader.loadTestsFromModule(module)
+        addition_spec = importlib.util.spec_from_file_location("deletion_web_integration", Path(__file__).with_name("test_deletion_web.py"))
+        addition = importlib.util.module_from_spec(addition_spec)
+        sys.modules[addition_spec.name] = addition
+        addition_spec.loader.exec_module(addition)
+        suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(addition))
         if extra_test_factory is not None:
             # Trusted Python-only QA seam, never a HTTP route/CLI DSN/key argument.
             # Appended cases run after the built-in class has lazily migrated.
