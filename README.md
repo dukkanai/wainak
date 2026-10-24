@@ -2,6 +2,8 @@
 
 وينك، بالاسم اللاتيني `wainak`، مشروع تطبيق Flutter لنظامي iOS وAndroid يساعد المسلمين البالغين على البحث عن شريك للزواج، والاستعداد للحياة المشتركة، ومواصلة الحوار خلال الخطبة والزواج.
 
+المستودع العام: [dukkanai/wainak](https://github.com/dukkanai/wainak). نتائج الفحوص التلقائية: [GitHub Actions — CI](https://github.com/dukkanai/wainak/actions/workflows/ci.yml).
+
 ## ابدأ من هنا
 
 - [فهرس المواصفات وملخص القرارات](docs/README.md).
