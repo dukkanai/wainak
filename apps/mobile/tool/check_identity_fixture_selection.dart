@@ -53,6 +53,23 @@ Future<void> main() async {
     ).create(recursive: true);
     await rejected(() => resolveFixtureScript(explicit: directory.path));
     passed++;
+    var timedOut = false;
+    try {
+      await resolveFixtureScript(
+        explicit: script.path,
+        validationTimeout: const Duration(microseconds: 1),
+      );
+    } on FixtureScriptFailure catch (failure) {
+      timedOut = failure.code == 'fixture_verifier_timeout';
+    }
+    check(timedOut);
+    passed++;
+    final fifoDir = await Directory('${root.path}/fifo').create();
+    final fifoPath = '${fifoDir.path}/serve_identity_fixture.py';
+    final fifo = await Process.run('/usr/bin/mkfifo', [fifoPath]);
+    check(fifo.exitCode == 0);
+    await rejected(() => resolveFixtureScript(explicit: fifoPath));
+    passed++;
     final mode = await Process.run('/usr/bin/chmod', ['0666', script.path]);
     check(mode.exitCode == 0);
     await rejected(() => resolveFixtureScript(explicit: script.path));
