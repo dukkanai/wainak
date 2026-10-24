@@ -1,4 +1,4 @@
-# Phase 2 native identity sandbox
+# Native identity sandbox — phases 2 and 3
 
 Explicit, separate development mode. Phase1 `fake` and `api` remain available and do not silently change their authentication.
 
@@ -15,13 +15,13 @@ This mode is native-only; web and invalid origins fail closed. A device's localh
 - Native X-Session-Token in RAM only; no Bearer, Cookie, Origin, CSRF-web marker or token URL. The Django/allauth fixture is authoritative.
 - Registration with fixture email/password, adult/Muslim declarations and policy versions; 401 pending verification is distinct from authenticated access.
 - Session-bound fake-email code verification/resend; login, session refresh, logout, global revocation, owned pending deletion and recent-password authenticated deletion.
-- Account/profile/preferences hydration on login preserves existing gender, marital status, declared wives, marriage goal and unedited preference lists. New empty accounts use the explicitly described female/single sample. Three adaptive reflection questions use backend option IDs.
+- Account/profile/preferences hydration on login preserves existing gender, marital status, declared wives, marriage goal and unedited preference lists. New empty accounts use an explicitly described female/single sample; phase3 exposes a synthetic gender selector while preserving unedited values. Three adaptive reflection questions use backend option IDs.
 - Auth transitions advance a generation; old pending replies cannot replace verified sessions. Delete/revoke confirmation is bound to the generation when opened, not whichever account is current later. Password/code controllers clear promptly, and disposed clients reject late responses.
 - Busy forms exclude keyboard focus as well as pointer actions. Arabic/RTL, light/dark theme and existing48-target/16-helper tokens are retained. Layout tests exist but their execution must be checked in the evidence report.
 
 Only ASCII canonical `@example.invalid` addresses are accepted. Do not reuse real passwords. Email proof is not legal identity, age assurance or device/key trust. No password-reset/change UI, secure token persistence, SMTP, social/MFA login, production keys or HTTPS deployment is implemented.
 
-This mode currently ends at the authenticated profile/assessment. Relationship activation has no endpoint in the identity API; relationship/discovery/message/payment interfaces are not wired in this mode, and it never switches to phase1 simulation as a substitute. Existing phase1 safety flows remain in their own explicit modes.
+Phase3 adds authenticated candidates, introduction requests, recipient acceptance/decline and independent safety actions. It stops at mutual acceptance: no activation/payment/card/text/media interface or server dialogue storage is added. It never switches to phase1 simulation as a substitute. See PHASE3_MATCHING.md for the contract, asynchronous safeguards and exact unexecuted acceptance gates. Existing phase1 modes remain explicit and unchanged.
 
 Deletion describes the backend's bounded synthetic erasure, not removal of all tombstones/receipts/counters, backups, fake-mail snapshots or another device's memory. It neither cancels subscriptions nor recovers conversation keys. Refresh/401 revalidates session access; no local timer is treated as server-authoritative expiry.
 
