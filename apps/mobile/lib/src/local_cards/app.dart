@@ -135,7 +135,8 @@ class _LocalCardsHomeState extends State<_LocalCardsHome>
       try {
         operation();
       } on LocalDraftFailure {
-        error = 'تغير العرض أو لم يكتمل الاختيار. لم نرسل أو نحفظ شيئًا خارج حالة العرض المحلية.';
+        error =
+            'تغير العرض أو لم يكتمل الاختيار. لم نرسل أو نحفظ شيئًا خارج حالة العرض المحلية.';
       }
     });
     final resultingView = controller.viewToken;
