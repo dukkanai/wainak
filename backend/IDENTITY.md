@@ -4,7 +4,10 @@ Read `../contracts/identity-api.md` and
 `../docs/phase2-identity-architecture.md` before integration.
 
 There is intentionally no public server command, `.env`, production secret,
-real SMTP adapter, existing-database DSN flag or mobile auth build in this slice.
+real SMTP adapter or existing-database DSN flag. The integrated native mobile
+auth UI is now in `../apps/mobile`; it remains a synthetic development UI, not
+a production account service. See `../docs/phase2-integration.md` for exact-source
+integration gates and local-only main authorization.
 `wainak_identity.bootstrap.configure` accepts the owned disposable harness's
 private Python connection factory. The account namespace is `@example.invalid`.
 
@@ -26,9 +29,10 @@ temporary synthetic DB credentials, and checks ownership before cleanup.
 Authentication keys remain only in the Python harness parent's RAM; the temporary
 DB password file is inside a private temporary directory removed at exit.
 
-The unchanged phase1 PostgreSQL14-case suite runs first. The additive pending
-deletion/web cases run after the identity class, before any independent QA hook. Only afterward does the
-identity class apply its migrations to this new disposable database. Tests use
+The unchanged phase1 PostgreSQL14-case suite runs first. The identity class then
+applies Django migrations in its lazy `setUpClass`, before its identity test cases.
+The additive pending deletion/web cases run after that class, followed by any
+independent QA hook. All migrations target only this new disposable database. Tests use
 real default-cost Argon2, sequential account operations, and limited database-only
 counter concurrency. No Flutter compiler or service-memory adjustment is needed.
 The HTTP durability case binds only127.0.0.1 on an ephemeral port, suppresses logs,
@@ -50,17 +54,20 @@ explicitly disables the HTTP application and is **not** a persistence test.
 Passing these checks proves only this synthetic slice on the exact tested source.
 The application is still missing production secret provisioning, HTTPS/provider
 setup, durable mail retries, scalable domain SQL, tuned anti-abuse/monitoring,
-approved retention/backups, mobile secure token storage/auth UI, device testing,
-payments, chat/media encryption and moderation evidence upload. Main remains
-unchanged. No merge, publication or store/security-readiness claim follows.
+approved retention/backups, mobile secure token storage, device testing, payments,
+chat/media encryption and moderation evidence upload. A tested native development
+auth UI does not close those production gates. A local main move is separately
+authorized only after the exact integration checks pass; no remote publication,
+deployment or store/security-readiness claim follows.
 
 Runtime result inventory is recorded in the phase2 architecture/QA report after
 the final frozen commit is tested; draft source alone is not passing evidence.
 
 For the additive inline script regression (mock DOM/network, not a browser),
-use an existing Node runtime. The observed local verifier was Node24.19.0; the
-server user PATH had no Node, and no server installation was performed. Compare
-the template/test Git blob hashes when using a separate verification workspace:
+use a verified Node24 runtime. Earlier backend-only checks used local Node24.19.0;
+the integration checkpoint may use the separately authorized project-scoped server
+runtime, with its official archive/checksum recorded alongside the exact test report.
+Compare template/test Git blob hashes when using a separate verification workspace:
 
 ```sh
 node backend/tests/test_web_deletion_script.mjs
