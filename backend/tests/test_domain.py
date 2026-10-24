@@ -268,6 +268,17 @@ class DomainTests(unittest.TestCase):
         self.denied("not_found", self.service.report, a, {"target_id": c, "category": "harassment", "relationship_id": rel})
         self.assertEqual(self.service.reports, {})
 
+    def test_target_cannot_prevent_known_candidate_reporting_by_blocking_first(self):
+        a, _ = self.create()
+        b, _ = self.create("female")
+        self.assertEqual(self.service.candidate(b, a)["id"], a)
+        self.service.block(a, {"target_id": b})
+        report = self.service.report(b, {"target_id": a, "category": "harassment"})
+        self.assertEqual(report["status"], "recorded_development_only")
+        self.denied("not_found", self.service.candidate, b, a)
+        self.assertEqual(self.service.candidates(b)["items"], [])
+        self.denied("not_found", self.service.request, b, {"candidate_id": a}, "request-001")
+
     def test_deletion_revokes_session_erases_private_data_and_disables_peer(self):
         a, token = self.create()
         b, _ = self.create("female")

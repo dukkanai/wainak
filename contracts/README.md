@@ -103,8 +103,10 @@ real billing or cryptography endpoint exists; these fail closed.
 ## Safety and deletion
 
 `POST /v1/blocks {target_id}` works before payment, disables both directions, and
-does not alter a marital declaration. After blocking a known candidate the blocker
-can still report. No unblock/reopen action is provided in this slice.
+does not alter a marital declaration. After either party blocks a known candidate,
+both can still report without regaining profile access or communication permission.
+The target cannot silence a safety report by blocking first. No unblock/reopen action
+is provided in this slice.
 
 `POST /v1/reports {target_id,category,relationship_id?}` accepts categories
 `harassment|threat|impersonation|child_safety|other_safety`. It stores only metadata

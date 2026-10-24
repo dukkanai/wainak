@@ -443,7 +443,7 @@ class DevelopmentService:
     def _can_address(self, actor, target):
         return (isinstance(target, str) and actor != target and target in self.accounts
                 and not self.accounts[target]["deleted"]
-                and (self._discoverable(actor, target) or (actor, target) in self.blocks
+                and (self._discoverable(actor, target) or self._blocked(actor, target)
                      or any({r["initiator_id"], r["recipient_id"]} == {actor, target} for r in self.relationships.values())))
 
     @locked
