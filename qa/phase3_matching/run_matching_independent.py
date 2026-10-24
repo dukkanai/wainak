@@ -24,6 +24,7 @@ def main(argv=None):
     parser.add_argument('--backend-root',type=Path,required=True)
     parser.add_argument('--expected-backend-commit',required=True)
     parser.add_argument('--run-disposable-identity',action='store_true')
+    parser.add_argument('--include-existing-qa',action='store_true')
     args=parser.parse_args(argv)
     if not args.run_disposable_identity:
         parser.error('Explicit disposable identity opt-in is required')
@@ -33,6 +34,8 @@ def main(argv=None):
     required=[root/'backend/integration/run_identity.py',
               root/'qa/phase2/test_auth_independent.py',
               Path(__file__).with_name('test_matching_independent.py')]
+    if args.include_existing_qa:
+        required.append(root/'qa/phase2_deletion/test_deletion_independent.py')
     if not all(p.is_file() and not p.is_symlink() for p in required):
         parser.error('Reviewed local fixture and QA source files are required')
     def check():
@@ -42,17 +45,28 @@ def main(argv=None):
             raise RuntimeError('Candidate must match expected clean commit')
     check()
     print('QA_MATCHING_SOURCE '+json.dumps({'root':str(root),'commit':args.expected_backend_commit,
-        'test_sha256':hashlib.sha256(required[-1].read_bytes()).hexdigest()},sort_keys=True),flush=True)
+        'test_sha256':hashlib.sha256(required[2].read_bytes()).hexdigest(),
+        'existing_qa_included':args.include_existing_qa},sort_keys=True),flush=True)
     sys.path.insert(0,str(root/'backend'))
     sys.path.insert(0,str(root/'backend/integration'))
     import run_identity
     def extra(connect,restart,temporary,keys):
         # No key/DSN is serialized or printed; same reviewed Python-only seam.
-        helpers=module_from_path('qa_matching_baseline_helpers',required[1])
+        helpers=module_from_path('qa_identity_independent',required[1])
+        helpers.RESTART_DATABASE=restart
         module=module_from_path('qa_matching_independent',required[2])
         module.BASELINE_HELPERS=helpers
         module.RESTART_DATABASE=restart
-        return unittest.defaultTestLoader.loadTestsFromTestCase(module.MatchingIndependentTests)
+        suite=unittest.TestSuite()
+        if args.include_existing_qa:
+            previous=module_from_path('qa_deletion_independent',required[3])
+            previous.RESTART_DATABASE=restart
+            suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(helpers))
+            suite.addTests(unittest.defaultTestLoader.loadTestsFromModule(previous))
+            if suite.countTestCases()!=43:
+                raise RuntimeError('Expected 43 existing independent regression cases')
+        suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(module.MatchingIndependentTests))
+        return suite
     try:
         return run_identity.main(extra_test_factory=extra,argv=['--run-disposable-identity'])
     finally:
