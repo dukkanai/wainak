@@ -279,7 +279,7 @@ class _IdentityMatchingPaneState extends State<IdentityMatchingPane> {
                 ),
               if (widget.view == MatchingView.candidates) ...[
                 const Text(
-                  'يلزم اكتمال الملف والأسئلة والموافقات والأهلية المتبادلة. نتيجة فارغة لا تكشف سبب عدم ظهور أي شخص.',
+                  'تعتمد الترشيحات على الملف والتفضيلات والموافقات والأهلية المتبادلة. نتيجة فارغة لا تكشف سبب عدم ظهور أي شخص.',
                 ),
                 if (loaded &&
                     !busy &&
