@@ -33,6 +33,7 @@ val archiveAar = archivePath?.let {
 android {
     namespace = "invalid.example.wainak.wainak_mobile"
     compileSdk = 36
+    buildToolsVersion = "36.0.0"
     ndkVersion = "30.0.16248370"
     buildFeatures { buildConfig = true }
 
