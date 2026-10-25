@@ -1,3 +1,6 @@
+import java.nio.file.Files
+import java.security.MessageDigest
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -14,10 +17,10 @@ val archiveAar = archivePath?.let {
     require(candidate.isFile && archiveHash!!.matches(Regex("[a-f0-9]{64}"))) { "archive_artifact_missing" }
     var path = candidate.toPath()
     while (path != projectDir.toPath()) {
-        require(!java.nio.file.Files.isSymbolicLink(path)) { "archive_artifact_symlink" }
+        require(!Files.isSymbolicLink(path)) { "archive_artifact_symlink" }
         path = path.parent ?: error("archive_artifact_path")
     }
-    val digest = java.security.MessageDigest.getInstance("SHA-256")
+    val digest = MessageDigest.getInstance("SHA-256")
     candidate.inputStream().use { input ->
         val buffer = ByteArray(65536)
         while (true) {
