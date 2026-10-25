@@ -17,6 +17,7 @@ import subprocess
 import sys
 import time
 from verify import GateError, require, read_json, digest, inventory, framework_slices, xcconfig, unsigned_settings
+from diagnostics import LABELS, cleanup_process, emit, native_summary, safe_error
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / 'apps/mobile'
@@ -108,25 +109,34 @@ class Runner:
         require(shutil.disk_usage(self.work).free >= 4 * 1024 ** 3, 'disk_headroom')
 
     def run(self, label, args, cwd=ROOT, timeout=1200, maximum=16 * 1024 * 1024):
-        self.guard()
-        require(git_snapshot() == self.sources, 'source_changed_before_command')
-        require(git_snapshot(self.flutter, ('packages/flutter_tools', 'bin/internal', 'bin/flutter', 'bin/dart')) == self.flutter_sources, 'flutter_source_drift')
+        require(label in LABELS, 'unknown_command_label')
         self.sequence += 1
         output = bytearray()
-        command = {'label': label, 'argv': [str(x) for x in args], 'cwd': str(cwd), 'timeout_seconds': timeout}
-        path = self.work / 'logs' / f'{self.sequence:02d}-{label}'
-        path.with_suffix('.command.json').write_text(json.dumps(command, indent=2) + '\n')
-        p = subprocess.Popen(args, cwd=cwd, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
-        sel = selectors.DefaultSelector()
-        sel.register(p.stdout, selectors.EVENT_READ)
+        p = sel = primary = None
+        operation = 'preflight'
         start = time.monotonic()
-        last_guard = start
-        status = 'FAILED'
+        path = self.work / 'logs' / f'{self.sequence:02d}-{label}'
         try:
+            emit('command_start', stage=label, sequence=self.sequence)
+            self.guard()
+            require(git_snapshot() == self.sources, 'source_changed_before_command')
+            require(git_snapshot(self.flutter, ('packages/flutter_tools', 'bin/internal', 'bin/flutter', 'bin/dart')) == self.flutter_sources, 'flutter_source_drift')
+            operation = 'write_command_metadata'
+            command = {'label': label, 'argv': [str(x) for x in args], 'cwd': str(cwd), 'timeout_seconds': timeout}
+            path.with_suffix('.command.json').write_text(json.dumps(command, indent=2) + '\n')
+            operation = 'spawn_command'
+            p = subprocess.Popen(args, cwd=cwd, env=self.env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
+            operation = 'register_output'
+            sel = selectors.DefaultSelector()
+            sel.register(p.stdout, selectors.EVENT_READ)
+            last_guard = time.monotonic()
+            operation = 'collect_output'
             while sel.get_map():
                 require(time.monotonic() - start <= timeout and not self.cancelled, 'command_timeout_or_cancel')
                 if time.monotonic() - last_guard > 2:
+                    operation = 'resource_guard'
                     self.guard(); last_guard = time.monotonic()
+                operation = 'collect_output'
                 for key, _ in sel.select(.2):
                     block = os.read(key.fd, 65536)
                     if not block:
@@ -134,45 +144,66 @@ class Runner:
                     else:
                         require(len(output) + len(block) <= maximum, 'command_output_bound')
                         output.extend(block)
+            operation = 'wait_command'
             require(p.wait(timeout=5) == 0, 'command_failed_' + label)
+            operation = 'post_command_guards'
             self.guard()
             require(git_snapshot() == self.sources, 'source_changed_by_command')
             require(git_snapshot(self.flutter, ('packages/flutter_tools', 'bin/internal', 'bin/flutter', 'bin/dart')) == self.flutter_sources, 'flutter_source_drift')
-            status = 'PASS'
             return bytes(output)
+        except BaseException as error:
+            primary = error
+            raise
         finally:
-            # This process group is ours, including a pipe-holding descendant
-            # after the leader exits. No global process/service kill is used.
-            for sig, delay in ((signal.SIGTERM, 15), (signal.SIGKILL, 2)):
-                try:
-                    os.killpg(p.pid, sig)
-                except ProcessLookupError:
-                    break
-                end = time.monotonic() + delay
-                while time.monotonic() < end:
-                    try:
-                        os.killpg(p.pid, 0)
-                    except ProcessLookupError:
-                        break
-                    time.sleep(.05)
+            # Cleanup errors must not replace a primary timeout/command/permission error.
+            failures = cleanup_process(p, sel)
+            log_hash = None
             try:
-                p.wait(timeout=5)
-                end = time.monotonic() + 5
-                group_gone = False
-                while time.monotonic() < end:
-                    try:
-                        os.killpg(p.pid, 0)
-                    except ProcessLookupError:
-                        group_gone = True
-                        break
-                    time.sleep(.05)
-                require(group_gone, 'owned_process_group_survived')
-            finally:
-                sel.close(); p.stdout.close()
                 path.with_suffix('.log').write_bytes(output)
-                self.results.append({'label': label, 'status': status, 'exit_code': p.returncode,
-                                     'log_sha256': digest(path.with_suffix('.log'))})
+                log_hash = digest(path.with_suffix('.log'))
+            except BaseException as error:
+                failures.append({'operation': 'write_private_log', **safe_error(error)})
+            row = {'label': label, 'status': 'FAILED' if primary or failures else 'PASS',
+                   'exit_code': None if p is None else p.returncode, 'log_sha256': log_hash,
+                   'primary': None if primary is None else {'operation': operation, **safe_error(primary)},
+                   'cleanup_errors': failures}
+            self.results.append(row)
+            try:
                 (self.work / 'commands.json').write_text(json.dumps(self.results, indent=2) + '\n')
+            except BaseException as error:
+                failures.append({'operation': 'write_commands_manifest', **safe_error(error)})
+                row['status'] = 'FAILED'
+            public = {'stage': label, 'sequence': self.sequence, 'status': row['status'],
+                      'elapsed_seconds': round(time.monotonic() - start, 3),
+                      'primary': row['primary'], 'cleanup_errors': failures}
+            if label == 'native':
+                public['native_result'] = native_summary(self.work / 'native/result.json')
+            try:
+                emit('command_end', **public)
+            except BaseException as error:
+                failures.append({'operation': 'emit_diagnostic', **safe_error(error)})
+                row['status'] = 'FAILED'
+                try:
+                    (self.work / 'commands.json').write_text(json.dumps(self.results, indent=2) + '\n')
+                except BaseException as manifest_error:
+                    failures.append({'operation': 'write_failed_diagnostic_manifest', **safe_error(manifest_error)})
+            if failures and primary is None:
+                raise GateError('command_cleanup_failed')
+
+
+def cleanup_owned_files(cfg_owned, cfg, cfg_hash, sources):
+    failures = []
+    if cfg_owned:
+        try:
+            require(cfg.is_file() and not cfg.is_symlink() and digest(cfg) == cfg_hash, 'generated_config_drift')
+            cfg.unlink()
+        except BaseException as error:
+            failures.append({'operation': 'remove_owned_generated_config', **safe_error(error)})
+    try:
+        require(git_snapshot() == sources, 'source_drift_at_exit')
+    except BaseException as error:
+        failures.append({'operation': 'final_source_guard', **safe_error(error)})
+    return failures
 
 
 def static_check():
@@ -274,24 +305,34 @@ def main():
                 row.update(xctest='COMPILED_NOT_RUN', xctest_binary_sha256=digest(test_bundles[0] / 'RunnerTests'), xctestrun_sha256=digest(test_runs[0]))
             artifact_rows.append(row)
         require(inventory(framework) == native_inventory and digest(cfg) == cfg_hash, 'native_input_drift')
-        (work / 'result.json').write_text(json.dumps({'status': 'PASS_UNSIGNED_IOS_COMPILE_ONLY', 'apps': artifact_rows,
+        final_result = {'status': 'PASS_UNSIGNED_IOS_COMPILE_ONLY', 'apps': artifact_rows,
             'native_artifact_files': native_inventory, 'source_files': runner.sources,
             'device_runtime': 'NOT_RUN', 'simulator_runtime': 'NOT_RUN', 'signing': False,
             'production_security_acceptance': False,
             'flutter_provenance': 'Codemagic-provisioned SDK; exact Git revision/source integrity and version checked, whole archive not independently rehashed',
-            'flutter_tool_sources': runner.flutter_sources}, indent=2) + '\n')
-        print('PASS unsigned iOS compile only; runtime and production security NOT accepted')
+            'flutter_tool_sources': runner.flutter_sources}
     finally:
-        if cfg_owned:
-            # Remove only the generated configuration this process created.
-            require(cfg.is_file() and not cfg.is_symlink() and digest(cfg) == cfg_hash, 'generated_config_drift')
-            cfg.unlink()
-        require(git_snapshot() == runner.sources, 'source_drift_at_exit')
+        # Preserve an in-flight command error even if final config/source checks fail.
+        primary = sys.exc_info()[1]
+        failures = cleanup_owned_files(cfg_owned, cfg, cfg_hash, runner.sources)
+        if failures:
+            try:
+                emit('final_cleanup_failed', primary=None if primary is None else safe_error(primary), cleanup_errors=failures)
+            except BaseException:
+                pass  # Never replace the existing error when diagnostics cannot be written.
+            if primary is None:
+                raise GateError('command_cleanup_failed')
+
+    (work / 'result.json').write_text(json.dumps(final_result, indent=2) + '\n')
+    print('PASS unsigned iOS compile only; runtime and production security NOT accepted')
 
 
 if __name__ == '__main__':
     try:
         main()
     except (GateError, OSError, ValueError, subprocess.SubprocessError) as error:
-        print('iOS preparation/build gate failed: ' + type(error).__name__, file=sys.stderr)
+        try:
+            emit('build_failed', error=safe_error(error))
+        except OSError:
+            pass
         raise SystemExit(1)
