@@ -178,6 +178,8 @@ HOST_COMMANDS = {
 }
 # Finite identities emitted by the reviewed native recipe; never argv or paths.
 NATIVE_COMMANDS = frozenset(['apple-bind', 'binding-input-controls', 'binding-input-modules', 'go-version', 'gobind-build', 'gobind-buildinfo', 'gomobile-build', 'gomobile-buildinfo', 'iphoneos-clang', 'iphoneos-sdk', 'iphoneos-sysroot', 'iphonesimulator-clang', 'iphonesimulator-sdk', 'iphonesimulator-sysroot', 'module-acquisition', 'module-verify', 'module-verify-after', 'slice-architecture', 'slice-load-commands', 'slice-symbols', 'target-0-controls', 'target-0-modules', 'target-1-controls', 'target-1-modules', 'target-device-packages', 'target-simulator-packages', 'tool-input-controls', 'tool-input-modules', 'xcode-version'])
+GRAPH_REASONS = frozenset(['TARGET_MAIN', 'CONTROLS', 'DUPLICATE_REPLACEMENT', 'INPUT_SELECTION', 'LOCAL_REPLACEMENT', 'MODULE_UNRESOLVED', 'OWNED_MAIN_CONTEXT', 'OWNED_MAIN_PATH', 'OWNED_MAIN_SELECTED', 'PACKAGES_EMPTY', 'PACKAGES_UNRESOLVED', 'PACKAGE_LOCAL', 'PACKAGE_MODULE', 'PUBLIC_MODULE', 'REPLACEMENT', 'REPLACEMENT_VERSION', 'TARGET_EVIDENCE'])
+
 TOOL_CATEGORIES = frozenset(['COMPILER', 'GOMOBILE_BIND', 'GO_MODULE_OFFLINE', 'GO_MODULE_SUM', 'GO_MODULE_UPDATE', 'GO_VERSION', 'GRAPH_MISMATCH', 'SDK_TOOL', 'UNKNOWN_TOOL_FAILURE'])
 
 FAILURE_KINDS = frozenset({'NONE', 'NONZERO_EXIT', 'TIMEOUT', 'CANCELLED', 'OUTPUT_BOUND',
@@ -272,6 +274,9 @@ def native_summary(path, reader=None, trusted_tests=None):
             category = data.get('gate_category')
             if category is not None:
                 row['gate_category'] = category if type(category) is str and category in TOOL_CATEGORIES else 'UNKNOWN_TOOL_FAILURE'
+            reason = data.get('graph_reason')
+            if row.get('gate_category') == 'GRAPH_MISMATCH' and type(reason) is str and reason in GRAPH_REASONS:
+                row['graph_reason'] = reason
         if 'last_command' in data:
             try:
                 row['last_command'] = command_summary(data['last_command'], trusted_tests or {})

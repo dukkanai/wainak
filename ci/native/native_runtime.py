@@ -24,7 +24,7 @@ import tarfile
 import time
 import urllib.request
 from check_static import InvalidRecipe, require, read_regular, read_json, sha, module_id
-from host_diagnostics import declared_tests, project_go_events, safe_last_command, HOST_COMMANDS, classify_tool_output, classify_gate_error
+from host_diagnostics import declared_tests, project_go_events, safe_last_command, HOST_COMMANDS, classify_tool_output, classify_gate_error, graph_failure_reason
 from artifact_static import static_arm64_container, validate_modulemap, validate_apple_load_commands
 
 class BuildFailure(RuntimeError):
@@ -277,22 +277,53 @@ def make_module(path, name, lock, local_sources=None):
     (path/'go.sum').write_text('\n'.join(sorted(set(sums)))+'\n')
 
 
-def inspect_graph(runtime, go, cwd, env, name, allowed, local):
+def validate_graph_controls(controls, local, generated_main=None):
+    require(not controls.get('Exclude') and not controls.get('Toolchain'),'unapproved graph controls')
+    seen=set()
+    for replacement in controls.get('Replace') or []:
+        old,new=replacement.get('Old',{}),replacement.get('New',{})
+        identity=old.get('Path')
+        require(identity not in seen,'duplicate replacement control');seen.add(identity)
+        require(not old.get('Version') and not new.get('Version'),'versioned replacement control')
+        # Upstream parseModuleVersions preserves the original versionless main
+        # module as a control-only local replacement. It is NOT a dependency.
+        expected=local.get(identity)
+        if identity=='wainak.local/cibinding' and generated_main is not None:
+            expected=generated_main
+        require(expected is not None and new.get('Path')==str(expected),'unapproved replacement')
+
+
+def inspect_graph(runtime, go, cwd, env, name, allowed, local, generated_main=None):
+    if generated_main is not None:
+        require(name in ('target-0','target-1'),'owned main replacement context invalid')
+        target_root=runtime.work/'tmp'
+        parts=cwd.relative_to(target_root).parts if cwd.is_relative_to(target_root) else ()
+        require(len(parts)==3 and parts[-2] in ('ios','iossimulator') and parts[-1]=='src-arm64' and
+                cwd.is_dir() and cwd.resolve()==cwd and not any(part.is_symlink() for part in (cwd,*cwd.parents)),
+                'owned main replacement context invalid')
+        expected=runtime.work/'binding'
+        require(type(generated_main) is type(expected) and generated_main==expected and generated_main.is_absolute(),
+                'owned main replacement path invalid')
+        # Reject links in every component, not merely the final directory.
+        require(generated_main.is_dir() and generated_main.resolve()==generated_main and
+                not any(part.is_symlink() for part in (generated_main,*generated_main.parents)),
+                'owned main replacement path invalid')
     raw=runtime.run([go,'list','-m','-json','all'],cwd,env,name+'-modules')
     rows=json_stream(raw)
+    if generated_main is not None:
+        mains=[row for row in rows if row.get('Main')]
+        require(len(mains)==1 and mains[0].get('Path')=='gobind','generated target main module invalid')
     for row in rows:
         require(not row.get('Error'),'unresolved graph metadata')
         if row.get('Main'): continue
+        require(row.get('Path')!='wainak.local/cibinding','owned main module selected as dependency')
         key=(row['Path'],row.get('Version'))
         if row['Path'] in local:
             require(row.get('Replace',{}).get('Dir')==str(local[row['Path']]),'local source replacement drift')
         else:
             require(key in allowed and not row.get('Replace'),'unapproved public module selected')
     controls=json.loads(runtime.run([go,'mod','edit','-json'],cwd,env,name+'-controls'))
-    require(not controls.get('Exclude') and not controls.get('Toolchain'),'unapproved graph controls')
-    for replacement in controls.get('Replace') or []:
-        require(replacement['Old']['Path'] in local and replacement['New']['Path']==str(local[replacement['Old']['Path']]),
-                'unapproved replacement')
+    validate_graph_controls(controls,local,generated_main)
     return {'modules':rows,'controls':controls,'go_mod_sha256':digest_file(cwd/'go.mod'),
             'go_sum_sha256':digest_file(cwd/'go.sum') if (cwd/'go.sum').exists() else None}
 
@@ -564,7 +595,7 @@ def build_ios(repo, directory, lock, work, output):
                 require(len(parts)==3 and parts[-1]=='src-arm64' and parts[-2] in ('ios','iossimulator'),'unexpected generated target path')
                 variant='simulator' if parts[-2]=='iossimulator' else 'device'
                 generated.append({'relative_path':relative,
-                                  'graph':inspect_graph(runtime,go,mod.parent,env,'target-'+str(len(generated)),allowed,local)})
+                                  'graph':inspect_graph(runtime,go,mod.parent,env,'target-'+str(len(generated)),allowed,local,generated_main=binding)})
                 target_packages.append(inspect_target_packages(runtime,go,mod.parent,env,variant,allowed,local))
         require(len(generated)==2 and {r['variant'] for r in target_packages}=={'device','simulator'},'generated target module evidence absent/ambiguous')
         runtime.stage='artifact-inspection'
@@ -585,7 +616,10 @@ def build_ios(repo, directory, lock, work, output):
                        'native_binary_advisory_scan':'NOT_RUN_BY_THIS_RECIPE',
                        'whole_process_group_cleanup':'OWNED_BY_OUTER_DRIVER'})
     except BaseException as error:
-        try: result['gate_category'] = classify_gate_error(error)
+        try:
+            result['gate_category'] = classify_gate_error(error)
+            reason=graph_failure_reason(error)
+            if reason is not None:result['graph_reason']=reason
         except BaseException: result['gate_category'] = 'UNKNOWN_TOOL_FAILURE'
         result.update({'status':'FAILED','failed_stage':runtime.stage,'whole_process_group_cleanup':'REQUIRED_FROM_OUTER_DRIVER'})
         raise

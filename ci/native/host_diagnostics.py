@@ -114,16 +114,15 @@ def classify_tool_output(raw):
     return found or ['UNKNOWN_TOOL_FAILURE']
 
 
-def classify_gate_error(error):
-    # Exact reviewed source messages only; no untrusted exception detail emitted.
-    graph_messages = {
-        'input26 selected graph changed', 'unresolved graph metadata',
-        'local source replacement drift', 'unapproved public module selected',
-        'unapproved graph controls', 'unapproved replacement',
-        'generated target module evidence absent/ambiguous',
-        'target imported package closure unresolved', 'target package local replacement drift',
-        'target package uses an unapproved dependency', 'target package closure empty',
-    }
+GRAPH_MESSAGES = {'generated target main module invalid': 'TARGET_MAIN', 'input26 selected graph changed': 'INPUT_SELECTION', 'unresolved graph metadata': 'MODULE_UNRESOLVED', 'local source replacement drift': 'LOCAL_REPLACEMENT', 'unapproved public module selected': 'PUBLIC_MODULE', 'unapproved graph controls': 'CONTROLS', 'unapproved replacement': 'REPLACEMENT', 'generated target module evidence absent/ambiguous': 'TARGET_EVIDENCE', 'target imported package closure unresolved': 'PACKAGES_UNRESOLVED', 'target package local replacement drift': 'PACKAGE_LOCAL', 'target package uses an unapproved dependency': 'PACKAGE_MODULE', 'target package closure empty': 'PACKAGES_EMPTY', 'owned main replacement context invalid': 'OWNED_MAIN_CONTEXT', 'owned main replacement path invalid': 'OWNED_MAIN_PATH', 'owned main module selected as dependency': 'OWNED_MAIN_SELECTED', 'duplicate replacement control': 'DUPLICATE_REPLACEMENT', 'versioned replacement control': 'REPLACEMENT_VERSION'}
+GRAPH_REASONS = frozenset(GRAPH_MESSAGES.values())
+
+def graph_failure_reason(error):
+    # No exception formatting, paths, argv or arbitrary values may be emitted.
     args = getattr(error, 'args', ())
     message = args[0] if type(args) is tuple and len(args) == 1 and type(args[0]) is str and len(args[0]) <= 160 else None
-    return 'GRAPH_MISMATCH' if message in graph_messages else 'UNKNOWN_TOOL_FAILURE'
+    return GRAPH_MESSAGES.get(message)
+
+
+def classify_gate_error(error):
+    return 'GRAPH_MISMATCH' if graph_failure_reason(error) is not None else 'UNKNOWN_TOOL_FAILURE'
