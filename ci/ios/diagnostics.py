@@ -176,6 +176,10 @@ HOST_COMMANDS = {
     'archivebridge-test-compile': 'archivebridge', 'archivebridge-tests': 'archivebridge',
     'archivebridge-vet': 'archivebridge',
 }
+# Finite identities emitted by the reviewed native recipe; never argv or paths.
+NATIVE_COMMANDS = frozenset(['apple-bind', 'binding-input-controls', 'binding-input-modules', 'go-version', 'gobind-build', 'gobind-buildinfo', 'gomobile-build', 'gomobile-buildinfo', 'iphoneos-clang', 'iphoneos-sdk', 'iphoneos-sysroot', 'iphonesimulator-clang', 'iphonesimulator-sdk', 'iphonesimulator-sysroot', 'module-acquisition', 'module-verify', 'module-verify-after', 'slice-architecture', 'slice-load-commands', 'slice-symbols', 'target-0-controls', 'target-0-modules', 'target-1-controls', 'target-1-modules', 'target-device-packages', 'target-simulator-packages', 'tool-input-controls', 'tool-input-modules', 'xcode-version'])
+TOOL_CATEGORIES = frozenset(['COMPILER', 'GOMOBILE_BIND', 'GO_MODULE_OFFLINE', 'GO_MODULE_SUM', 'GO_MODULE_UPDATE', 'GO_VERSION', 'GRAPH_MISMATCH', 'SDK_TOOL', 'UNKNOWN_TOOL_FAILURE'])
+
 FAILURE_KINDS = frozenset({'NONE', 'NONZERO_EXIT', 'TIMEOUT', 'CANCELLED', 'OUTPUT_BOUND',
                           'RESOURCE_GUARD', 'SPAWN_OR_IO', 'CLEANUP', 'OTHER'})
 FAILURE_CATEGORIES = frozenset({'MALFORMED_TEST_JSON', 'INCOMPLETE_TEST_JSON', 'TEST_FAILURE',
@@ -212,7 +216,7 @@ def command_summary(data, trusted_tests):
     if type(data) is not dict:
         raise ValueError('command_summary_type')
     name, outcome, kind = data.get('name'), data.get('outcome'), data.get('failure_kind')
-    if type(name) is not str or name not in HOST_COMMANDS:
+    if type(name) is not str or name not in (HOST_COMMANDS.keys() | NATIVE_COMMANDS):
         raise ValueError('command_summary_name')
     if type(outcome) is not str or outcome not in {'PASS', 'FAILED'}:
         raise ValueError('command_summary_outcome')
@@ -226,7 +230,7 @@ def command_summary(data, trusted_tests):
     tests, categories = data.get('failed_tests'), data.get('failure_categories')
     if type(tests) is not list or len(tests) > 32 or type(categories) is not list or len(categories) > 5:
         raise ValueError('command_summary_lists')
-    allowed = trusted_tests.get(HOST_COMMANDS[name], frozenset())
+    allowed = trusted_tests.get(HOST_COMMANDS.get(name), frozenset())
     if any(type(x) is not str or x not in allowed or '/' in x for x in tests):
         raise ValueError('command_summary_test_name')
     if any(type(x) is not str or x not in FAILURE_CATEGORIES for x in categories):
@@ -237,8 +241,17 @@ def command_summary(data, trusted_tests):
         raise ValueError('command_summary_false_pass')
     if outcome == 'FAILED' and kind == 'NONE':
         raise ValueError('command_summary_missing_failure')
-    return {'name': name, 'exit_code': code, 'elapsed_seconds': elapsed, 'outcome': outcome,
+    tool = data.get('tool_categories', [])
+    if type(tool) is not list or len(tool) > len(TOOL_CATEGORIES) or any(type(x) is not str or x not in TOOL_CATEGORIES for x in tool) or len(set(tool)) != len(tool):
+        raise ValueError('command_summary_tool_categories')
+    if tool and (outcome != 'FAILED' or name in HOST_COMMANDS):
+        raise ValueError('command_summary_tool_scope')
+    if name in NATIVE_COMMANDS and (tests or categories):
+        raise ValueError('command_summary_nonhost_tests')
+    row = {'name': name, 'exit_code': code, 'elapsed_seconds': elapsed, 'outcome': outcome,
             'failure_kind': kind, 'failed_tests': list(tests), 'failure_categories': list(categories)}
+    if 'tool_categories' in data: row['tool_categories'] = list(tool)
+    return row
 
 
 def native_summary(path, reader=None, trusted_tests=None):
@@ -256,6 +269,9 @@ def native_summary(path, reader=None, trusted_tests=None):
             if type(stage) is not str or stage not in NATIVE_STAGES:
                 return {'availability': 'invalid'}
             row['failed_stage'] = stage
+            category = data.get('gate_category')
+            if category is not None:
+                row['gate_category'] = category if type(category) is str and category in TOOL_CATEGORIES else 'UNKNOWN_TOOL_FAILURE'
         if 'last_command' in data:
             try:
                 row['last_command'] = command_summary(data['last_command'], trusted_tests or {})

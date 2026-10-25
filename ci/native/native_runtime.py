@@ -24,7 +24,7 @@ import tarfile
 import time
 import urllib.request
 from check_static import InvalidRecipe, require, read_regular, read_json, sha, module_id
-from host_diagnostics import declared_tests, project_go_events, safe_last_command
+from host_diagnostics import declared_tests, project_go_events, safe_last_command, HOST_COMMANDS, classify_tool_output, classify_gate_error
 from artifact_static import static_arm64_container, validate_modulemap, validate_apple_load_commands
 
 class BuildFailure(RuntimeError):
@@ -173,6 +173,9 @@ class Runtime:
             elif outcome=='FAILED' and name in ('age-cli-build','archive-test-compile','archivebridge-test-compile'):
                 projection={'failed_tests':[],'failure_categories':['COMPILE_PHASE_FAILURE']}
             last=safe_last_command(name,None if proc is None else proc.returncode,elapsed,outcome,failure,projection)
+            if last is not None and outcome == 'FAILED' and name not in HOST_COMMANDS:
+                try: last['tool_categories'] = classify_tool_output(bytes(data))
+                except BaseException: last['tool_categories'] = ['UNKNOWN_TOOL_FAILURE']
             self.last_command=last
             row={'name':name,'exit_code':None if proc is None else proc.returncode,
                  'elapsed_seconds':round(elapsed,3),'outcome':outcome,'failure_kind':failure,
@@ -581,7 +584,9 @@ def build_ios(repo, directory, lock, work, output):
                        'framework_plist_minimum_ios':'100.0','runtime_security_acceptance':False,
                        'native_binary_advisory_scan':'NOT_RUN_BY_THIS_RECIPE',
                        'whole_process_group_cleanup':'OWNED_BY_OUTER_DRIVER'})
-    except BaseException:
+    except BaseException as error:
+        try: result['gate_category'] = classify_gate_error(error)
+        except BaseException: result['gate_category'] = 'UNKNOWN_TOOL_FAILURE'
         result.update({'status':'FAILED','failed_stage':runtime.stage,'whole_process_group_cleanup':'REQUIRED_FROM_OUTER_DRIVER'})
         raise
     finally:

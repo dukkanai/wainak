@@ -179,7 +179,7 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(saved['status'],'FAILED');self.assertIn('RESOURCE_GUARD',saved['final_audit_errors'])
     def test_unknown_later_command_cannot_reuse_old_host_result(self):
         self.rt.last_command={'name':'archive-tests','outcome':'PASS'}
-        self.rt.run(['/not-run'],self.root,{},'apple-bind')
+        self.rt.run(['/not-run'],self.root,{},'unknown-command')
         self.assertIsNone(self.rt.last_command)
     def test_runtime_env_has_no_external_compiler_cache_authority(self):
         age=self.root/'age';age.write_bytes(b'public-binary-fixture')
