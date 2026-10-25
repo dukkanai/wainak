@@ -38,7 +38,11 @@ final class MethodChannelArchiveProbe implements ArchiveProbePort {
       throw const ArchiveProbeFailure('timeout');
     } on PlatformException catch (error) {
       throw ArchiveProbeFailure(
-        error.code == 'unavailable' ? 'unavailable' : 'failed',
+        switch (error.code) {
+          'unavailable' => 'unavailable',
+          'capacity' => 'capacity',
+          _ => 'failed',
+        },
       );
     }
   }

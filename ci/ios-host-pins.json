@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "host": "darwin-arm64",
+  "codemagic_instance": "mac_mini_m2",
+  "xcode_version": "26.4.1",
+  "xcode_build": "17E202",
+  "ios_minimum": "15.0",
+  "targets": ["ios/arm64", "iossimulator/arm64"],
+  "flutter": {
+    "version": "3.47.8",
+    "framework_revision": "737ba8f885dc774b53b442759999a312c9461e4e",
+    "engine_revision": "cf636b1dfb818dd6a3ff16e390e93b1a036969c8",
+    "dart_version": "3.13.7",
+    "archive_url": "https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.47.8-stable.zip",
+    "archive_sha256": "6114edc2dae3636cfefb7e4456a4510399ee856e324149b34dbacb509e329d05",
+    "metadata_url": "https://storage.googleapis.com/flutter_infra_release/releases/releases_macos.json",
+    "metadata_sha256": "24b326850806cc75c81371cfb73f071d3154fd877b8a7fb29484c5248be13b7b"
+  },
+  "go": {
+    "version": "1.27.3",
+    "archive_url": "https://dl.google.com/go/go1.27.3.darwin-arm64.tar.gz",
+    "archive_sha256": "dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2",
+    "archive_size": 68196737,
+    "toolchain_auto_download": false
+  },
+  "evidence": {
+    "observed_utc": "2026-10-25T03:21:57Z",
+    "metadata_only": true,
+    "mac_archives_downloaded": false,
+    "mac_execution": "NOT_RUN",
+    "xcode_source": "https://docs.codemagic.io/specs-macos/xcode-26-4/",
+    "go_source": "https://go.dev/dl/?mode=json"
+  }
+}

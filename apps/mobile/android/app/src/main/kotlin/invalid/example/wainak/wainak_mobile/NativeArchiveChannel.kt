@@ -38,6 +38,7 @@ internal class NativeArchiveChannel(
     private val cleaning = AtomicInteger(0)
     private val cleanupFailed = AtomicBoolean(false)
     private var context: Context? = null
+    private val handleFence = ArchiveHandleFence()
     private var disposed = false
     private val handlePattern = Regex("^probe_[a-f0-9]{32}$")
 
@@ -62,6 +63,8 @@ internal class NativeArchiveChannel(
             "open" -> {
                 if (cleanupFailed.get()) { fail(result, "cleanup_unconfirmed"); return }
                 if (context != null || working.get() || cleaning.get() != 0) { fail(result, "busy"); return }
+                val rejection = handleFence.claim(handle)
+                if (rejection != null) { fail(result, rejection); return }
                 context = Context(handle, epoch)
                 result.success(mapOf("schema" to 1, "handle" to handle, "epoch" to epoch))
             }

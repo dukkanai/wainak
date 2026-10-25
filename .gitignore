@@ -24,3 +24,6 @@ credentials/
 .flutter-plugins-dependencies
 build/
 coverage/
+
+# Disposable native/iOS CI tools, logs and unsigned artifacts stay local.
+/.ci-work/

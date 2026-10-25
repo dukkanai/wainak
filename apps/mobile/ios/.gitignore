@@ -32,3 +32,6 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# Generated only by a reviewed native artifact verifier, never hand-enabled.
+Flutter/NativeArchive.generated.xcconfig

@@ -1,1 +1,4 @@
 #include "Generated.xcconfig"
+// Development preparation only; no native artifact/condition is enabled here.
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) DEBUG
+#include? "NativeArchive.generated.xcconfig"

@@ -95,6 +95,7 @@ final class ArchiveProbeController {
       failure = switch (error.code) {
         'unavailable' => 'unavailable',
         'timeout' => 'timeout',
+        'capacity' => 'capacity',
         _ => 'failed',
       };
     } catch (_) {

@@ -1,0 +1,31 @@
+{
+  "android_artifact_rebuilt": false,
+  "base_commit": "120a0c24970427438af7c693e772b95050b3fcfc",
+  "limit_semantics": "64 unique caller handles per synthetic engine instance, not a product backup quota; reopen app for a new engine",
+  "modified": {
+    "apps/mobile/android/app/src/main/kotlin/invalid/example/wainak/wainak_mobile/NativeArchiveChannel.kt": {
+      "after_sha256": "b1caaee059093f99ccfdf73bf6c1c5621e3a625115b5a3bb96f23bd1c450c320",
+      "before_sha256": "5d3d5ce27a17a588860f26b7a055dee58031f69d05a69036d004ad1c64e58e6f"
+    },
+    "apps/mobile/lib/src/native_archive/app.dart": {
+      "after_sha256": "8c7c6083a699d11ee361f97504b9b6526bd867d96a933a1e2098d46c039ede6f",
+      "before_sha256": "67f757ea80bf99af4b8aed6d6bc4e17a32a04dc0efdbdade314f467dc777c94d"
+    },
+    "apps/mobile/lib/src/native_archive/channel.dart": {
+      "after_sha256": "bd3e1108cb4bd941eaca05754728dc1abbd7bcdd770eb89bd5f593efe4a4443f",
+      "before_sha256": "c4f249fc3c9f4a49d62516ae2d907ab56d6f20e185ac9613841be1ddbf802498"
+    },
+    "apps/mobile/lib/src/native_archive/controller.dart": {
+      "after_sha256": "1d43fb6ae0d23643b034247f7f78ac2b95e5d37f455a495f42c30f90825551be",
+      "before_sha256": "463e1032ff5ab04f3b8216a385e3fd4e67de41c1aef63e3c8b32dd3bc2e6eb48"
+    }
+  },
+  "new_source_files": {
+    "apps/mobile/android/app/src/main/kotlin/invalid/example/wainak/wainak_mobile/ArchiveHandleFence.kt": "9fdcd384397edbb015ee59abdc98dbc9a97fa195ea203b1f99700cf00db5c685",
+    "apps/mobile/test/native_archive_capacity_test.dart": "5c5526588d13228ff998ec9ff6513a8b17dc2db546f445dfb382eb00c5054dff",
+    "apps/mobile/tool/kotlin/ArchiveHandleFenceCheck.kt": "eafd7690ce0e60ce0223dd82078b720364cf31c09a25c6e5e92060fa786a1cfe"
+  },
+  "new_tests": "NOT_RUN",
+  "purpose": "bounded engine-lifetime handle replay fence and explicit capacity UX",
+  "schema": 1
+}

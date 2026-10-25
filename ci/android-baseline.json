@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "commit": "120a0c24970427438af7c693e772b95050b3fcfc",
+  "files": {
+    "apps/mobile/android/.gitignore": "2b236ebd1414a4d5fcc1896ea13d841209b42a9da43a67ab8d7f64b6e2710b21",
+    "apps/mobile/android/app/build.gradle.kts": "428103c0f2c34184e9e044c5fb9e3e129a73d7962dbc27e093efa1da1d9f54f4",
+    "apps/mobile/android/app/src/archiveBridge/kotlin/invalid/example/wainak/wainak_mobile/ArchiveEngineFactory.kt": "67c175aa79bcdb846b93e88f0ff608c14babf8cedfd03a3785740171072df725",
+    "apps/mobile/android/app/src/archiveUnavailable/kotlin/invalid/example/wainak/wainak_mobile/ArchiveEngineFactory.kt": "72cc40739739ea75636c43e110f5c717135731abd1d759905afc511ae7da3e9f",
+    "apps/mobile/android/app/src/debug/AndroidManifest.xml": "30b0832ed8b92dfbd6ae2abfa939ccf26333d37600056b1572bd4a397a18a74b",
+    "apps/mobile/android/app/src/main/AndroidManifest.xml": "f46e2ffbacbaba43afc3e8c4d64846d9daa9a30333d2197b0ae940628f2c3d3f",
+    "apps/mobile/android/app/src/main/kotlin/invalid/example/wainak/wainak_mobile/ArchiveEngine.kt": "0271e8bf58847a3d818ddc6147bad6b073f173319c059a6ffd8f1f0c82ea9b07",
+    "apps/mobile/android/app/src/main/kotlin/invalid/example/wainak/wainak_mobile/MainActivity.kt": "600991ab50dd1b1f742e1ccca5523c585f2a754cd1b57792e42036b1ae360c2c",
+    "apps/mobile/android/app/src/main/kotlin/invalid/example/wainak/wainak_mobile/NativeArchiveChannel.kt": "5d3d5ce27a17a588860f26b7a055dee58031f69d05a69036d004ad1c64e58e6f",
+    "apps/mobile/android/app/src/main/res/drawable-v21/launch_background.xml": "7ca6d5cec2169c5a98661a119db23a6f3399c8fef2256ff04f3a642831282478",
+    "apps/mobile/android/app/src/main/res/drawable/launch_background.xml": "94433756fe10005ddd6fc55cc5c0b1e9f3c10b66a08ceac795ece6713d34e28a",
+    "apps/mobile/android/app/src/main/res/mipmap-hdpi/ic_launcher.png": "6a7c8f0d703e3682108f9662f813302236240d3f8f638bb391e32bfb96055fef",
+    "apps/mobile/android/app/src/main/res/mipmap-mdpi/ic_launcher.png": "c7c0c0189145e4e32a401c61c9bdc615754b0264e7afae24e834bb81049eaf81",
+    "apps/mobile/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png": "e14aa40904929bf313fded22cf7e7ffcbf1d1aac4263b5ef1be8bfce650397aa",
+    "apps/mobile/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png": "4d470bf22d5c17d84edc5f82516d1ba8a1c09559cd761cefb792f86d9f52b540",
+    "apps/mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png": "3c34e1f298d0c9ea3455d46db6b7759c8211a49e9ec6e44b635fc5c87dfb4180",
+    "apps/mobile/android/app/src/main/res/values-night/styles.xml": "8c5bad5152f217e837519f9c15211d19f39bd45f5f67faf6dd81cb4b299e518f",
+    "apps/mobile/android/app/src/main/res/values/styles.xml": "937d7c82f539c72eb94fd3a3773f29b3d3fef1997213c92cb632298cedf4bda9",
+    "apps/mobile/android/app/src/profile/AndroidManifest.xml": "30b0832ed8b92dfbd6ae2abfa939ccf26333d37600056b1572bd4a397a18a74b",
+    "apps/mobile/android/build.gradle.kts": "6a26dba2cb8dfba1e74f540b0d17a89d96c1301d3c3bfda14348bed257fddcba",
+    "apps/mobile/android/gradle.properties": "0efa11d49fd01ecd35fb6a2911b6f69cd56788e83a648b8f90ab62d4fa3831d2",
+    "apps/mobile/android/gradle/wrapper/gradle-wrapper.properties": "67ce033cdd43a5af2686f7ecae3b527d70041824260d6f15a7c2c3a100a8d1c2",
+    "apps/mobile/android/settings.gradle.kts": "016759283e88ade6eba92910583feeef88b962839b957aa414296afd2952d122"
+  }
+}

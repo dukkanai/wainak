@@ -76,15 +76,20 @@ void main() {
     skip: dev && mode != 'native_archive',
   );
 
-  testWidgets('actual entry rejects non-Android even with opt-in', (
+  testWidgets('actual entry keeps iOS preview separately opt-in', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     try {
       application.main();
       await tester.pumpAndSettle();
-      expect(find.byType(application.DisabledBuild), findsOneWidget);
-      expect(find.byType(NativeArchiveApp), findsNothing);
+      const iosPreview = bool.fromEnvironment('WAINAK_IOS_ARCHIVE_PREVIEW');
+      if (dev && iosPreview) {
+        expect(find.byType(NativeArchiveApp), findsOneWidget);
+      } else {
+        expect(find.byType(application.DisabledBuild), findsOneWidget);
+        expect(find.byType(NativeArchiveApp), findsNothing);
+      }
       await tester.pumpWidget(const SizedBox());
     } finally {
       debugDefaultTargetPlatformOverride = null;

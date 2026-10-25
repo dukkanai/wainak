@@ -21,18 +21,23 @@ void main() {
     defaultValue: 'fake',
   );
   const baseUrl = String.fromEnvironment('WAINAK_API_BASE_URL');
+  const iosArchivePreview = bool.fromEnvironment('WAINAK_IOS_ARCHIVE_PREVIEW');
   if (!devEnabled) {
     runApp(const DisabledBuild());
     return;
   }
   if (mode == 'native_archive') {
-    if (!archiveProbeEnabled(optedIn: devEnabled, release: kReleaseMode) ||
-        kIsWeb ||
-        defaultTargetPlatform != TargetPlatform.android) {
+    if (!nativeArchiveHostAllowed(
+      platform: defaultTargetPlatform,
+      isWeb: kIsWeb,
+      release: kReleaseMode,
+      devOptIn: devEnabled,
+      iosPreview: iosArchivePreview,
+    )) {
       runApp(
         const DisabledBuild(
           message:
-              'اختبار الأرشيف متاح للتطوير على Android فقط. لا محاكاة ناجحة بديلة ولا حفظ أو إرسال.',
+              'اختبار الأرشيف يتطلب منصة تطوير مدعومة وموافقة معاينة صريحة على iOS. لا محاكاة ناجحة بديلة ولا حفظ أو إرسال.',
         ),
       );
       return;
@@ -107,3 +112,16 @@ class DisabledBuild extends StatelessWidget {
     ),
   );
 }
+
+/// iOS remains a separate explicit preview until native artifact/device evidence.
+bool nativeArchiveHostAllowed({
+  required TargetPlatform platform,
+  required bool isWeb,
+  required bool release,
+  required bool devOptIn,
+  required bool iosPreview,
+}) =>
+    archiveProbeEnabled(optedIn: devOptIn, release: release) &&
+    !isWeb &&
+    (platform == TargetPlatform.android ||
+        (platform == TargetPlatform.iOS && iosPreview));
