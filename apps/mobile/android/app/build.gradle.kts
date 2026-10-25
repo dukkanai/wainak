@@ -60,6 +60,19 @@ android {
     )
 }
 
+// AGP keeps variant version defaults even when the DSL signing config is null.
+// Explicitly disable all formats; this never creates a config or a key.
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.signingConfig?.let { config ->
+            config.enableV1Signing.set(false)
+            config.enableV2Signing.set(false)
+            config.enableV3Signing.set(false)
+            config.enableV4Signing.set(false)
+        }
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
