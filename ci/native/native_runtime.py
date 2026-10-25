@@ -6,6 +6,8 @@ Children never start another session. No signing, license acceptance, SDK instal
 provider calls, vendor patches, go interception, init or latest operations exist.
 """
 import base64
+from contextlib import contextmanager
+import sys
 import hashlib
 import json
 import os
@@ -16,11 +18,13 @@ import re
 import selectors
 import shutil
 import signal
+import stat
 import subprocess
 import tarfile
 import time
 import urllib.request
 from check_static import InvalidRecipe, require, read_regular, read_json, sha, module_id
+from host_diagnostics import declared_tests, project_go_events, safe_last_command
 from artifact_static import static_arm64_container, validate_modulemap, validate_apple_load_commands
 
 class BuildFailure(RuntimeError):
@@ -69,24 +73,53 @@ class Runtime:
     def __init__(self, repo, work, lock):
         self.repo, self.work, self.lock=repo,work,lock
         self.cancelled=False; self.commands=[]; self.stage='preflight'; self.sequence=0
+        self.last_audit=None; self.last_aggregate=0; self.reserved=0
+        self.last_command=None; self.test_names=declared_tests(repo,lock['source_hashes']); self.resource_final_audit_failed=False
         self.previous={s:signal.signal(s,self.signal) for s in (signal.SIGTERM,signal.SIGINT)}
     def signal(self, number, frame): self.cancelled=True
     def restore(self):
         for sig,handler in self.previous.items(): signal.signal(sig,handler)
-    def guard(self):
-        if self.cancelled: raise BuildFailure('build cancelled')
+    def full_audit(self):
         aggregate=sum(byte_size(p) for p in (
             self.repo/'.ci-work',self.repo/'apps/mobile/build',self.repo/'apps/mobile/.dart_tool',
             self.repo/'apps/mobile/ios/Flutter/ephemeral'))
-        if aggregate>self.lock['limits']['aggregate_bytes']: raise BuildFailure('workspace budget exceeded')
-        if shutil.disk_usage(self.repo).free<self.lock['limits']['minimum_free_bytes']:
-            raise BuildFailure('free disk floor exceeded')
+        self.last_aggregate=aggregate; self.last_audit=time.monotonic()
+        self.full_audits=getattr(self,'full_audits',0)+1
         return aggregate
-    def run(self, args, cwd, env, name, public_output=True, seconds=None):
-        self.guard(); self.sequence+=1; started=time.monotonic(); data=bytearray(); proc=None
-        timeout=seconds or self.lock['limits']['process_seconds']
+    def guard(self, force=False):
+        if self.cancelled: raise BuildFailure('build cancelled')
+        now=time.monotonic()
+        if force or self.last_audit is None or now-self.last_audit>=2:
+            self.full_audit()
+        if self.last_aggregate+self.reserved>self.lock['limits']['aggregate_bytes']:
+            raise BuildFailure('workspace budget exceeded')
+        if shutil.disk_usage(self.repo).free<self.lock['limits']['minimum_free_bytes']+self.reserved:
+            raise BuildFailure('free disk floor exceeded')
+        return self.last_aggregate
+    @contextmanager
+    def reservation(self, size):
+        require(type(size) is int and size>=0 and self.reserved==0,'invalid resource reservation')
+        self.reserved=size
+        self.peak_reserved=max(getattr(self,'peak_reserved',0),size)
         try:
-            # All descendants remain in the outer driver's owned session/group.
+            self.guard(force=True)
+            yield
+        finally:
+            primary=sys.exc_info()[1]; self.reserved=0
+            try: self.guard(force=True)
+            except BaseException:
+                if primary is None: raise
+                self.resource_final_audit_failed=True
+    def consume(self, size):
+        require(type(size) is int and 0<=size<=self.reserved,'reservation exhausted')
+        self.reserved-=size
+    def run(self, args, cwd, env, name, public_output=True, seconds=None, go_json=False):
+        self.sequence+=1; started=time.monotonic(); data=bytearray(); proc=None
+        timeout=seconds if seconds is not None else self.lock['limits']['process_seconds']
+        primary=None; failure='NONE'; cleanup_failed=False
+        try:
+            if timeout<=0: raise BuildFailure('child deadline exceeded')
+            self.guard(force=True)
             proc=subprocess.Popen([str(a) for a in args],cwd=cwd,env=env,
                                   stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
                                   stderr=subprocess.STDOUT,start_new_session=False)
@@ -102,25 +135,62 @@ class Runtime:
                             raise BuildFailure('child output bound exceeded')
                         data.extend(chunk)
                 code=proc.wait(timeout=5)
-            self.guard()
+            self.guard(force=True)
             if code: raise BuildFailure('child command failed')
             return bytes(data)
+        except BaseException as error:
+            primary=error
+            fixed={'build cancelled':'CANCELLED','child deadline exceeded':'TIMEOUT',
+                   'child output bound exceeded':'OUTPUT_BOUND','child command failed':'NONZERO_EXIT',
+                   'workspace budget exceeded':'RESOURCE_GUARD','free disk floor exceeded':'RESOURCE_GUARD'}
+            failure=fixed.get(str(error),'SPAWN_OR_IO' if isinstance(error,OSError) else 'OTHER')
+            raise
         finally:
-            # Direct-child reaping only. Whole-group cleanup is the driver's job.
+            # Preserve primary failure; never claim success if direct-child cleanup fails.
             if proc is not None:
-                if proc.poll() is None:
-                    proc.terminate()
-                    try: proc.wait(timeout=8)
-                    except subprocess.TimeoutExpired: proc.kill(); proc.wait(timeout=2)
-                if proc.stdout is not None: proc.stdout.close()
-            row={'name':name,'argv':[str(a) for a in args],'exit_code':None if proc is None else proc.returncode,
-                 'elapsed_seconds':round(time.monotonic()-started,3),'output_bytes':len(data),
-                 'output_sha256':hashlib.sha256(data).hexdigest()}
+                try:
+                    if proc.poll() is None:
+                        proc.terminate()
+                        try: proc.wait(timeout=8)
+                        except subprocess.TimeoutExpired: proc.kill(); proc.wait(timeout=2)
+                except BaseException: cleanup_failed=True
+                try:
+                    if proc.stdout is not None: proc.stdout.close()
+                except BaseException: cleanup_failed=True
+            try: self.guard(force=True)
+            except BaseException: cleanup_failed=True
+            if cleanup_failed and primary is None: failure='CLEANUP'
+            outcome='FAILED' if primary is not None or cleanup_failed else 'PASS'
+            elapsed=time.monotonic()-started
+            projection=None; proof_failed=False
+            if go_json:
+                package='wainak.local/archivebridge' if name.startswith('archivebridge-') else 'wainak.local/historyarchive'
+                projection,has_failure,proof_ok=project_go_events(bytes(data),self.test_names[package],package)
+                proof_failed=not proof_ok
+                if proof_failed and primary is None and not cleanup_failed: failure='OTHER';outcome='FAILED'
+                if outcome=='FAILED' and not has_failure:
+                    projection['failure_categories'].append('NO_TEST_FAILURE_EVENT')
+            elif outcome=='FAILED' and name in ('age-cli-build','archive-test-compile','archivebridge-test-compile'):
+                projection={'failed_tests':[],'failure_categories':['COMPILE_PHASE_FAILURE']}
+            last=safe_last_command(name,None if proc is None else proc.returncode,elapsed,outcome,failure,projection)
+            self.last_command=last
+            row={'name':name,'exit_code':None if proc is None else proc.returncode,
+                 'elapsed_seconds':round(elapsed,3),'outcome':outcome,'failure_kind':failure,
+                 'output_bytes':len(data),'output_sha256':hashlib.sha256(data).hexdigest()}
+            if projection is not None: row.update(projection)
             self.commands.append(row)
-            if public_output:
-                (self.work/'logs'/f'{self.sequence:03}-{name}.log').write_bytes(data)
-            # Go tests are retained as fixed status/hash only, never raw key-bearing output.
-            (self.work/'commands.json').write_text(json.dumps(self.commands,indent=2,sort_keys=True)+'\n')
+            try:
+                if public_output: (self.work/'logs'/f'{self.sequence:03}-{name}.log').write_bytes(data)
+                (self.work/'commands.json').write_text(json.dumps(self.commands,indent=2,sort_keys=True)+'\n')
+            except BaseException:
+                cleanup_failed=True
+                row.update(outcome='FAILED',failure_kind=failure if primary is not None else 'SPAWN_OR_IO')
+                if self.last_command is not None:
+                    self.last_command.update(outcome='FAILED',failure_kind=row['failure_kind'])
+                try: (self.work/'commands.json').write_text(json.dumps(self.commands,indent=2,sort_keys=True)+'\n')
+                except BaseException: pass
+            if cleanup_failed and primary is None: raise BuildFailure('command cleanup failed')
+            if proof_failed and primary is None: raise BuildFailure('test JSON proof invalid')
 
 def download_go(runtime, spec, target):
     part=target.with_suffix('.part'); require(not part.exists() and not target.exists(),'download destination exists')
@@ -140,29 +210,46 @@ def download_go(runtime, spec, target):
     part.rename(target)
 
 def extract_go(runtime, archive, destination, limit):
-    require(not destination.exists(),'tool extraction destination exists'); destination.mkdir(mode=0o700)
-    total=0; names=set()
-    with tarfile.open(archive,'r:gz') as tar:
-        for member in tar:
-            runtime.guard(); p=PurePosixPath(member.name)
-            require(not p.is_absolute() and '..' not in p.parts and p.parts and p.parts[0]=='go','unsafe Go archive path')
-            require(member.name not in names and len(names)<30000,'duplicate/excess Go archive members'); names.add(member.name)
-            require(member.isdir() or member.isfile(),'Go archive links/special files rejected')
-            require(member.size>=0,'negative archive size'); total+=member.size
-            require(total<=limit,'Go archive expanded bound exceeded')
-            output=safe_child(destination,destination.joinpath(*p.parts))
-            if member.isdir(): output.mkdir(parents=True,exist_ok=True,mode=0o700); continue
-            output.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
-            with tar.extractfile(member) as source, output.open('xb') as sink:
-                shutil.copyfileobj(source,sink,1024*1024)
-            require(output.stat().st_size==member.size,'Go archive member size mismatch')
-            output.chmod(0o700 if member.mode&0o111 else 0o600)
+    require(not destination.exists(),'tool extraction destination exists')
+    # Reserve payload plus conservative metadata before any extraction. This is
+    # accounting under a monitored cap, not an OS allocation quota.
+    with runtime.reservation(limit+128*1024*1024):
+        destination.mkdir(mode=0o700); runtime.consume(destination.lstat().st_size)
+        total=0; names=set(); metadata=0
+        with tarfile.open(archive,'r:gz') as tar:
+            for member in tar:
+                runtime.guard(); p=PurePosixPath(member.name)
+                require(not p.is_absolute() and '..' not in p.parts and p.parts and p.parts[0]=='go','unsafe Go archive path')
+                require(len(member.name)<=4096 and len(p.parts)<=32,'archive path bounds')
+                require(member.name not in names and len(names)<30000,'duplicate/excess Go archive members'); names.add(member.name)
+                require(member.isdir() or member.isfile(),'Go archive links/special files rejected')
+                require(member.size>=0,'negative archive size'); total+=member.size
+                require(total<=limit,'Go archive expanded bound exceeded')
+                output=safe_child(destination,destination.joinpath(*p.parts))
+                parent=output if member.isdir() else output.parent
+                absent=[]; current=parent
+                while not current.exists(): absent.append(current);current=current.parent
+                for directory in reversed(absent):
+                    directory.mkdir(mode=0o700); cost=directory.lstat().st_size
+                    metadata+=cost; require(metadata<=128*1024*1024,'archive metadata bound')
+                    runtime.consume(cost)
+                if member.isdir(): continue
+                require(member.size<=runtime.reserved,'extraction reservation exhausted')
+                with tar.extractfile(member) as source, output.open('xb') as sink:
+                    written=0
+                    while True:
+                        runtime.guard(); block=source.read(1024*1024)
+                        if not block: break
+                        require(written+len(block)<=member.size,'archive member size grew')
+                        sink.write(block);written+=len(block);runtime.consume(len(block))
+                require(output.stat().st_size==member.size,'Go archive member size mismatch')
+                output.chmod(0o700 if member.mode&0o111 else 0o600)
     return destination/'go/bin/go'
 
 def make_env(work, go, developer_dir):
     # No inherited credentials, signing settings, proxies, GOFLAGS or persistent Go config.
     return {'HOME':str(work/'home'),'PATH':str(go.parent)+':'+str(work/'bin')+':/usr/bin:/bin:/usr/sbin:/sbin',
-            'TMPDIR':str(work/'tmp'),'GOENV':'off','GOTOOLCHAIN':'local','GOWORK':'off','GOTELEMETRY':'off',
+            'TMPDIR':str(work/'tmp'),'GOTMPDIR':str(work/'compiler-tmp'),'GOENV':'off','GOTOOLCHAIN':'local','GOWORK':'off','GOTELEMETRY':'off',
             'GOPROXY':'off','GOSUMDB':'off','GONOSUMDB':'','GONOPROXY':'','GOPRIVATE':'',
             'GOMODCACHE':str(work/'gomodcache'),'GOCACHE':str(work/'gocache'),'GOPATH':str(work/'gopath'),
             'GOFLAGS':'-mod=readonly -p=1','GOMAXPROCS':'2','GOMEMLIMIT':'1073741824',
@@ -278,28 +365,89 @@ def acquire_modules(runtime, go, cwd, env, lock):
     return modules
 
 
+def cache_inventory(env):
+    result={}
+    for name in ('GOCACHE','GOMODCACHE','GOTMPDIR'):
+        root=Path(env[name]);require(root.is_dir() and not root.is_symlink(),'cache root boundary')
+        files={}
+        for path in sorted(root.rglob('*')):
+            mode=path.lstat().st_mode
+            require(stat.S_ISDIR(mode) or stat.S_ISREG(mode),'unexpected cache special file')
+            if stat.S_ISREG(mode): files[str(path.relative_to(root))]=digest_file(path)
+        result[name]=files
+    return result
+
+def runtime_test_env(env, root, age):
+    # No compiler cache paths inherited by the executed test/CLI. These writable
+    # destinations and cwd are all inside the owned canary-scanned root.
+    return {'PATH':'/nonexistent','LC_ALL':'C','HOME':str(root/'home'),'TMPDIR':str(root/'tmp'),
+            'GOENV':'off','GOTOOLCHAIN':'local','GOWORK':'off','GOTELEMETRY':'off',
+            'GOPROXY':'off','GOSUMDB':'off','GOMAXPROCS':'2','GOMEMLIMIT':'1073741824',
+            'WAINAK_ARCHIVE_INTEROP':'1','WAINAK_AGE_CLI':str(age),
+            'WAINAK_AGE_CLI_SHA256':digest_file(age),'WAINAK_ARCHIVE_SCAN_ROOT':str(root)}
+
 def test_host_policy(runtime, go, tools_module, env, lock):
     runtime.stage='new-policy-host-tests'
     age=runtime.work/'bin/age'
-    runtime.run([go,'build','-trimpath','-o',age,'filippo.io/age/cmd/age'],tools_module,env,'age-cli-build')
-    source=runtime.work/'host-source'; source.mkdir()
-    local={'wainak.local/historyarchive':source/'archive'}
+    runtime.run([go,'build','-trimpath','-o',age,'filippo.io/age/cmd/age'],tools_module,dict(env,CGO_ENABLED='0'),'age-cli-build')
+    source=runtime.work/'host-tests'; source.mkdir()
+    local={'wainak.local/historyarchive':source/'archive/module'}
     results=[]
     for name,module in [('archive','wainak.local/historyarchive'),('archivebridge','wainak.local/archivebridge')]:
-        target=source/name
-        make_module(target,module,lock,None if name=='archive' else local)
+        root=source/name; root.mkdir(mode=0o700)
+        for folder in ('home','tmp'): (root/folder).mkdir(mode=0o700)
+        target=root/'module';make_module(target,module,lock,None if name=='archive' else local)
         for path in (runtime.repo/name).glob('*.go'): shutil.copyfile(path,target/path.name)
-        testenv=dict(env,WAINAK_ARCHIVE_INTEROP='1',WAINAK_AGE_CLI=str(age),WAINAK_AGE_CLI_SHA256=digest_file(age),
-                     WAINAK_ARCHIVE_SCAN_ROOT=str(runtime.work),CGO_ENABLED='0')
-        runtime.run([go,'test','-count=1','-timeout=120s','./...'],target,testenv,name+'-tests',public_output=False,seconds=180)
-        runtime.run([go,'vet','./...'],target,testenv,name+'-vet',public_output=False,seconds=180)
-        results.append({'module':module,'status':'PASS','graph_policy':'explicit-input26','interop_enabled':name=='archive'})
+        compileenv=dict(env,CGO_ENABLED='0')
+        binary=runtime.work/'bin'/(name+'.test')
+        deadline=time.monotonic()+180
+        runtime.run([go,'test','-c','-o',binary,'.'],target,compileenv,name+'-test-compile',public_output=False,seconds=deadline-time.monotonic())
+        before=cache_inventory(env)
+        binary_before=digest_file(binary); age_before=digest_file(age)
+        testenv=runtime_test_env(env,root,age)
+        audit={'cache_before_sha256':hashlib.sha256(json.dumps(before,sort_keys=True).encode()).hexdigest(),
+               'runtime_cwd_home_tmp':'owned-test-root','cache_unchanged_during_runtime_tests':False,
+               'scan_bound_bytes':512*1024*1024,'os_sandbox':False,
+               'test_binary_sha256':binary_before,'age_cli_sha256':age_before}
+        try:
+            runtime.run([go,'tool','test2json','-t','-p',module,binary,'-test.v=test2json','-test.count=1','-test.timeout=120s'],
+                        root,testenv,name+'-tests',public_output=False,seconds=deadline-time.monotonic(),go_json=True)
+        finally:
+            primary=sys.exc_info()[1]
+            try:
+                after=cache_inventory(env)
+                audit.update(cache_after_sha256=hashlib.sha256(json.dumps(after,sort_keys=True).encode()).hexdigest(),
+                             cache_unchanged_during_runtime_tests=before==after)
+                (runtime.work/(name+'-runtime-cache.json')).write_text(json.dumps(audit,sort_keys=True)+'\n')
+                require(before==after,'compiler/module cache changed during runtime tests')
+                require(binary_before==digest_file(binary) and age_before==digest_file(age),'runtime binary changed')
+            except BaseException:
+                if primary is None: raise
+                runtime.resource_final_audit_failed=True
+        runtime.run([go,'vet','./...'],target,compileenv,name+'-vet',public_output=False,seconds=180)
+        results.append({'module':module,'status':'PASS','graph_policy':'explicit-input26','interop_enabled':name=='archive',
+                        'runtime_cache_audit':audit})
         if name=='archive':
             for fuzz in ('FuzzStrictHistoryJSON','FuzzArchiveOpen'):
-                runtime.run([go,'test','-run=^$','-fuzz=^'+fuzz+'$','-fuzztime=10s','-parallel=1'],target,testenv,
-                            'fuzz-'+fuzz,public_output=False,seconds=60)
-    return results
+                # Keep supported go test fuzz instrumentation. Corpus inputs are
+                # public schema literals or ciphertext, never runtime key/canary.
+                fuzz_env=dict(compileenv,HOME=str(root/'home'),TMPDIR=str(root/'tmp'))
+                cache_before=cache_inventory(env)
+                try:
+                    runtime.run([go,'test','-json','-run=^$','-fuzz=^'+fuzz+'$','-fuzztime=10s','-parallel=1'],target,fuzz_env,
+                                'fuzz-'+fuzz,public_output=False,seconds=60,go_json=True)
+                finally:
+                    primary=sys.exc_info()[1]
+                    try:
+                        cache_after=cache_inventory(env)
+                        (runtime.work/(fuzz+'-cache.json')).write_text(json.dumps({'before':cache_before,'after':cache_after,
+                            'corpus_scope':'public-schema-input-or-ciphertext-only','cache_immutable_claim':False},sort_keys=True)+'\n')
+                        require(cache_before['GOMODCACHE']==cache_after['GOMODCACHE'],'module cache changed during fuzz')
+                    except BaseException:
+                        if primary is None: raise
+                        runtime.resource_final_audit_failed=True
 
+    return results
 
 def inspect_xcframework(runtime, output, env, lock):
     info=plistlib.loads(read_regular(output/'Info.plist'))
@@ -330,6 +478,33 @@ def inspect_xcframework(runtime, output, env, lock):
     return results
 
 
+def finalize_native_result(runtime,repo,directory,result,initial,manifests,primary):
+    """Bounded audit labels; final bookkeeping never replaces an existing failure."""
+    errors=[]
+    def audit(label, action):
+        try: return action()
+        except BaseException: errors.append(label); return None
+    audit('SOURCE_GUARD',lambda:require(initial=={name:sha(repo/name) for name in initial},'repository Go source changed'))
+    audit('MODULE_MANIFEST_GUARD',lambda:require(manifests=={name:sha(repo/name) for name in manifests},'repository manifests changed'))
+    result['last_command']=runtime.last_command
+    result['resource_final_audit_failed']=runtime.resource_final_audit_failed
+    result['resource_monitor']={'period_seconds':2,'full_audits_before_final':getattr(runtime,'full_audits',0),
+        'peak_reserved_bytes':getattr(runtime,'peak_reserved',0),'hard_quota':False}
+    result['commands_manifest_sha256']=audit('COMMAND_METADATA',lambda:digest_file(runtime.work/'commands.json') if (runtime.work/'commands.json').exists() else None)
+    result['lock_sha256']=audit('LOCK_METADATA',lambda:sha(directory/'lock.json'))
+    if errors or primary is not None:result.update(status='FAILED',failed_stage=runtime.stage)
+    result['final_audit_errors']=errors;result['final_budget_audit']='PASS'
+    path=runtime.work/'result.json'
+    audit('RESULT_WRITE',lambda:path.write_text(json.dumps(result,indent=2,sort_keys=True)+'\n'))
+    audit('RESOURCE_GUARD',lambda:runtime.guard(force=True))
+    if errors:
+        result.update(status='FAILED',failed_stage=runtime.stage,final_budget_audit='FAILED')
+        # One best-effort fixed failure result; never serialize exception messages.
+        try:path.write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
+        except BaseException:pass
+        if primary is None:raise BuildFailure('final audit failed')
+
+
 def build_ios(repo, directory, lock, work, output):
     require(platform.system()=='Darwin' and platform.machine()=='arm64','Apple arm64 host required')
     require(os.getpgrp()==os.getpid(),'outer driver must own this native process group')
@@ -337,7 +512,7 @@ def build_ios(repo, directory, lock, work, output):
     require(work.absolute()==expected and output.absolute()==expected/'Archivebridge.xcframework','explicit canonical native output required')
     safe_child(repo,work); require(not work.exists(),'native attempt already exists; no implicit cleanup/overwrite')
     os.umask(0o077); work.mkdir(parents=True,mode=0o700)
-    for name in ('logs','home','tmp','bin','licenses'): (work/name).mkdir(mode=0o700)
+    for name in ('logs','home','tmp','compiler-tmp','bin','licenses'): (work/name).mkdir(mode=0o700)
     runtime=Runtime(repo,work,lock); result={'status':'FAILED','native_runtime_test':False,'application_signing_performed':False}
     initial={name:sha(repo/name) for name in lock['source_hashes']}
     manifests={name:sha(repo/name) for name in ('archive/go.mod','archive/go.sum','archivebridge/go.mod','archivebridge/go.sum')}
@@ -410,11 +585,7 @@ def build_ios(repo, directory, lock, work, output):
         result.update({'status':'FAILED','failed_stage':runtime.stage,'whole_process_group_cleanup':'REQUIRED_FROM_OUTER_DRIVER'})
         raise
     finally:
-        try:
-            require(initial=={name:sha(repo/name) for name in initial},'repository Go source changed')
-            require(manifests=={name:sha(repo/name) for name in manifests},'repository module manifests changed')
-            result['commands_manifest_sha256']=digest_file(work/'commands.json') if (work/'commands.json').exists() else None
-            result['lock_sha256']=sha(directory/'lock.json')
-            (work/'result.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
+        primary=sys.exc_info()[1]
+        try: finalize_native_result(runtime,repo,directory,result,initial,manifests,primary)
         finally: runtime.restore()
     print(json.dumps({'status':result['status'],'result_sha256':digest_file(work/'result.json')},sort_keys=True))

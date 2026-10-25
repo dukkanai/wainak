@@ -11,9 +11,10 @@
       "reason": "Coherent upstream dependency preparation; additive authenticated checksums are NOT a go mod tidy result"
     },
     "archive/interop_test.go": {
-      "after_sha256": "9f543799174f56dbf8e8bf140a24583449763394e6333ca0bbd4d54dea000c6a",
+      "after_sha256": "80061c03c2bcc19d2f709a6ff131d162dc5573ab3e5ff331ff910d02d4304072",
       "before_sha256": "739831ea30f84e2b3119f7a4314f0a3a3c073ae84e39e2ae63e7dafd77cd10d5",
-      "reason": "Darwin/Linux inherited anonymous FD3 test portability; no test skip or key file"
+      "previous_preparation_sha256": "9f543799174f56dbf8e8bf140a24583449763394e6333ca0bbd4d54dea000c6a",
+      "reason": "Darwin/Linux inherited anonymous FD3 portability plus explicit owned CLI cwd/HOME/TMPDIR sandbox; unchanged 512MiB canary scan and crypto assertions; source-only harness change, not runtime acceptance"
     },
     "archivebridge/go.mod": {
       "after_sha256": "8fe3d9077d27830843a138ad522156fa367a922039e61b50761275c858dedf3e",

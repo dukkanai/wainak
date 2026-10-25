@@ -290,7 +290,7 @@
   "source_hashes": {
     "archive/archive.go": "20ed943c8e8a4c4c8f1b3c19c422c3530678302b408884c8c311b71efa0d639e",
     "archive/archive_test.go": "ec0aa6352375e556b411ff0bfcc33c27acf8d90f7ae9877fbdc33fb42d51ead0",
-    "archive/interop_test.go": "9f543799174f56dbf8e8bf140a24583449763394e6333ca0bbd4d54dea000c6a",
+    "archive/interop_test.go": "80061c03c2bcc19d2f709a6ff131d162dc5573ab3e5ff331ff910d02d4304072",
     "archivebridge/bridge.go": "3cf7dcf2f25454bcf3c16dd3a6189382babcb93fe7fb2913a60383aeb48df415",
     "archivebridge/bridge_test.go": "c58856dcf372791b03553924111ae9c403afb0501ceacf3bc230a6ffafdc52a1"
   },

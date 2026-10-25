@@ -135,3 +135,60 @@ Public upstream test vectors may contain example keys; these are not generated
 user credentials. No real key/content is included in these locks/proofs/notices.
 A manually prepared workflow is not permission to run paid builds, publish an app,
 change main, push a branch or deploy.
+
+
+## Host-harness v3 diagnostic correction (source-only; no third run)
+
+Two earlier manual cloud attempts failed. The second reached
+`new-policy-host-tests`; its exact failing child command is **not established**.
+The source exposed a concrete configuration mismatch: the interop test's512MiB
+canary scan was pointed at the entire toolchain/cache workspace. That is corrected
+here, but it is not retroactively declared the cause of either observed failure.
+
+- Compile each host test binary with supported `go test -c`, then execute it using
+  Go's documented `go tool test2json -t -p <fixed-package> <binary>
+  -test.v=test2json -test.count=1 -test.timeout=120s`. Compile+runtime share the
+  existing180s per-package wall deadline; this does not raise limits. Host CLI and
+  tests useCGO0 consistently; Apple builds remainCGO1. No new host test is skipped.
+- Each module has one owned test root containing public copied fixture source,
+  runtime cwd, HOME and TMPDIR. CLI children receive exactly the validated HOME,
+  TMPDIR, constant PATH/locale, and explicit owned cwd. Their private identities
+  still travel only through inherited anonymousFD3. The512MiB canary scan is
+  unchanged, and no key/plaintext staging file is introduced.
+- Compilation uses explicit separate GOTMPDIR/GOCACHE/GOMODCACHE. The direct
+  runtime test environment does not inherit these compiler-cache paths. Their
+  before/after byte inventories and CLI/test-binary hashes must remain unchanged
+  across non-fuzz test execution, including failure auditing. This is scoped
+  filesystem evidence, not an OS sandbox, universal leak proof, paging/core-dump
+  control or secure zeroization guarantee.
+- Keep actual supported `go test -json -fuzz=... -fuzztime=10s -parallel=1`, not an
+  ordinary non-instrumented `-c` binary. Existing60s fuzz limits remain. Fuzz cwd,
+  source, HOME and TMPDIR are owned; compiler temp is explicit. Build/fuzz cache
+  deltas are recorded separately, and module cache must remain unchanged. Only
+  public schema input or ciphertext can enter fuzz corpus; runtime-generated
+  identities and interop canaries are never corpus inputs. Mutable fuzz-cache
+  evidence is not represented as an immutable-cache test.
+- Recursive whole-workspace accounting is no longer done for every tar member.
+  Full aggregate/free-space checks occur at command/phase boundaries, at most
+  every2s during work, and forcibly after final result/artifact writes. Extraction
+  first reserves its512MiB payload bound plus128MiB metadata allowance **inside**
+  the existing8GiB cap and4GiB free-space floor; known writes consume that reserve.
+  Every cancellation check remains immediate. Unknown child writes remain
+  periodically monitored, not a hard kernel quota; no capacity is increased.
+- `last_command` projects only nine fixed host-command names, bounded exit/time,
+  fixed outcome/failure kind, and trusted top-level Test/Fuzz identifiers captured
+  before execution. Go JSON has byte/event/depth bounds, strict UTF8/duplicate
+  checks and a required terminal package PASS. Raw Output, argv, paths, child
+  exceptions and hashes are **not** included in this public projection. Malformed,
+  incomplete or contradictory exit0 streams fail evidence validation. A later
+  unlisted command clears the prior host summary rather than mislabeling it.
+- Test stdout remains RAM-only. Cleanup or evidence-write failure cannot turn a
+  command into PASS or mask its original error. The outer group owner remains
+  responsible for whole-group termination/verification.
+
+Reference for the supported separate-binary JSON path:
+https://pkg.go.dev/cmd/test2json (Go1.27.3 documentation inspected; no tool run).
+The interop test delta is explicit and provenance-pinned. Core/facade implementation,
+module versions, artifact target pins,512MiB/8GiB bounds and native deadlines are
+unchanged. All v3 runtime/native/cloud checks remain NOT RUN until separately
+authorized execution.

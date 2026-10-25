@@ -45,6 +45,31 @@ func privateFD3(t *testing.T) string {
 	}
 }
 
+func cliEnvironment(t *testing.T) []string {
+	t.Helper()
+	root := os.Getenv("WAINAK_ARCHIVE_SCAN_ROOT")
+	if !filepath.IsAbs(root) || filepath.Clean(root) != root {
+		t.Fatal("CLI child sandbox boundary")
+	}
+	rootInfo, rootErr := os.Lstat(root)
+	if rootErr != nil || !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("CLI child sandbox boundary")
+	}
+	rootStat, rootOK := rootInfo.Sys().(*syscall.Stat_t)
+	if !rootOK || int(rootStat.Uid) != os.Geteuid() {
+		t.Fatal("CLI child sandbox boundary")
+	}
+	for _, entry := range []struct{ name, leaf string }{{"HOME", "home"}, {"TMPDIR", "tmp"}} {
+		p := os.Getenv(entry.name)
+		if p != filepath.Join(root, entry.leaf) { t.Fatal("CLI child sandbox boundary") }
+		info, err := os.Lstat(p)
+		if err != nil || !info.IsDir() || info.Mode() & os.ModeSymlink != 0 { t.Fatal("CLI child sandbox boundary") }
+		st, ok := info.Sys().(*syscall.Stat_t)
+		if !ok || int(st.Uid) != os.Geteuid() { t.Fatal("CLI child sandbox boundary") }
+	}
+	return []string{"PATH=/nonexistent", "LC_ALL=C", "HOME="+os.Getenv("HOME"), "TMPDIR="+os.Getenv("TMPDIR")}
+}
+
 func cliPath(t *testing.T) string {
 	t.Helper()
 	if os.Getenv("WAINAK_ARCHIVE_INTEROP") != "1" {
@@ -100,7 +125,8 @@ func cliRun(t *testing.T, path string, decrypt bool, input, identity []byte) ([]
 		args = []string{"-d", "-i", privateFD3(t), "-o", "-"}
 	}
 	cmd := exec.CommandContext(ctx, path, args...)
-	cmd.Env = []string{"PATH=/nonexistent", "LC_ALL=C"}
+	cmd.Env = cliEnvironment(t)
+	cmd.Dir = os.Getenv("WAINAK_ARCHIVE_SCAN_ROOT")
 	cmd.ExtraFiles = []*os.File{rd}
 	cmd.Stdin = bytes.NewReader(input)
 	cmd.WaitDelay = time.Second
@@ -160,7 +186,9 @@ func TestCLIInteroperabilityAndLeaks(t *testing.T) {
 		}
 	}
 	// The tests and CLI create no plaintext/key staging files. Runtime-generated
-	// canaries are not source literals. This directory is test-owned and empty.
+	// canaries are not source literals. This directory is test-owned; it contains only public fixture sources and
+	// the runtime cwd/HOME/TMPDIR. External compiler/module caches are separately
+	// checked unchanged around this already-compiled test by the runner.
 	tmp := os.Getenv("WAINAK_ARCHIVE_SCAN_ROOT")
 	if !filepath.IsAbs(tmp) || filepath.Clean(tmp) != tmp {
 		t.Fatal("owned scan root missing")
@@ -249,7 +277,8 @@ func TestCLIChildCancellation(t *testing.T) {
 	defer inputR.Close()
 	defer inputW.Close()
 	cmd := exec.CommandContext(ctx, path, "-d", "-i", privateFD3(t), "-o", "-")
-	cmd.Env = []string{"PATH=/nonexistent", "LC_ALL=C"}
+	cmd.Env = cliEnvironment(t)
+	cmd.Dir = os.Getenv("WAINAK_ARCHIVE_SCAN_ROOT")
 	cmd.ExtraFiles = []*os.File{keyR}
 	cmd.Stdin = inputR
 	cmd.WaitDelay = time.Second

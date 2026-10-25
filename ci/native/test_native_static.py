@@ -1,5 +1,6 @@
 """Source-preparation tests only. No Go, Apple, native or network execution."""
 import copy
+from contextlib import contextmanager
 import hashlib
 import io
 import json
@@ -166,6 +167,10 @@ class AcquisitionGuardTests(unittest.TestCase):
     def test_tar_traversal_and_symlink_fail_before_extract(self):
         class Fake:
             def guard(self):pass
+            @contextmanager
+            def reservation(self,size):
+                self.reserved=size; yield
+            def consume(self,size): self.reserved-=size
         for member in ('../escape','go/link'):
             with tempfile.TemporaryDirectory() as name:
                 root=Path(name);archive=root/'go.tar.gz'
@@ -178,6 +183,10 @@ class AcquisitionGuardTests(unittest.TestCase):
     def test_tar_expansion_bound(self):
         class Fake:
             def guard(self):pass
+            @contextmanager
+            def reservation(self,size):
+                self.reserved=size; yield
+            def consume(self,size): self.reserved-=size
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);archive=root/'go.tar.gz'
             with tarfile.open(archive,'w:gz') as tar:

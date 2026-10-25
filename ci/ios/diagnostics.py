@@ -1,5 +1,10 @@
 """Bounded, value-free diagnostics. Never serialize exception text, argv or logs."""
 import errno
+import hashlib
+import math
+from pathlib import Path
+import re
+from types import MappingProxyType
 import json
 import os
 import signal
@@ -105,7 +110,7 @@ def cleanup_process(process, selector):
     return failures
 
 
-def read_diagnostic_json(path, maximum=1024 * 1024):
+def read_regular_bytes(path, maximum):
     # Bound the opened descriptor, not a racy path stat followed by unbounded read_text.
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
@@ -122,6 +127,11 @@ def read_diagnostic_json(path, maximum=1024 * 1024):
                 raise ValueError('diagnostic_read_bound')
     finally:
         os.close(fd)
+    return bytes(data)
+
+
+def read_diagnostic_json(path, maximum=1024 * 1024):
+    data = read_regular_bytes(path, maximum)
     def pairs(items):
         result = {}
         for key, value in items:
@@ -158,21 +168,100 @@ def read_diagnostic_json(path, maximum=1024 * 1024):
     return json.loads(text, object_pairs_hook=pairs, parse_constant=constant)
 
 
-def native_summary(path, reader=None):
-    """Project only fixed status/stage from a bounded regular JSON result, not its other fields."""
+# Public, fixed command identities; no arbitrary command path or arguments.
+HOST_COMMANDS = {
+    'age-cli-build': None,
+    'archive-test-compile': 'archive', 'archive-tests': 'archive', 'archive-vet': 'archive',
+    'fuzz-FuzzStrictHistoryJSON': 'archive', 'fuzz-FuzzArchiveOpen': 'archive',
+    'archivebridge-test-compile': 'archivebridge', 'archivebridge-tests': 'archivebridge',
+    'archivebridge-vet': 'archivebridge',
+}
+FAILURE_KINDS = frozenset({'NONE', 'NONZERO_EXIT', 'TIMEOUT', 'CANCELLED', 'OUTPUT_BOUND',
+                          'RESOURCE_GUARD', 'SPAWN_OR_IO', 'CLEANUP', 'OTHER'})
+FAILURE_CATEGORIES = frozenset({'MALFORMED_TEST_JSON', 'INCOMPLETE_TEST_JSON', 'TEST_FAILURE',
+                               'NO_TEST_FAILURE_EVENT', 'COMPILE_PHASE_FAILURE'})
+TEST_SOURCES = {
+    'archive': ('archive/archive_test.go', 'archive/interop_test.go'),
+    'archivebridge': ('archivebridge/bridge_test.go',),
+}
+
+
+def snapshot_test_names(root, source_hashes):
+    """Capture immutable public source names BEFORE the native child can run.
+
+    Exact tracked-byte checks bind this diagnostic allowlist to the source inventory.
+    Only top-level declarations are admitted; runtime subtest strings are never trusted.
+    """
+    result = {}
+    for package, names in TEST_SOURCES.items():
+        allowed = set()
+        for name in names:
+            data = read_regular_bytes(Path(root) / name, 1024 * 1024)
+            if hashlib.sha256(data).hexdigest() != source_hashes.get(name):
+                raise ValueError('test_source_inventory_mismatch')
+            text = data.decode('utf-8')
+            allowed.update(re.findall(r'^func ((?:Test|Fuzz)[A-Za-z0-9_]{1,120})\(', text, re.M))
+        if not allowed or len(allowed) > 128:
+            raise ValueError('test_name_inventory_bound')
+        result[package] = frozenset(allowed)
+    return MappingProxyType(result)
+
+
+def command_summary(data, trusted_tests):
+    """Reject malformed fields and copy only the fixed, bounded diagnostic schema."""
+    if type(data) is not dict:
+        raise ValueError('command_summary_type')
+    name, outcome, kind = data.get('name'), data.get('outcome'), data.get('failure_kind')
+    if type(name) is not str or name not in HOST_COMMANDS:
+        raise ValueError('command_summary_name')
+    if type(outcome) is not str or outcome not in {'PASS', 'FAILED'}:
+        raise ValueError('command_summary_outcome')
+    if type(kind) is not str or kind not in FAILURE_KINDS:
+        raise ValueError('command_summary_kind')
+    code, elapsed = data.get('exit_code'), data.get('elapsed_seconds')
+    if code is not None and (type(code) is not int or not -255 <= code <= 255):
+        raise ValueError('command_summary_code')
+    if type(elapsed) not in {int, float} or not math.isfinite(elapsed) or not 0 <= elapsed <= 3600:
+        raise ValueError('command_summary_elapsed')
+    tests, categories = data.get('failed_tests'), data.get('failure_categories')
+    if type(tests) is not list or len(tests) > 32 or type(categories) is not list or len(categories) > 5:
+        raise ValueError('command_summary_lists')
+    allowed = trusted_tests.get(HOST_COMMANDS[name], frozenset())
+    if any(type(x) is not str or x not in allowed or '/' in x for x in tests):
+        raise ValueError('command_summary_test_name')
+    if any(type(x) is not str or x not in FAILURE_CATEGORIES for x in categories):
+        raise ValueError('command_summary_category')
+    if len(set(tests)) != len(tests) or len(set(categories)) != len(categories):
+        raise ValueError('command_summary_duplicates')
+    if outcome == 'PASS' and (code != 0 or kind != 'NONE' or tests or categories):
+        raise ValueError('command_summary_false_pass')
+    if outcome == 'FAILED' and kind == 'NONE':
+        raise ValueError('command_summary_missing_failure')
+    return {'name': name, 'exit_code': code, 'elapsed_seconds': elapsed, 'outcome': outcome,
+            'failure_kind': kind, 'failed_tests': list(tests), 'failure_categories': list(categories)}
+
+
+def native_summary(path, reader=None, trusted_tests=None):
+    """Project fixed status/stage and a bounded source-bound last host-command receipt."""
     try:
         data = (reader or read_diagnostic_json)(path, maximum=1024 * 1024)
         if type(data) is not dict or data.get('native_runtime_test') is not False:
             return {'availability': 'invalid'}
         status = data.get('status')
-        if status not in {'FAILED', 'PASS_UNSIGNED_NATIVE_BUILD_ONLY'}:
+        if type(status) is not str or status not in {'FAILED', 'PASS_UNSIGNED_NATIVE_BUILD_ONLY'}:
             return {'availability': 'invalid'}
         row = {'availability': 'present', 'status': status}
         if status == 'FAILED':
             stage = data.get('failed_stage')
-            if stage not in NATIVE_STAGES:
+            if type(stage) is not str or stage not in NATIVE_STAGES:
                 return {'availability': 'invalid'}
             row['failed_stage'] = stage
+        if 'last_command' in data:
+            try:
+                row['last_command'] = command_summary(data['last_command'], trusted_tests or {})
+            except Exception:
+                # Invalid optional detail must not erase the already validated failure stage.
+                row['last_command'] = {'availability': 'invalid'}
         return row
     except Exception:
         # Malformed/deep JSON and reader errors must never replace the primary failure.

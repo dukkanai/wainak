@@ -17,7 +17,7 @@ import subprocess
 import sys
 import time
 from verify import GateError, require, read_json, digest, inventory, framework_slices, xcconfig, unsigned_settings
-from diagnostics import LABELS, cleanup_process, emit, native_summary, safe_error
+from diagnostics import LABELS, cleanup_process, emit, native_summary, safe_error, snapshot_test_names
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / 'apps/mobile'
@@ -67,6 +67,7 @@ class Runner:
     def __init__(self, work, flutter):
         self.work, self.flutter = work, flutter
         self.sources = git_snapshot()
+        self.trusted_tests = snapshot_test_names(ROOT, self.sources)
         self.flutter_start = size(flutter)
         self.flutter_sources = git_snapshot(flutter, ('packages/flutter_tools', 'bin/internal', 'bin/flutter', 'bin/dart'))
         self.cancelled = False
@@ -177,7 +178,7 @@ class Runner:
                       'elapsed_seconds': round(time.monotonic() - start, 3),
                       'primary': row['primary'], 'cleanup_errors': failures}
             if label == 'native':
-                public['native_result'] = native_summary(self.work / 'native/result.json')
+                public['native_result'] = native_summary(self.work / 'native/result.json', trusted_tests=getattr(self, 'trusted_tests', {}))
             try:
                 emit('command_end', **public)
             except BaseException as error:
