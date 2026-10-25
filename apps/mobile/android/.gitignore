@@ -12,3 +12,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Rebuilt, explicitly SHA-pinned synthetic spike artifact; never source.
+/app/libs/wainak-archivebridge.aar
