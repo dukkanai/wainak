@@ -411,7 +411,7 @@ def test_host_policy(runtime, go, tools_module, env, lock):
                'test_binary_sha256':binary_before,'age_cli_sha256':age_before}
         try:
             runtime.run([go,'tool','test2json','-t','-p',module,binary,'-test.v=test2json','-test.count=1','-test.timeout=120s'],
-                        root,testenv,name+'-tests',public_output=False,seconds=deadline-time.monotonic(),go_json=True)
+                        target,testenv,name+'-tests',public_output=False,seconds=deadline-time.monotonic(),go_json=True)
         finally:
             primary=sys.exc_info()[1]
             try:

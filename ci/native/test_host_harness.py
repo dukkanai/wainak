@@ -227,13 +227,44 @@ class HostBoundaryTests(unittest.TestCase):
             self.assertEqual({c[3] for c in calls},d.HOST_COMMANDS)
             for args,cwd,child,name,kwargs in calls:
                 if name.endswith('-tests'):
-                    self.assertEqual(child['HOME'],str(cwd/'home'));self.assertEqual(child['TMPDIR'],str(cwd/'tmp'))
-                    self.assertEqual(child['WAINAK_ARCHIVE_SCAN_ROOT'],str(cwd))
+                    self.assertEqual(child['HOME'],str(cwd.parent/'home'));self.assertEqual(child['TMPDIR'],str(cwd.parent/'tmp'))
+                    self.assertEqual(child['WAINAK_ARCHIVE_SCAN_ROOT'],str(cwd.parent))
+                    self.assertEqual(cwd.name,'module')
                     for key in env:self.assertNotIn(key,child)
                     self.assertTrue(kwargs['go_json']);self.assertFalse(kwargs['public_output'])
                 if name.startswith('fuzz-'):
                     self.assertEqual(child['GOTMPDIR'],env['GOTMPDIR'])
                     self.assertEqual(cwd.parent/'home',Path(child['HOME']))
                     self.assertEqual(kwargs['seconds'],60)
+
+    def test_each_compiled_runtime_resolves_all_relative_public_sources(self):
+        # Exercise the actual orchestration with fake compilers; old parent cwd
+        # deterministically fails these checks before any ABI assertion can run.
+        with tempfile.TemporaryDirectory() as tmp:
+            repo=Path(tmp)/'repo';work=repo/'.ci-work/native';(work/'bin').mkdir(parents=True)
+            sources={'archive':{'archive.go':b'package archive\n','archive_test.go':b'package archive\n','interop_test.go':b'package archive\n'},
+                     'archivebridge':{'bridge.go':b'package archivebridge\n','bridge_test.go':b'package archivebridge\n'}}
+            for module,files in sources.items():
+                (repo/module).mkdir()
+                for name,data in files.items():(repo/module/name).write_bytes(data)
+            observed=[]
+            class Fake:
+                def __init__(self):self.repo=repo;self.work=work;self.resource_final_audit_failed=False
+                def run(self,args,cwd,env,name,**kwargs):
+                    if name=='age-cli-build':(work/'bin/age').write_bytes(b'public-cli')
+                    if name.endswith('-test-compile'):Path(args[args.index('-o')+1]).write_bytes(b'public-test')
+                    if name in ('archive-tests','archivebridge-tests'):
+                        module=name.removesuffix('-tests');cwd=Path(cwd);root=Path(env['WAINAK_ARCHIVE_SCAN_ROOT'])
+                        assert cwd==root/'module' and cwd.is_relative_to(root)
+                        assert Path(env['HOME'])==root/'home' and Path(env['TMPDIR'])==root/'tmp'
+                        for relative,data in sources[module].items():
+                            assert (cwd/relative).is_file() and (cwd/relative).read_bytes()==data
+                        assert not (root/next(iter(sources[module]))).exists()
+                        observed.append(module)
+                    return b''
+            env={key:str(work/key) for key in ('GOCACHE','GOMODCACHE','GOTMPDIR')}
+            lock=json.loads((Path(__file__).parent/'lock.json').read_text());empty={key:{} for key in env}
+            with patch.object(r,'cache_inventory',return_value=empty):r.test_host_policy(Fake(),Path('/not-run/go'),work,env,lock)
+            self.assertEqual(observed,['archive','archivebridge'])
 
 if __name__=='__main__':unittest.main()
