@@ -16,11 +16,12 @@ import signal
 import subprocess
 import sys
 import time
-from verify import GateError, require, read_json, digest, inventory, framework_slices, xcconfig, unsigned_settings, UNCACHED_SETTINGS, uncached_settings
+from verify import GateError, require, read_json, digest, inventory, framework_slices, xcconfig, unsigned_settings, UNCACHED_SETTINGS, uncached_settings, unsigned_linker_setting, unsigned_linker_settings
 from diagnostics import LABELS, cleanup_process, emit, native_summary, safe_error, snapshot_test_names
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from build_guards import tree_size, wait_until
 from resources import budget_snapshot, identity, retire_native_tools, retirement_error, large_file_summary
+from unsigned_diagnostics import unsigned_summary
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / 'apps/mobile'
@@ -222,6 +223,8 @@ class Runner:
                    'primary': None if primary is None else {'operation': operation, **safe_error(primary)},
                    'cleanup_errors': failures,
                    'resource_snapshot': getattr(self, 'resource_snapshot', None)}
+            if label in ('unsigned-iphoneos', 'unsigned-iphonesimulator'):
+                row['unsigned_result'] = unsigned_summary(output)
             self.results.append(row)
             try:
                 (self.work / 'commands.json').write_text(json.dumps(self.results, indent=2) + '\n')
@@ -232,6 +235,8 @@ class Runner:
                       'elapsed_seconds': round(time.monotonic() - start, 3),
                       'primary': row['primary'], 'cleanup_errors': failures,
                       'resource_snapshot': row['resource_snapshot']}
+            if label in ('unsigned-iphoneos', 'unsigned-iphonesimulator'):
+                public['unsigned_result'] = row['unsigned_result']
             if label == 'native':
                 public['native_result'] = native_summary(self.work / 'native/result.json', trusted_tests=getattr(self, 'trusted_tests', {}))
             try:
@@ -353,11 +358,13 @@ def main():
                     'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG WAINAK_ARCHIVE_BRIDGE',
                     'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) WAINAK_ARCHIVE_BRIDGE=1',
                     'FRAMEWORK_SEARCH_PATHS=$(inherited) "' + str(slices['device' if sdk == 'iphoneos' else 'simulator']) + '"',
-                    'OTHER_LDFLAGS=$(inherited) -framework Archivebridge -framework Foundation', *SIGNING]
+                    unsigned_linker_setting(sdk), *SIGNING]
             settings_command, compile_command = xcode_commands(base, sdk)
             settings = json.loads(runner.run('settings-' + sdk, settings_command, cwd=APP / 'ios', timeout=120))
             cache_receipt = cache_policy_receipt(settings, sdk)
             unsigned_settings(settings, sdk)
+            linker_receipt = unsigned_linker_settings(settings, sdk)
+            emit('unsigned_linker_policy', sdk=sdk, status='PASS', **linker_receipt)
             emit('compile_cache_policy', sdk=sdk, status='PASS', **cache_receipt)
             runner.run('compile-' + sdk, compile_command, cwd=APP / 'ios')
             app = work / ('derived-' + sdk) / 'Build/Products' / ('Debug-' + sdk) / 'Runner.app'

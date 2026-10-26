@@ -185,3 +185,38 @@ def uncached_settings(items, sdk):
     if sdk == 'iphonesimulator':
         require(names.count('RunnerTests') == 1, 'cache_policy_test_target_missing')
     return {'targets_checked': len(items), 'settings': {key: 'NO' for key in UNCACHED_SETTINGS}}
+
+
+SIMULATOR_UNSIGNED_LINKER_FLAG = '-Wl,-no_adhoc_codesign'
+
+
+def unsigned_linker_setting(sdk):
+    require(sdk in ('iphoneos', 'iphonesimulator'), 'unsigned_linker_sdk')
+    flags = 'OTHER_LDFLAGS=$(inherited) -framework Archivebridge -framework Foundation'
+    return flags + (' ' + SIMULATOR_UNSIGNED_LINKER_FLAG if sdk == 'iphonesimulator' else '')
+
+
+def unsigned_linker_settings(items, sdk):
+    """Verify the same simulator-only control on every planned target."""
+    import shlex
+    require(sdk in ('iphoneos', 'iphonesimulator'), 'unsigned_linker_sdk')
+    require(type(items) is list and items, 'unsigned_linker_settings')
+    names = []
+    for item in items:
+        require(type(item) is dict and type(item.get('target')) is str, 'unsigned_linker_settings')
+        names.append(item['target'])
+        settings = item.get('buildSettings')
+        require(type(settings) is dict and type(settings.get('OTHER_LDFLAGS')) is str,
+                'unsigned_linker_settings')
+        try:
+            flags = shlex.split(settings['OTHER_LDFLAGS'])
+        except ValueError:
+            raise GateError('unsigned_linker_settings') from None
+        control = [flag for flag in flags if 'adhoc_codesign' in flag]
+        expected = [SIMULATOR_UNSIGNED_LINKER_FLAG] if sdk == 'iphonesimulator' else []
+        require(control == expected, 'unsigned_linker_control')
+    require(len(names) == len(set(names)) and names.count('Runner') == 1, 'unsigned_linker_targets')
+    if sdk == 'iphonesimulator':
+        require(names.count('RunnerTests') == 1, 'unsigned_linker_test_target')
+    return {'targets_checked': len(items), 'implicit_linker_signing':
+            'disabled_for_simulator' if sdk == 'iphonesimulator' else 'unchanged_device_default'}
