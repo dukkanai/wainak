@@ -25,6 +25,7 @@ import time
 import urllib.request
 from check_static import InvalidRecipe, require, read_regular, read_json, sha, module_id
 from host_diagnostics import declared_tests, project_go_events, safe_last_command, HOST_COMMANDS, classify_tool_output, classify_gate_error, graph_failure_reason
+from artifact_diagnostics import strict_symbols_present, symbol_summary, load_summary, reason as artifact_reason
 from artifact_static import static_arm64_container, validate_modulemap, validate_apple_load_commands
 
 class BuildFailure(RuntimeError):
@@ -484,31 +485,82 @@ def test_host_policy(runtime, go, tools_module, env, lock):
     return results
 
 def inspect_xcframework(runtime, output, env, lock):
-    info=plistlib.loads(read_regular(output/'Info.plist'))
-    libs=info.get('AvailableLibraries',[]); require(len(libs)==2,'wrong XCFramework slice count')
-    observed=set(); results=[]
-    functions=['Cancel','Close','Epoch','ExportHistory','HistorySnapshot','ImportHistory','NewSyntheticSession']
+    # Only independent read-only checks continue after a semantic mismatch.
+    # Command/resource/cancellation failures still propagate immediately.
+    receipt={'checks':[],'symbols':[],'loads':[]};runtime.artifact_receipt=receipt
+    failed=False
+    def check(label,variant,operation):
+        nonlocal failed
+        try:
+            value=operation()
+        except (InvalidRecipe,OSError,ValueError,KeyError,TypeError) as error:
+            failed=True
+            try:code=artifact_reason(error)
+            except BaseException:code='UNKNOWN'
+            receipt['checks'].append({'check':label,'variant':variant,'outcome':'FAILED','reason':code})
+            return False,None
+        receipt['checks'].append({'check':label,'variant':variant,'outcome':'PASS','reason':'NONE'})
+        return True,value
+    def metadata():
+        info=plistlib.loads(read_regular(output/'Info.plist'))
+        require(type(info) is dict,'wrong XCFramework slice count')
+        libs=info.get('AvailableLibraries',[])
+        require(type(libs) is list and len(libs)==2,'wrong XCFramework slice count')
+        return libs
+    ok,libs=check('metadata','unknown',metadata)
+    require(ok,'artifact validation failed')
+    observed=set();results=[]
     for lib in libs:
-        require(lib['SupportedPlatform']=='ios' and lib['SupportedArchitectures']==['arm64'],'unexpected native platform/ABI')
-        variant=lib.get('SupportedPlatformVariant','device'); require(variant in ('device','simulator'),'unexpected native variant')
-        require(variant not in observed,'duplicate native variant'); observed.add(variant)
-        path=PurePosixPath(lib['LibraryIdentifier'])/lib['LibraryPath']
-        require(not path.is_absolute() and '..' not in path.parts,'unsafe XCFramework metadata path')
-        framework=safe_child(output,output.joinpath(*path.parts)); binary=framework/'Archivebridge'
-        require(sha(framework/'Headers/Archivebridge.objc.h')==lock['apple']['header_sha256'],'regenerated ABI header changed')
-        modulemap=read_regular(framework/'Modules/module.modulemap').decode()
-        validate_modulemap(modulemap,lock['apple']['headers'])
-        container=static_arm64_container(binary)
-        arch=runtime.run(['/usr/bin/xcrun','lipo','-archs',binary],runtime.repo,env,'slice-architecture').decode().strip()
-        require(arch=='arm64','unexpected binary architectures')
-        symbols=runtime.run(['/usr/bin/xcrun','nm','-g',binary],runtime.repo,env,'slice-symbols').decode()
-        require(all(re.search(r'(?m)^[0-9a-fA-F]+\s+[Tt]\s+_Archivebridge'+name+r'$',symbols) for name in functions),'defined native binding symbols missing')
-        loads=runtime.run(['/usr/bin/xcrun','otool','-l',binary],runtime.repo,env,'slice-load-commands').decode()
-        load_evidence=validate_apple_load_commands(loads,variant)
-        plist=plistlib.loads(read_regular(framework/'Info.plist'))
-        require(plist.get('MinimumOSVersion')==lock['apple']['framework_plist_minimum_os_upstream'],'upstream framework metadata changed')
-        results.append({'variant':variant,'architectures':['arm64'],'binary_sha256':digest_file(binary),'static_container':container,'load_command_evidence':load_evidence})
-    require(observed=={'device','simulator'},'missing Apple slice')
+        def slice_metadata():
+            require(type(lib) is dict,'unexpected native platform/ABI')
+            require(lib['SupportedPlatform']=='ios' and lib['SupportedArchitectures']==['arm64'],'unexpected native platform/ABI')
+            variant=lib.get('SupportedPlatformVariant','device')
+            require(variant in ('device','simulator'),'unexpected native variant')
+            require(variant not in observed,'duplicate native variant');observed.add(variant)
+            return variant
+        ok,variant=check('slice_metadata','unknown',slice_metadata)
+        if not ok:continue
+        def slice_path():
+            path=PurePosixPath(lib['LibraryIdentifier'])/lib['LibraryPath']
+            require(not path.is_absolute() and '..' not in path.parts,'unsafe XCFramework metadata path')
+            return safe_child(output,output.joinpath(*path.parts))
+        ok,framework=check('path',variant,slice_path)
+        if not ok:continue
+        binary=framework/'Archivebridge'
+        check('header',variant,lambda:require(sha(framework/'Headers/Archivebridge.objc.h')==lock['apple']['header_sha256'],'regenerated ABI header changed'))
+        check('modulemap',variant,lambda:validate_modulemap(read_regular(framework/'Modules/module.modulemap').decode(),lock['apple']['headers']))
+        container_ok,container=check('container',variant,lambda:static_arm64_container(binary))
+        load_evidence=None
+        if container_ok:
+            # Do not swallow runtime.run errors: limits and primary errors retain ownership.
+            raw=runtime.run(['/usr/bin/xcrun','lipo','-archs',binary],runtime.repo,env,'slice-architecture')
+            check('architecture',variant,lambda:require(raw.decode().strip()=='arm64','unexpected binary architectures'))
+            raw=runtime.run(['/usr/bin/xcrun','nm','-g',binary],runtime.repo,env,'slice-symbols')
+            decoded,symbols=check('symbols',variant,lambda:raw.decode())
+            if decoded:
+                try:summary=symbol_summary(symbols)
+                except BaseException:summary={'complete':False}
+                receipt['symbols'].append({'variant':variant,**summary})
+                # Replace decode-only receipt with the unchanged acceptance check.
+                receipt['checks'].pop()
+                check('symbols',variant,lambda:require(strict_symbols_present(symbols),'defined native binding symbols missing'))
+            raw=runtime.run(['/usr/bin/xcrun','otool','-l',binary],runtime.repo,env,'slice-load-commands')
+            decoded,loads=check('load_commands',variant,lambda:raw.decode())
+            if decoded:
+                try:summary=load_summary(loads)
+                except BaseException:summary={'complete':False}
+                receipt['loads'].append({'variant':variant,**summary})
+                receipt['checks'].pop()
+                _,load_evidence=check('load_commands',variant,lambda:validate_apple_load_commands(loads,variant))
+        def framework_plist():
+            plist=plistlib.loads(read_regular(framework/'Info.plist'))
+            require(type(plist) is dict,'upstream framework metadata changed')
+            require(plist.get('MinimumOSVersion')==lock['apple']['framework_plist_minimum_os_upstream'],'upstream framework metadata changed')
+        check('framework_plist',variant,framework_plist)
+        _,binary_hash=check('binary_hash',variant,lambda:digest_file(binary)) if container_ok else (False,None)
+        results.append({'variant':variant,'architectures':['arm64'],'binary_sha256':binary_hash,'static_container':container,'load_command_evidence':load_evidence})
+    check('variants','unknown',lambda:require(observed=={'device','simulator'},'missing Apple slice'))
+    require(not failed,'artifact validation failed')
     return results
 
 
@@ -521,6 +573,7 @@ def finalize_native_result(runtime,repo,directory,result,initial,manifests,prima
     audit('SOURCE_GUARD',lambda:require(initial=={name:sha(repo/name) for name in initial},'repository Go source changed'))
     audit('MODULE_MANIFEST_GUARD',lambda:require(manifests=={name:sha(repo/name) for name in manifests},'repository manifests changed'))
     result['last_command']=runtime.last_command
+    if hasattr(runtime,'artifact_receipt'):result['artifact_inspection']=runtime.artifact_receipt
     result['resource_final_audit_failed']=runtime.resource_final_audit_failed
     result['resource_monitor']={'period_seconds':2,'full_audits_before_final':getattr(runtime,'full_audits',0),
         'peak_reserved_bytes':getattr(runtime,'peak_reserved',0),'hard_quota':False}

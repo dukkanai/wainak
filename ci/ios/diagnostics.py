@@ -256,6 +256,51 @@ def command_summary(data, trusted_tests):
     return row
 
 
+ARTIFACT_ABI_NAMES = frozenset(['Cancel', 'Close', 'Epoch', 'ExportHistory', 'HistorySnapshot', 'ImportHistory', 'NewSyntheticSession'])
+ARTIFACT_CHECKS = frozenset(['architecture', 'binary_hash', 'container', 'framework_plist', 'header', 'load_commands', 'metadata', 'modulemap', 'path', 'slice_metadata', 'symbols', 'variants'])
+ARTIFACT_REASONS = frozenset(['ARCHITECTURE', 'CONTAINER', 'DECODE', 'DUPLICATE_VARIANT', 'FRAMEWORK_PLIST', 'HEADER', 'IO', 'LOAD_MINIMUM', 'LOAD_PLATFORM', 'LOAD_RECORD', 'METADATA', 'MODULEMAP', 'NONE', 'PATH', 'PLATFORM_ABI', 'SHAPE', 'SYMBOLS', 'UNKNOWN', 'VARIANT', 'VARIANTS'])
+
+def artifact_summary(data):
+    """Copy only fixed bounded values; raw paths, symbol text and tool output ignored."""
+    if type(data) is not dict:raise ValueError('artifact_type')
+    checks,symbols,loads=data.get('checks'),data.get('symbols'),data.get('loads')
+    if type(checks) is not list or len(checks)>24 or type(symbols) is not list or len(symbols)>2 or type(loads) is not list or len(loads)>2:
+        raise ValueError('artifact_bounds')
+    result={'checks':[],'symbols':[],'loads':[]}
+    for row in checks:
+        if type(row) is not dict:raise ValueError('artifact_check_type')
+        label,variant,outcome,reason=(row.get(k) for k in ('check','variant','outcome','reason'))
+        if type(label) is not str or label not in ARTIFACT_CHECKS or type(variant) is not str or variant not in {'device','simulator','unknown'} or type(outcome) is not str or outcome not in {'PASS','FAILED'} or type(reason) is not str or reason not in ARTIFACT_REASONS:
+            raise ValueError('artifact_check_fields')
+        if (outcome=='PASS')!=(reason=='NONE'):raise ValueError('artifact_false_pass')
+        result['checks'].append({'check':label,'variant':variant,'outcome':outcome,'reason':reason})
+    def bounded_counts(value,keys):
+        if type(value) is not dict or set(value)!=set(keys) or any(type(x) is not int or not 0<=x<=100000 for x in value.values()):raise ValueError('artifact_counts')
+        return {key:value[key] for key in keys}
+    for group,rows in (('symbols',symbols),('loads',loads)):
+        seen=set()
+        for row in rows:
+            if type(row) is not dict:raise ValueError('artifact_detail_type')
+            variant,complete=row.get('variant'),row.get('complete')
+            if type(variant) is not str or variant not in {'device','simulator'} or variant in seen or type(complete) is not bool:raise ValueError('artifact_detail_fields')
+            seen.add(variant);clean={'variant':variant,'complete':complete}
+            if group=='symbols':
+                keys=('defined','undefined','nontext','missing','hex_text','addressless_text','unrecognized')
+                if not complete and not any(key in row for key in keys):result[group].append(clean);continue
+                for key in keys:
+                    value=row.get(key)
+                    if type(value) is not list or len(value)>7 or any(type(x) is not str or x not in ARTIFACT_ABI_NAMES for x in value) or len(set(value))!=len(value):raise ValueError('artifact_symbol_names')
+                    clean[key]=list(value)
+                if not set(clean['hex_text']+clean['addressless_text'])<=set(clean['defined']):raise ValueError('artifact_symbol_sets')
+                if set(clean['missing']) & set(clean['defined']+clean['undefined']+clean['nontext']+clean['unrecognized']):raise ValueError('artifact_symbol_missing')
+                clean['format_counts']=bounded_counts(row.get('format_counts'),('bsd','posix','darwin','other'))
+            else:
+                if not complete and 'counts' not in row:result[group].append(clean);continue
+                clean['counts']=bounded_counts(row.get('counts'),('build_records','legacy_records','platform_device','platform_simulator','platform_other','minimum_match','minimum_other'))
+            result[group].append(clean)
+    return result
+
+
 def native_summary(path, reader=None, trusted_tests=None):
     """Project fixed status/stage and a bounded source-bound last host-command receipt."""
     try:
@@ -277,6 +322,9 @@ def native_summary(path, reader=None, trusted_tests=None):
             reason = data.get('graph_reason')
             if row.get('gate_category') == 'GRAPH_MISMATCH' and type(reason) is str and reason in GRAPH_REASONS:
                 row['graph_reason'] = reason
+        if 'artifact_inspection' in data:
+            try:row['artifact_inspection']=artifact_summary(data['artifact_inspection'])
+            except Exception:row['artifact_inspection']={'availability':'invalid'}
         if 'last_command' in data:
             try:
                 row['last_command'] = command_summary(data['last_command'], trusted_tests or {})
