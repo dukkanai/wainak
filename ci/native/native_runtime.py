@@ -547,7 +547,8 @@ def inspect_xcframework(runtime, output, env, lock):
             # Do not swallow runtime.run errors: limits and primary errors retain ownership.
             raw=runtime.run(['/usr/bin/xcrun','lipo','-archs',binary],runtime.repo,env,'slice-architecture')
             check('architecture',variant,lambda:require(raw.decode().strip()=='arm64','unexpected binary architectures'))
-            raw=runtime.run(['/usr/bin/xcrun','nm','-g',binary],runtime.repo,env,'slice-symbols')
+            # Embedded LLVM IR can hide native addresses; require native symbol evidence.
+            raw=runtime.run(['/usr/bin/xcrun','nm','-g','--no-llvm-bc',binary],runtime.repo,env,'slice-symbols')
             decoded,symbols=check('symbols',variant,lambda:raw.decode())
             if decoded:
                 try:summary=symbol_summary(symbols)

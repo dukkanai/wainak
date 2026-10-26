@@ -110,6 +110,27 @@ class ArtifactAggregationTests(unittest.TestCase):
     def test_valid_both_slices_pass(self):
         self.assertEqual(len(self.invoke()),2);self.assertEqual(len(self.calls),6)
         receipt=outer.artifact_summary(self.rt.artifact_receipt);self.assertTrue(all(c['outcome']=='PASS' for c in receipt['checks']))
+    def test_native_reader_option_is_required_for_both_slices(self):
+        self.invoke()
+        commands=[call.args[0] for call in self.rt.run.call_args_list if call.args[3]=='slice-symbols']
+        self.assertEqual(len(commands),2)
+        for command in commands:
+            self.assertEqual(command[:-1],['/usr/bin/xcrun','nm','-g','--no-llvm-bc'])
+    def test_addressless_or_absent_native_symbols_still_fail(self):
+        for raw in (symbols().replace('0000000000000010','----------------'),'',symbols().replace(' T ',' U ')):
+            with self.subTest(raw=bool(raw)):
+                self.outputs['device']['slice-symbols']=raw.encode()
+                with self.assertRaisesRegex(Exception,'artifact validation failed'):self.invoke()
+                self.assertIn('SYMBOLS',{c['reason'] for c in self.rt.artifact_receipt['checks']})
+    def test_unsupported_reader_option_fails_without_fallback(self):
+        primary=runtime.BuildFailure('slice-symbols failed')
+        self.outputs['device']['slice-symbols']=primary
+        with self.assertRaises(runtime.BuildFailure) as caught:self.invoke()
+        self.assertIs(caught.exception,primary)
+        self.assertEqual(self.calls,[('device','slice-architecture'),('device','slice-symbols')])
+        commands=[call.args[0] for call in self.rt.run.call_args_list if call.args[3]=='slice-symbols']
+        self.assertEqual(len(commands),1)
+        self.assertIn('--no-llvm-bc',commands[0])
     def test_symbol_and_load_and_plist_failures_all_collected_before_failure(self):
         self.outputs['device']['slice-symbols']=symbols().replace('_ArchivebridgeCancel','_PRIVATE').encode()
         self.outputs['simulator']['slice-load-commands']=loads('device').replace('15.0','16.0').encode()
