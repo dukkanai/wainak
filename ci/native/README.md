@@ -81,6 +81,38 @@ The driver and native runner monitor a shared8GiB logical-byte workspace budget
 floor. Monitoring is not a kernel allocation quota. This recipe is not permission
 to expand the already nearly-full Linux tool budget or delete old evidence.
 
+## Successful native stage lifetime
+
+After the outer driver has verified native PASS, whole-group cleanup, the result
+and commands/license receipts, and the exact XCFramework inventory and slices,
+it may retire exactly these freshly created, run-owned native entries before the
+Flutter/Xcode application stages:
+
+- `go-darwin-arm64.tar.gz`
+- `toolchain`
+- `gocache`
+- `compiler-tmp`
+- `bin`
+
+This is a new future-run deletion scope, not permission to delete existing server
+caches or failed attempts. The physical tool binaries/archive/cache bytes are no
+longer retained after successful retirement; authenticated acquisition, version,
+build-info and command provenance remain in the preserved evidence. The
+XCFramework, result, commands, logs, licenses, module cache, generated `-work`
+sources/target records, host-test fixtures, binding and tools modules remain.
+A separate exclusive retirement receipt records fixed-name logical byte counts,
+retained-evidence digest, completed entries and partial failure. The historical
+native result is never rewritten.
+
+All five targets are preflighted before the first unlink. Descriptor-relative
+traversal rejects links, unknown ownership/types, cross-device paths, detected
+mount points and drift; no chmod or retry fallback is used. Failures abort the
+app build. This is not a transaction against hostile same-UID writers or a
+privileged actor injecting same-device mounts. Logical-byte counting and the
+8GiB ceiling remain unchanged; receipts are sampled measurements, not quotas or
+proof that the next Xcode phase will fit. No allocated-byte metric substitutes
+for the existing logical-byte policy.
+
 ## Why the dependency policy changed
 
 The old Android experiment used an inherited `GOFLAGS=-modfile` to retain its

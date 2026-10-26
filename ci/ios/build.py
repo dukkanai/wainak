@@ -20,6 +20,7 @@ from verify import GateError, require, read_json, digest, inventory, framework_s
 from diagnostics import LABELS, cleanup_process, emit, native_summary, safe_error, snapshot_test_names
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from build_guards import tree_size, wait_until
+from resources import budget_snapshot, identity, retire_native_tools, retirement_error
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / 'apps/mobile'
@@ -54,6 +55,8 @@ def git_snapshot(root=ROOT, paths=()):
 class Runner:
     def __init__(self, work, flutter):
         self.work, self.flutter = work, flutter
+        self.work_identity = identity(work.stat())
+        self.resource_snapshot = None
         self.sources = git_snapshot()
         self.trusted_tests = snapshot_test_names(ROOT, self.sources)
         self.flutter_start = size(flutter)
@@ -84,10 +87,10 @@ class Runner:
 
     def guard(self):
         require(not self.cancelled, 'cancelled')
-        used = size(self.work) + size(APP / 'build') + size(APP / '.dart_tool') + size(APP / 'ios/Flutter/ephemeral')
-        used += max(0, size(self.flutter) - self.flutter_start)
-        require(used <= MAX_BYTES, 'workspace_budget')
-        require(shutil.disk_usage(self.work).free >= 4 * 1024 ** 3, 'disk_headroom')
+        self.resource_snapshot = None  # Never mislabel an old sample after an I/O failure.
+        self.resource_snapshot = budget_snapshot(self.work, APP, self.flutter, self.flutter_start, measure=size)
+        require(self.resource_snapshot['total_logical_bytes'] <= MAX_BYTES, 'workspace_budget')
+        require(self.resource_snapshot['free_disk_bytes'] >= 4 * 1024 ** 3, 'disk_headroom')
 
     def run(self, label, args, cwd=ROOT, timeout=1200, maximum=16 * 1024 * 1024):
         require(label in LABELS, 'unknown_command_label')
@@ -153,7 +156,8 @@ class Runner:
             row = {'label': label, 'status': 'FAILED' if primary or failures else 'PASS',
                    'exit_code': None if p is None else p.returncode, 'log_sha256': log_hash,
                    'primary': None if primary is None else {'operation': operation, **safe_error(primary)},
-                   'cleanup_errors': failures}
+                   'cleanup_errors': failures,
+                   'resource_snapshot': getattr(self, 'resource_snapshot', None)}
             self.results.append(row)
             try:
                 (self.work / 'commands.json').write_text(json.dumps(self.results, indent=2) + '\n')
@@ -162,7 +166,8 @@ class Runner:
                 row['status'] = 'FAILED'
             public = {'stage': label, 'sequence': self.sequence, 'status': row['status'],
                       'elapsed_seconds': round(time.monotonic() - start, 3),
-                      'primary': row['primary'], 'cleanup_errors': failures}
+                      'primary': row['primary'], 'cleanup_errors': failures,
+                      'resource_snapshot': row['resource_snapshot']}
             if label == 'native':
                 public['native_result'] = native_summary(self.work / 'native/result.json', trusted_tests=getattr(self, 'trusted_tests', {}))
             try:
@@ -249,6 +254,22 @@ def main():
         native_inventory = inventory(framework)
         require(native.get('artifact_files') == native_inventory, 'native_artifact_hashes')
         slices = framework_slices(framework)
+        # A successful native run is quiescent: run() has already verified whole-group
+        # cleanup. Retire only the five builder-only entries, never failed attempts.
+        runner.guard()
+        before_retirement = runner.resource_snapshot
+        try:
+            retirement = retire_native_tools(work, runner.work_identity, runner.results[-1],
+                                             check=lambda: require(not runner.cancelled, 'cancelled'))
+            runner.guard()
+            emit('native_retirement', status='PASS', retirement=retirement,
+                 before=before_retirement, after=runner.resource_snapshot)
+        except BaseException as error:
+            try:
+                emit('native_retirement_failed', error=retirement_error(error))
+            except BaseException:
+                pass  # Diagnostics must not replace the retirement failure.
+            raise
         with cfg.open('x', encoding='utf-8') as f:
             cfg_owned = True
             f.write(xcconfig(slices))
@@ -293,7 +314,8 @@ def main():
             artifact_rows.append(row)
         require(inventory(framework) == native_inventory and digest(cfg) == cfg_hash, 'native_input_drift')
         final_result = {'status': 'PASS_UNSIGNED_IOS_COMPILE_ONLY', 'apps': artifact_rows,
-            'native_artifact_files': native_inventory, 'source_files': runner.sources,
+            'native_artifact_files': native_inventory, 'native_transient_retirement': retirement,
+            'source_files': runner.sources,
             'device_runtime': 'NOT_RUN', 'simulator_runtime': 'NOT_RUN', 'signing': False,
             'production_security_acceptance': False,
             'flutter_provenance': 'Codemagic-provisioned SDK; exact Git revision/source integrity and version checked, whole archive not independently rehashed',
