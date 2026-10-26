@@ -16,11 +16,11 @@ import signal
 import subprocess
 import sys
 import time
-from verify import GateError, require, read_json, digest, inventory, framework_slices, xcconfig, unsigned_settings
+from verify import GateError, require, read_json, digest, inventory, framework_slices, xcconfig, unsigned_settings, UNCACHED_SETTINGS, uncached_settings
 from diagnostics import LABELS, cleanup_process, emit, native_summary, safe_error, snapshot_test_names
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from build_guards import tree_size, wait_until
-from resources import budget_snapshot, identity, retire_native_tools, retirement_error
+from resources import budget_snapshot, identity, retire_native_tools, retirement_error, large_file_summary
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / 'apps/mobile'
@@ -50,6 +50,32 @@ def git_snapshot(root=ROOT, paths=()):
             result[name] = digest(p)
     require(result, 'empty_source_inventory')
     return result
+
+
+
+def xcode_commands(base, sdk):
+    """Use one explicit cache policy for settings and the matching compile action."""
+    require(sdk in ('iphoneos', 'iphonesimulator'), 'cache_policy_sdk')
+    require(not any(str(arg).split('=', 1)[0] in UNCACHED_SETTINGS for arg in base),
+            'cache_policy_duplicate_override')
+    action = 'build' if sdk == 'iphoneos' else 'build-for-testing'
+    shared = [*base, *(key + '=NO' for key in UNCACHED_SETTINGS)]
+    return [*shared, action, '-showBuildSettings', '-json'], [*shared, action]
+
+
+def cache_policy_receipt(settings, sdk):
+    try:
+        return uncached_settings(settings, sdk)
+    except GateError as error:
+        allowed = {'cache_policy_sdk', 'cache_policy_settings', 'compile_cache_enabled_or_unknown',
+                   'cache_policy_targets', 'cache_policy_test_target_missing'}
+        reason = str(error) if str(error) in allowed else 'invalid_settings'
+        try:
+            public_sdk = sdk if sdk in ('iphoneos', 'iphonesimulator') else 'unknown'
+            emit('compile_cache_policy', sdk=public_sdk, status='FAILED', reason=reason)
+        except BaseException:
+            pass
+        raise
 
 
 class Runner:
@@ -89,6 +115,12 @@ class Runner:
         require(not self.cancelled, 'cancelled')
         self.resource_snapshot = None  # Never mislabel an old sample after an I/O failure.
         self.resource_snapshot = budget_snapshot(self.work, APP, self.flutter, self.flutter_start, measure=size)
+        if self.resource_snapshot['total_logical_bytes'] > MAX_BYTES:
+            try:
+                detail = large_file_summary(self.work)
+            except BaseException as error:
+                detail = {'availability': 'unavailable', 'complete': False, 'error': safe_error(error)}
+            self.resource_snapshot['work_largest_files'] = detail
         require(self.resource_snapshot['total_logical_bytes'] <= MAX_BYTES, 'workspace_budget')
         require(self.resource_snapshot['free_disk_bytes'] >= 4 * 1024 ** 3, 'disk_headroom')
 
@@ -291,10 +323,12 @@ def main():
                     'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) WAINAK_ARCHIVE_BRIDGE=1',
                     'FRAMEWORK_SEARCH_PATHS=$(inherited) "' + str(slices['device' if sdk == 'iphoneos' else 'simulator']) + '"',
                     'OTHER_LDFLAGS=$(inherited) -framework Archivebridge -framework Foundation', *SIGNING]
-            settings = json.loads(runner.run('settings-' + sdk, [*base, '-showBuildSettings', '-json'], cwd=APP / 'ios', timeout=120))
+            settings_command, compile_command = xcode_commands(base, sdk)
+            settings = json.loads(runner.run('settings-' + sdk, settings_command, cwd=APP / 'ios', timeout=120))
+            cache_receipt = cache_policy_receipt(settings, sdk)
             unsigned_settings(settings, sdk)
-            action = 'build' if sdk == 'iphoneos' else 'build-for-testing'
-            runner.run('compile-' + sdk, [*base, action], cwd=APP / 'ios')
+            emit('compile_cache_policy', sdk=sdk, status='PASS', **cache_receipt)
+            runner.run('compile-' + sdk, compile_command, cwd=APP / 'ios')
             app = work / ('derived-' + sdk) / 'Build/Products' / ('Debug-' + sdk) / 'Runner.app'
             require(app.is_dir() and not app.is_symlink(), 'app_missing')
             require(not (app / '_CodeSignature').exists() and not (app / 'embedded.mobileprovision').exists(), 'signed_app')

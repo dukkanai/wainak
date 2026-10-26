@@ -164,3 +164,24 @@ def unsigned_settings(items, sdk):
     require('WAINAK_ARCHIVE_BRIDGE=1' in b.get('GCC_PREPROCESSOR_DEFINITIONS', '').split(), 'native_objc_disabled')
     require('-framework Archivebridge' in b.get('OTHER_LDFLAGS', ''), 'native_link_disabled')
     return b
+
+
+UNCACHED_SETTINGS = ('COMPILATION_CACHE_ENABLE_CACHING', 'CLANG_ENABLE_COMPILE_CACHE',
+                     'SWIFT_ENABLE_COMPILE_CACHE')
+
+
+def uncached_settings(items, sdk):
+    """Require explicit command-scoped cache-off values for every planned target."""
+    require(sdk in ('iphoneos', 'iphonesimulator'), 'cache_policy_sdk')
+    require(type(items) is list and items, 'cache_policy_settings')
+    names = []
+    for item in items:
+        require(type(item) is dict and type(item.get('target')) is str, 'cache_policy_settings')
+        names.append(item['target'])
+        settings = item.get('buildSettings')
+        require(type(settings) is dict, 'cache_policy_settings')
+        require(all(settings.get(key) == 'NO' for key in UNCACHED_SETTINGS), 'compile_cache_enabled_or_unknown')
+    require(len(names) == len(set(names)) and names.count('Runner') == 1, 'cache_policy_targets')
+    if sdk == 'iphonesimulator':
+        require(names.count('RunnerTests') == 1, 'cache_policy_test_target_missing')
+    return {'targets_checked': len(items), 'settings': {key: 'NO' for key in UNCACHED_SETTINGS}}

@@ -275,3 +275,109 @@ def retire_native_tools(work, work_identity, command, check=lambda: None):
         for fd in (receipt_fd, native_fd, work_fd):
             if fd is not None:
                 os.close(fd)
+
+
+# Diagnostic-only role labels: never emit actual paths, filenames or file contents.
+_DIAGNOSTIC_PREFIXES = (
+    ('home/Library/Developer/Xcode/DerivedData/CompilationCache.noindex', 'home_compilation_cache'),
+    ('home/Library/Developer/Xcode/DerivedData/ModuleCache.noindex', 'home_module_cache'),
+    ('derived-iphoneos/CompilationCache.noindex', 'device_compilation_cache'),
+    ('derived-iphoneos/ModuleCache.noindex', 'device_module_cache'),
+    ('derived-iphonesimulator/CompilationCache.noindex', 'simulator_compilation_cache'),
+    ('derived-iphonesimulator/ModuleCache.noindex', 'simulator_module_cache'),
+    ('derived-iphoneos', 'device_derived'),
+    ('derived-iphonesimulator', 'simulator_derived'),
+    ('native', 'native'),
+    ('home', 'home_other'),
+    ('pub-cache', 'pub_cache'),
+    ('tmp', 'temporary'),
+    ('logs', 'logs'),
+)
+
+
+def _diagnostic_role(relative):
+    for prefix, label in _DIAGNOSTIC_PREFIXES:
+        if relative == prefix or relative.startswith(prefix + '/'):
+            return label
+    return 'other_work'
+
+
+class _DiagnosticBound(Exception):
+    pass
+
+
+def large_file_summary(work, maximum_rows=8, maximum_entries=100000, seconds=1.0):
+    """Separate best-effort metadata snapshot; never changes logical accounting.
+
+    Only bounded enum/numeric metadata leaves this function. It is not atomic,
+    cannot identify an exact filename, and may be incomplete while tools run.
+    """
+    import heapq
+    rows = []
+    visited = regular = churn = 0
+    deadline = time.monotonic() + seconds
+    require(1 <= maximum_rows <= 8 and 1 <= maximum_entries <= 100000 and 0 < seconds <= 1,
+            'resource_diagnostic_bound')
+    def tick():
+        if time.monotonic() >= deadline:
+            raise _DiagnosticBound('deadline')
+        if visited >= maximum_entries:
+            raise _DiagnosticBound('entry_limit')
+    def walk(fd, parent, depth=0):
+        nonlocal visited, regular, churn
+        if depth > 64:
+            raise _DiagnosticBound('depth_limit')
+        with os.scandir(fd) as entries:
+            for entry in entries:
+                tick()
+                visited += 1
+                relative = parent + '/' + entry.name if parent else entry.name
+                try:
+                    info = entry.stat(follow_symlinks=False)
+                    if stat.S_ISDIR(info.st_mode):
+                        child = os.open(entry.name, DIR_FLAGS, dir_fd=fd)
+                        try:
+                            if identity(os.fstat(child)) != identity(info):
+                                churn += 1
+                                continue
+                            walk(child, relative, depth + 1)
+                        finally:
+                            os.close(child)
+                    elif stat.S_ISREG(info.st_mode):
+                        regular += 1
+                        blocks = getattr(info, 'st_blocks', None)
+                        allocated = blocks * 512 if type(blocks) is int and blocks >= 0 else None
+                        suffix = next((label for suffix, label in
+                                       (('.index', 'index_suffix'), ('.data', 'data_suffix'), ('.db', 'database_suffix'))
+                                       if entry.name.endswith(suffix)), 'other')
+                        row = {'role': _diagnostic_role(relative), 'name_kind': suffix,
+                               'logical_bytes': info.st_size, 'allocated_bytes': allocated,
+                               'hard_links': info.st_nlink,
+                               'allocation_below_logical': None if allocated is None else allocated < info.st_size}
+                        item = (info.st_size, regular, row)
+                        if len(rows) < maximum_rows:
+                            heapq.heappush(rows, item)
+                        else:
+                            heapq.heappushpop(rows, item)
+                    # Links are not followed or opened. No file contents are read.
+                except FileNotFoundError:
+                    churn += 1
+    result = {'availability': 'present', 'complete': True, 'snapshot': 'separate_non_atomic',
+              'maximum_rows': maximum_rows, 'rows': []}
+    fd = None
+    try:
+        fd = os.open(work, DIR_FLAGS)
+        walk(fd, '')
+    except _DiagnosticBound as error:
+        result.update(availability='incomplete', complete=False, reason=str(error))
+    except BaseException as error:
+        result.update(availability='incomplete', complete=False, reason='io_or_scan_failure',
+                      error=safe_error(error))
+    finally:
+        if fd is not None:
+            os.close(fd)
+    if churn:
+        result.update(availability='incomplete', complete=False)
+    result.update(visited_entries=visited, scanned_regular_files=regular, churn_events=churn,
+                  rows=[row for _, _, row in sorted(rows, reverse=True)])
+    return result
