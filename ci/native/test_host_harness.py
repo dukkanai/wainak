@@ -77,7 +77,8 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(set(result['failure_categories']),{'MALFORMED_TEST_JSON','INCOMPLETE_TEST_JSON'})
     def test_terminal_pass_is_required_and_fail_event_contradiction_rejected(self):
         pkg='wainak.local/historyarchive'
-        for events,valid in [([{'Action':'pass','Package':pkg}],True),
+        for events,valid in [([{'Action':'pass','Package':pkg}],False),
+                            ([{'Action':'run','Package':pkg,'Test':'TestKnown'}, {'Action':'pass','Package':pkg,'Test':'TestKnown'}, {'Action':'pass','Package':pkg}],True),
                             ([{'Action':'run','Package':pkg,'Test':'TestKnown'}],False),
                             ([{'Action':'fail','Package':pkg,'Test':'TestKnown'},{'Action':'pass','Package':pkg}],False),
                             ([{'Action':'pass','Package':pkg},{'Action':'output','Package':pkg,'Output':'private'}],False)]:
@@ -222,6 +223,7 @@ class HostBoundaryTests(unittest.TestCase):
                     return b''
             env={key:str(work/key) for key in ('GOCACHE','GOMODCACHE','GOTMPDIR')}
             lock=json.loads((Path(__file__).parent/'lock.json').read_text())
+            lock['source_hashes']={str(p.relative_to(repo)):hashlib.sha256(p.read_bytes()).hexdigest() for module in ('archive','archivebridge') for p in (repo/module).glob('*.go')}
             empty={key:{} for key in env}
             with patch.object(r,'cache_inventory',return_value=empty):r.test_host_policy(Fake(),Path('/not-run/go'),work,env,lock)
             self.assertEqual({c[3] for c in calls},d.HOST_COMMANDS)
@@ -264,6 +266,7 @@ class HostBoundaryTests(unittest.TestCase):
                     return b''
             env={key:str(work/key) for key in ('GOCACHE','GOMODCACHE','GOTMPDIR')}
             lock=json.loads((Path(__file__).parent/'lock.json').read_text());empty={key:{} for key in env}
+            lock['source_hashes']={str(p.relative_to(repo)):hashlib.sha256(p.read_bytes()).hexdigest() for module in ('archive','archivebridge') for p in (repo/module).glob('*.go')}
             with patch.object(r,'cache_inventory',return_value=empty):r.test_host_policy(Fake(),Path('/not-run/go'),work,env,lock)
             self.assertEqual(observed,['archive','archivebridge'])
 

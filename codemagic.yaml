@@ -18,6 +18,10 @@
           "script": "python3 -m unittest discover -s ci/tests -p 'test_*.py' -v"
         },
         {
+          "name": "Native harness and boundary regressions",
+          "script": "python3 -m unittest discover -s ci/native -p 'test_*.py' -v"
+        },
+        {
           "name": "Native recipe static gates",
           "script": "python3 ci/native/build.py --check"
         },

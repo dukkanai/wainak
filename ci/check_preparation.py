@@ -12,6 +12,7 @@ NATIVE = "5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff"
 COMMANDS = [
     "python3 ci/check_preparation.py",
     "python3 -m unittest discover -s ci/tests -p 'test_*.py' -v",
+    "python3 -m unittest discover -s ci/native -p 'test_*.py' -v",
     "python3 ci/native/build.py --check",
     "python3 ci/ios/build.py --build-unsigned",
 ]

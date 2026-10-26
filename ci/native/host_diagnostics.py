@@ -1,4 +1,5 @@
 """Fixed public test diagnostics; untrusted Go JSON Output is never returned."""
+import errno
 import json
 import math
 import re
@@ -11,7 +12,7 @@ HOST_COMMANDS = frozenset({'age-cli-build', 'archive-test-compile', 'archive-tes
 FAILURE_KINDS = frozenset({'NONE','NONZERO_EXIT','TIMEOUT','CANCELLED','OUTPUT_BOUND',
  'RESOURCE_GUARD','SPAWN_OR_IO','CLEANUP','OTHER'})
 FAILURE_CATEGORIES = frozenset({'MALFORMED_TEST_JSON','INCOMPLETE_TEST_JSON','TEST_FAILURE',
- 'NO_TEST_FAILURE_EVENT','COMPILE_PHASE_FAILURE'})
+ 'NO_TEST_FAILURE_EVENT','COMPILE_PHASE_FAILURE','MISSING_TEST_EXECUTION','SKIPPED_TEST'})
 
 # Finite identities emitted by the reviewed native recipe; never argv or paths.
 NATIVE_COMMANDS = frozenset(['apple-bind', 'binding-input-controls', 'binding-input-modules', 'go-version', 'gobind-build', 'gobind-buildinfo', 'gomobile-build', 'gomobile-buildinfo', 'iphoneos-clang', 'iphoneos-sdk', 'iphoneos-sysroot', 'iphonesimulator-clang', 'iphonesimulator-sdk', 'iphonesimulator-sysroot', 'module-acquisition', 'module-verify', 'module-verify-after', 'slice-architecture', 'slice-load-commands', 'slice-symbols', 'target-0-controls', 'target-0-modules', 'target-1-controls', 'target-1-modules', 'target-device-packages', 'target-simulator-packages', 'tool-input-controls', 'tool-input-modules', 'xcode-version'])
@@ -49,7 +50,10 @@ def event_json(line):
     def constant(value): raise ValueError()
     return json.loads(text,object_pairs_hook=pairs,parse_constant=constant)
 
-def project_go_events(raw, names, package):
+def project_go_events(raw, names, package, expected=None):
+    expected=set(names if expected is None else expected)
+    require(bool(expected) and expected<=set(names),'invalid expected test inventory')
+    ran=set(); passed=set(); skipped=set()
     failed=set(); categories=set(); failure_event=False; terminal=None
     lines=raw.splitlines()
     if not raw or not raw.endswith(b'\n'): categories.add('INCOMPLETE_TEST_JSON')
@@ -70,13 +74,37 @@ def project_go_events(raw, names, package):
         test=row.get('Test')
         if terminal is not None: categories.add('MALFORMED_TEST_JSON')
         if action in ('pass','fail') and test is None: terminal=action
+        top=test.split('/',1)[0] if isinstance(test,str) else None
+        if test is not None and top not in names: categories.add('MALFORMED_TEST_JSON')
+        if action=='skip':
+            categories.add('SKIPPED_TEST')
+            if top in names: skipped.add(top)
+        if test in expected:
+            if action=='run':
+                if test in ran: categories.add('MALFORMED_TEST_JSON')
+                ran.add(test)
+            if action=='pass':
+                if test not in ran or test in passed: categories.add('MALFORMED_TEST_JSON')
+                passed.add(test)
         if action=='fail':
             failure_event=True; categories.add('TEST_FAILURE')
             top=test.split('/',1)[0] if isinstance(test,str) else None
             if top in names: failed.add(top)
     if terminal is None: categories.add('INCOMPLETE_TEST_JSON')
+    if terminal=='pass' and (ran!=expected or passed!=expected): categories.add('MISSING_TEST_EXECUTION')
     proof_ok=terminal=='pass' and not categories
-    return {'failed_tests':sorted(failed),'failure_categories':sorted(categories)},failure_event,proof_ok
+    counts={'expected':len(expected),'run':len(ran),'passed':len(passed),'skipped':len(skipped)}
+    return {'failed_tests':sorted(failed),'failure_categories':sorted(categories),'test_counts':counts},failure_event,proof_ok
+
+
+ERROR_OPERATIONS = frozenset({'preflight','resource_guard','spawn','register_output','collect_output','wait_child','post_guard'})
+ERROR_TYPES = frozenset({'PermissionError','FileNotFoundError','ProcessLookupError','BrokenPipeError','OSError','TimeoutExpired','ValueError','BuildFailure','InvalidRecipe','KeyboardInterrupt','SystemExit'})
+def safe_primary(error, operation):
+    row={'operation':operation if operation in ERROR_OPERATIONS else 'preflight',
+         'type':type(error).__name__ if type(error).__name__ in ERROR_TYPES else 'Exception'}
+    number=getattr(error,'errno',None)
+    if type(number) is int and number in errno.errorcode:row['errno']=number
+    return row
 
 def safe_last_command(name, code, elapsed, outcome, failure_kind, projection=None):
     if name not in HOST_COMMANDS | NATIVE_COMMANDS: return None

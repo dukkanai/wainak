@@ -18,6 +18,8 @@ import sys
 import time
 from verify import GateError, require, read_json, digest, inventory, framework_slices, xcconfig, unsigned_settings
 from diagnostics import LABELS, cleanup_process, emit, native_summary, safe_error, snapshot_test_names
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from build_guards import tree_size, wait_until
 
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / 'apps/mobile'
@@ -34,21 +36,7 @@ TESTS = ['test/native_archive_test.dart', 'test/native_archive_widget_test.dart'
 
 
 def size(root):
-    root = Path(root)
-    if not root.exists():
-        return 0
-    require(not root.is_symlink(), 'budget_root_symlink')
-    total = 0
-    for directory, dirs, files in os.walk(root, followlinks=False):
-        dirs[:] = [d for d in dirs if not Path(directory, d).is_symlink()]
-        for name in files:
-            path = Path(directory, name)
-            try:
-                total += path.lstat().st_size
-            except FileNotFoundError:
-                # Retry the entire snapshot; never count a failed scan as zero.
-                raise GateError('budget_snapshot_changed')
-    return total
+    return tree_size(root)
 
 
 def git_snapshot(root=ROOT, paths=()):
@@ -96,16 +84,8 @@ class Runner:
 
     def guard(self):
         require(not self.cancelled, 'cancelled')
-        used = None
-        for attempt in range(3):
-            try:
-                used = size(self.work) + size(APP / 'build') + size(APP / '.dart_tool') + size(APP / 'ios/Flutter/ephemeral')
-                used += max(0, size(self.flutter) - self.flutter_start)
-                break
-            except GateError:
-                if attempt == 2:
-                    raise
-                time.sleep(.05)
+        used = size(self.work) + size(APP / 'build') + size(APP / '.dart_tool') + size(APP / 'ios/Flutter/ephemeral')
+        used += max(0, size(self.flutter) - self.flutter_start)
         require(used <= MAX_BYTES, 'workspace_budget')
         require(shutil.disk_usage(self.work).free >= 4 * 1024 ** 3, 'disk_headroom')
 
@@ -146,7 +126,13 @@ class Runner:
                         require(len(output) + len(block) <= maximum, 'command_output_bound')
                         output.extend(block)
             operation = 'wait_command'
-            require(p.wait(timeout=5) == 0, 'command_failed_' + label)
+            def waiting_guard():
+                nonlocal last_guard
+                require(not self.cancelled, 'command_timeout_or_cancel')
+                if time.monotonic() - last_guard > 2:
+                    self.guard(); last_guard = time.monotonic()
+            require(wait_until(p, start + timeout, waiting_guard,
+                               lambda: GateError('command_timeout_or_cancel')) == 0, 'command_failed_' + label)
             operation = 'post_command_guards'
             self.guard()
             require(git_snapshot() == self.sources, 'source_changed_by_command')

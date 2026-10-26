@@ -23,8 +23,10 @@ import subprocess
 import tarfile
 import time
 import urllib.request
-from check_static import InvalidRecipe, require, read_regular, read_json, sha, module_id
-from host_diagnostics import declared_tests, project_go_events, safe_last_command, HOST_COMMANDS, classify_tool_output, classify_gate_error, graph_failure_reason
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from build_guards import tree_size, wait_until
+from check_static import InvalidRecipe, require, read_regular, read_json, sha, module_id, validate_source_inventory
+from host_diagnostics import declared_tests, project_go_events, safe_last_command, HOST_COMMANDS, classify_tool_output, classify_gate_error, graph_failure_reason, safe_primary
 from artifact_diagnostics import strict_symbols_present, symbol_summary, load_summary, reason as artifact_reason
 from artifact_static import static_arm64_container, validate_modulemap, validate_apple_load_commands
 
@@ -48,11 +50,7 @@ def safe_child(root, path):
     return path
 
 def byte_size(root):
-    if not root.exists(): return 0
-    total=root.lstat().st_size
-    for path in root.rglob('*'):
-        total += path.lstat().st_size
-    return total
+    return tree_size(root)
 
 def file_inventory(root):
     result={}
@@ -117,26 +115,31 @@ class Runtime:
     def run(self, args, cwd, env, name, public_output=True, seconds=None, go_json=False):
         self.sequence+=1; started=time.monotonic(); data=bytearray(); proc=None
         timeout=seconds if seconds is not None else self.lock['limits']['process_seconds']
-        primary=None; failure='NONE'; cleanup_failed=False
+        primary=None; failure='NONE'; cleanup_failed=False; operation='preflight'
         try:
             if timeout<=0: raise BuildFailure('child deadline exceeded')
             self.guard(force=True)
+            operation='spawn'
             proc=subprocess.Popen([str(a) for a in args],cwd=cwd,env=env,
                                   stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
                                   stderr=subprocess.STDOUT,start_new_session=False)
+            operation='register_output'
             with selectors.DefaultSelector() as select:
                 select.register(proc.stdout,selectors.EVENT_READ)
                 while select.get_map():
-                    self.guard()
+                    operation='resource_guard'; self.guard()
                     if time.monotonic()-started>timeout: raise BuildFailure('child deadline exceeded')
+                    operation='collect_output'
                     for key,_ in select.select(.5):
                         chunk=os.read(key.fileobj.fileno(),65536)
                         if not chunk: select.unregister(key.fileobj); continue
                         if len(data)+len(chunk)>self.lock['limits']['process_output_bytes']:
                             raise BuildFailure('child output bound exceeded')
                         data.extend(chunk)
-                code=proc.wait(timeout=5)
-            self.guard(force=True)
+                operation='wait_child'
+                code=wait_until(proc, started+timeout, self.guard,
+                                lambda: BuildFailure('child deadline exceeded'))
+            operation='post_guard'; self.guard(force=True)
             if code: raise BuildFailure('child command failed')
             return bytes(data)
         except BaseException as error:
@@ -166,7 +169,8 @@ class Runtime:
             projection=None; proof_failed=False
             if go_json:
                 package='wainak.local/archivebridge' if name.startswith('archivebridge-') else 'wainak.local/historyarchive'
-                projection,has_failure,proof_ok=project_go_events(bytes(data),self.test_names[package],package)
+                expected={name.removeprefix('fuzz-')} if name.startswith('fuzz-') else self.test_names[package]
+                projection,has_failure,proof_ok=project_go_events(bytes(data),self.test_names[package],package,expected)
                 proof_failed=not proof_ok
                 if proof_failed and primary is None and not cleanup_failed: failure='OTHER';outcome='FAILED'
                 if outcome=='FAILED' and not has_failure:
@@ -174,6 +178,7 @@ class Runtime:
             elif outcome=='FAILED' and name in ('age-cli-build','archive-test-compile','archivebridge-test-compile'):
                 projection={'failed_tests':[],'failure_categories':['COMPILE_PHASE_FAILURE']}
             last=safe_last_command(name,None if proc is None else proc.returncode,elapsed,outcome,failure,projection)
+            if last is not None and primary is not None: last['primary']=safe_primary(primary,operation)
             if last is not None and outcome == 'FAILED' and name not in HOST_COMMANDS:
                 try: last['tool_categories'] = classify_tool_output(bytes(data))
                 except BaseException: last['tool_categories'] = ['UNKNOWN_TOOL_FAILURE']
@@ -432,7 +437,14 @@ def test_host_policy(runtime, go, tools_module, env, lock):
         root=source/name; root.mkdir(mode=0o700)
         for folder in ('home','tmp'): (root/folder).mkdir(mode=0o700)
         target=root/'module';make_module(target,module,lock,None if name=='archive' else local)
-        for path in (runtime.repo/name).glob('*.go'): shutil.copyfile(path,target/path.name)
+        validate_source_inventory(runtime.repo, lock['source_hashes'])
+        for relative, expected in sorted(lock['source_hashes'].items()):
+            if relative.split('/')[0] != name: continue
+            data=read_regular(runtime.repo/relative)
+            require(hashlib.sha256(data).hexdigest()==expected,'reviewed Go source/test bytes changed')
+            destination=target/Path(relative).name
+            destination.write_bytes(data)
+            require(digest_file(destination)==expected,'copied Go source bytes changed')
         compileenv=dict(env,CGO_ENABLED='0')
         binary=runtime.work/'bin'/(name+'.test')
         deadline=time.monotonic()+180
@@ -570,6 +582,7 @@ def finalize_native_result(runtime,repo,directory,result,initial,manifests,prima
     def audit(label, action):
         try: return action()
         except BaseException: errors.append(label); return None
+    if initial: audit('SOURCE_INVENTORY',lambda:validate_source_inventory(repo,initial))
     audit('SOURCE_GUARD',lambda:require(initial=={name:sha(repo/name) for name in initial},'repository Go source changed'))
     audit('MODULE_MANIFEST_GUARD',lambda:require(manifests=={name:sha(repo/name) for name in manifests},'repository manifests changed'))
     result['last_command']=runtime.last_command
@@ -634,6 +647,8 @@ def build_ios(repo, directory, lock, work, output):
             runtime.run([go,'version','-m',work/'bin'/tool],repo,env,tool+'-buildinfo')
         host_tests=test_host_policy(runtime,go,tools_module,env,lock)
         runtime.stage='unmodified-upstream-apple-bind'
+        validate_source_inventory(repo,lock['source_hashes'])
+        require(initial=={name:sha(repo/name) for name in initial},'repository Go source changed')
         local={'wainak.local/archivebridge':repo/'archivebridge','wainak.local/historyarchive':repo/'archive'}
         binding=work/'binding'; make_module(binding,'wainak.local/cibinding',lock,local)
         input_graph=inspect_graph(runtime,go,binding,env,'binding-input',allowed,local)

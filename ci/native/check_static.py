@@ -122,7 +122,33 @@ def validate_lock(lock, directory):
         require(sha(directory/row['path']) == row['sha256'], 'retained notice changed')
     return lock
 
+def validate_source_inventory(repo, hashes):
+    """Reject any additional file in a compiled source directory, tracked or not.
+
+    Only the existing notices directory is non-compiler input. The copied host
+    modules use this same allowlist; no wildcard can silently acquire new code.
+    """
+    expected=set(hashes)
+    found=set()
+    for module in ('archive','archivebridge'):
+        root=repo/module
+        require(root.is_dir() and not root.is_symlink(),'source directory boundary')
+        with os.scandir(root) as entries:
+            for entry in entries:
+                relative=module+'/'+entry.name
+                info=entry.stat(follow_symlinks=False)
+                if module=='archive' and entry.name=='notices':
+                    require(stat.S_ISDIR(info.st_mode),'source notices boundary')
+                    continue
+                require(stat.S_ISREG(info.st_mode),'source entry type changed')
+                require(relative in expected or entry.name in ('go.mod','go.sum'),
+                        'unreviewed source input present')
+                if relative in expected: found.add(relative)
+    require(found==expected,'reviewed source inventory changed')
+    return found
+
 def validate_sources(repo, lock):
+    validate_source_inventory(repo, lock['source_hashes'])
     for relative, digest in lock['source_hashes'].items():
         require(sha(repo/relative) == digest, 'reviewed Go source/test bytes changed')
     for relative,digest in lock['source_module_hashes'].items():

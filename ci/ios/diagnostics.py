@@ -185,7 +185,7 @@ TOOL_CATEGORIES = frozenset(['COMPILER', 'GOMOBILE_BIND', 'GO_MODULE_OFFLINE', '
 FAILURE_KINDS = frozenset({'NONE', 'NONZERO_EXIT', 'TIMEOUT', 'CANCELLED', 'OUTPUT_BOUND',
                           'RESOURCE_GUARD', 'SPAWN_OR_IO', 'CLEANUP', 'OTHER'})
 FAILURE_CATEGORIES = frozenset({'MALFORMED_TEST_JSON', 'INCOMPLETE_TEST_JSON', 'TEST_FAILURE',
-                               'NO_TEST_FAILURE_EVENT', 'COMPILE_PHASE_FAILURE'})
+                               'NO_TEST_FAILURE_EVENT', 'COMPILE_PHASE_FAILURE', 'MISSING_TEST_EXECUTION', 'SKIPPED_TEST'})
 TEST_SOURCES = {
     'archive': ('archive/archive_test.go', 'archive/interop_test.go'),
     'archivebridge': ('archivebridge/bridge_test.go',),
@@ -230,7 +230,7 @@ def command_summary(data, trusted_tests):
     if type(elapsed) not in {int, float} or not math.isfinite(elapsed) or not 0 <= elapsed <= 3600:
         raise ValueError('command_summary_elapsed')
     tests, categories = data.get('failed_tests'), data.get('failure_categories')
-    if type(tests) is not list or len(tests) > 32 or type(categories) is not list or len(categories) > 5:
+    if type(tests) is not list or len(tests) > 32 or type(categories) is not list or len(categories) > len(FAILURE_CATEGORIES):
         raise ValueError('command_summary_lists')
     allowed = trusted_tests.get(HOST_COMMANDS.get(name), frozenset())
     if any(type(x) is not str or x not in allowed or '/' in x for x in tests):
@@ -252,6 +252,25 @@ def command_summary(data, trusted_tests):
         raise ValueError('command_summary_nonhost_tests')
     row = {'name': name, 'exit_code': code, 'elapsed_seconds': elapsed, 'outcome': outcome,
             'failure_kind': kind, 'failed_tests': list(tests), 'failure_categories': list(categories)}
+    if 'test_counts' in data:
+        counts=data['test_counts']
+        if type(counts) is not dict or set(counts)!={'expected','run','passed','skipped'} or any(type(x) is not int or not 0<=x<=128 for x in counts.values()):
+            raise ValueError('command_summary_test_counts')
+        if name not in HOST_COMMANDS or counts['expected']==0 or counts['run']>counts['expected'] or counts['passed']>counts['run']:
+            raise ValueError('command_summary_test_counts_scope')
+        if outcome=='PASS' and (counts['run']!=counts['expected'] or counts['passed']!=counts['expected'] or counts['skipped']):
+            raise ValueError('command_summary_test_counts_false_pass')
+        row['test_counts']=dict(counts)
+    if 'primary' in data:
+        primary=data['primary']
+        operations={'preflight','resource_guard','spawn','register_output','collect_output','wait_child','post_guard'}
+        kinds=ERROR_TYPES|{'BuildFailure','InvalidRecipe','Exception'}
+        if type(primary) is not dict or set(primary)-{'operation','type','errno'} or primary.get('operation') not in operations or primary.get('type') not in kinds:
+            raise ValueError('command_summary_primary')
+        if 'errno' in primary and (type(primary['errno']) is not int or primary['errno'] not in errno.errorcode):
+            raise ValueError('command_summary_primary_errno')
+        if outcome!='FAILED':raise ValueError('command_summary_primary_scope')
+        row['primary']=dict(primary)
     if 'tool_categories' in data: row['tool_categories'] = list(tool)
     return row
 
