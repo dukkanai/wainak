@@ -44,6 +44,8 @@ jobs:
         with:
           python-version: '3.14'
       - run: python3 -m unittest discover -s ops -p test_manage.py -v
+      - name: Prototype packaging containment regressions
+        run: python3 -m unittest discover -s prototype -p test_package_preview.py -v
 
   recovery:
     name: Isolated database recovery
