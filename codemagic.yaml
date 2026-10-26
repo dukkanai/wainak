@@ -30,6 +30,37 @@
           "script": "python3 ci/ios/build.py --build-unsigned"
         }
       ]
+    },
+    "ios-unsigned-40gib-experiment": {
+      "name": "iOS unsigned compile — one 40 GiB logical-space experiment",
+      "instance_type": "mac_mini_m2",
+      "max_build_duration": 45,
+      "environment": {
+        "xcode": "26.4.1",
+        "flutter": "3.47.8"
+      },
+      "scripts": [
+        {
+          "name": "Source and configuration gates",
+          "script": "python3 ci/check_preparation.py"
+        },
+        {
+          "name": "Static negative controls",
+          "script": "python3 -m unittest discover -s ci/tests -p 'test_*.py' -v"
+        },
+        {
+          "name": "Native harness and boundary regressions",
+          "script": "python3 -m unittest discover -s ci/native -p 'test_*.py' -v"
+        },
+        {
+          "name": "Native recipe static gates",
+          "script": "python3 ci/native/build.py --check"
+        },
+        {
+          "name": "Manual unsigned iOS compilation",
+          "script": "python3 ci/ios/build.py --build-unsigned --logical-workspace-40gib-experiment"
+        }
+      ]
     }
   }
 }

@@ -26,6 +26,8 @@ ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / 'apps/mobile'
 PINS = ROOT / 'ci/ios-host-pins.json'
 MAX_BYTES = 8 * 1024 ** 3
+EXPERIMENT_MAX_BYTES = 40 * 1024 ** 3
+EXPERIMENT_FLAG = '--logical-workspace-40gib-experiment'
 SIGNING = ['CODE_SIGNING_ALLOWED=NO', 'CODE_SIGNING_REQUIRED=NO', 'CODE_SIGN_IDENTITY=',
            'DEVELOPMENT_TEAM=', 'PROVISIONING_PROFILE=', 'PROVISIONING_PROFILE_SPECIFIER=',
            'CODE_SIGN_STYLE=Manual']
@@ -78,8 +80,36 @@ def cache_policy_receipt(settings, sdk):
         raise
 
 
+def select_workspace_budget(experiment=False):
+    require(type(experiment) is bool, 'invalid_workspace_budget_opt_in')
+    return EXPERIMENT_MAX_BYTES if experiment else MAX_BYTES
+
+
+def workspace_budget_policy(limit):
+    require(type(limit) is int and limit in (MAX_BYTES, EXPERIMENT_MAX_BYTES),
+            'invalid_workspace_budget_limit')
+    return {'limit_bytes': limit,
+            'limit_policy': 'cloud_40gib_experiment' if limit == EXPERIMENT_MAX_BYTES else 'default_8gib'}
+
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(allow_abbrev=False)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--check', action='store_true')
+    mode.add_argument('--build-unsigned', action='store_true')
+    parser.add_argument(EXPERIMENT_FLAG, action='store_true', dest='workspace_40gib_experiment',
+                        help='Explicit one-cloud-experiment 40 GiB logical limit; default is 8 GiB.')
+    args = parser.parse_args(argv)
+    if args.workspace_40gib_experiment and not args.build_unsigned:
+        parser.error(EXPERIMENT_FLAG + ' requires --build-unsigned')
+    return args
+
+
 class Runner:
-    def __init__(self, work, flutter):
+    workspace_budget_bytes = MAX_BYTES
+
+    def __init__(self, work, flutter, *, workspace_40gib_experiment=False):
+        self.workspace_budget_bytes = select_workspace_budget(workspace_40gib_experiment)
         self.work, self.flutter = work, flutter
         self.work_identity = identity(work.stat())
         self.resource_snapshot = None
@@ -114,14 +144,16 @@ class Runner:
     def guard(self):
         require(not self.cancelled, 'cancelled')
         self.resource_snapshot = None  # Never mislabel an old sample after an I/O failure.
+        policy = workspace_budget_policy(self.workspace_budget_bytes)
         self.resource_snapshot = budget_snapshot(self.work, APP, self.flutter, self.flutter_start, measure=size)
-        if self.resource_snapshot['total_logical_bytes'] > MAX_BYTES:
+        self.resource_snapshot.update(policy)
+        if self.resource_snapshot['total_logical_bytes'] > self.workspace_budget_bytes:
             try:
                 detail = large_file_summary(self.work)
             except BaseException as error:
                 detail = {'availability': 'unavailable', 'complete': False, 'error': safe_error(error)}
             self.resource_snapshot['work_largest_files'] = detail
-        require(self.resource_snapshot['total_logical_bytes'] <= MAX_BYTES, 'workspace_budget')
+        require(self.resource_snapshot['total_logical_bytes'] <= self.workspace_budget_bytes, 'workspace_budget')
         require(self.resource_snapshot['free_disk_bytes'] >= 4 * 1024 ** 3, 'disk_headroom')
 
     def run(self, label, args, cwd=ROOT, timeout=1200, maximum=16 * 1024 * 1024):
@@ -244,11 +276,7 @@ def static_check():
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument('--check', action='store_true')
-    mode.add_argument('--build-unsigned', action='store_true')
-    args = parser.parse_args()
+    args = parse_args()
     pins = static_check()
     if args.check:
         print('PASS iOS recipe static checks; Mac/Xcode execution NOT RUN')
@@ -260,11 +288,14 @@ def main():
     flutter = Path(flutter_exe).resolve().parent.parent
     work = ROOT / '.ci-work'
     work.mkdir(mode=0o700)  # Never reuse a prior partial execution or accept injected artifacts.
-    runner = Runner(work, flutter)
+    runner = Runner(work, flutter, workspace_40gib_experiment=args.workspace_40gib_experiment)
     cfg = APP / 'ios/Flutter/NativeArchive.generated.xcconfig'
     cfg_owned = False
     cfg_hash = None
     try:
+        runner.guard()  # Fresh free-disk and selected logical-budget preflight.
+        emit('workspace_budget_policy', **workspace_budget_policy(runner.workspace_budget_bytes),
+             minimum_free_bytes=4 * 1024 ** 3, metric='logical_bytes', hard_quota=False)
         if 'DEVELOPER_DIR' not in runner.env:
             selected = runner.run('xcode-selection', ['/usr/bin/xcode-select', '-p'], timeout=30).decode().strip()
             require(selected.startswith('/Applications/') and Path(selected).is_dir(), 'full_xcode_selection')
@@ -348,6 +379,7 @@ def main():
             artifact_rows.append(row)
         require(inventory(framework) == native_inventory and digest(cfg) == cfg_hash, 'native_input_drift')
         final_result = {'status': 'PASS_UNSIGNED_IOS_COMPILE_ONLY', 'apps': artifact_rows,
+            'workspace_budget': workspace_budget_policy(runner.workspace_budget_bytes),
             'native_artifact_files': native_inventory, 'native_transient_retirement': retirement,
             'source_files': runner.sources,
             'device_runtime': 'NOT_RUN', 'simulator_runtime': 'NOT_RUN', 'signing': False,

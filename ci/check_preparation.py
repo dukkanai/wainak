@@ -46,19 +46,28 @@ def validate_workflow(config) -> None:
     # no triggering, schedules, publishing, artifacts, secret groups or signing.
     require(isinstance(config, dict) and set(config) == {"workflows"}, "workflow_root")
     workflows = config["workflows"]
-    require(isinstance(workflows, dict) and set(workflows) == {"ios-unsigned-archive"}, "workflow_count")
-    workflow = workflows["ios-unsigned-archive"]
-    require(set(workflow) == {"name", "instance_type", "max_build_duration", "environment", "scripts"}, "workflow_keys")
-    require(workflow["name"] == "iOS unsigned archive — manual compile validation (not runtime)", "workflow_label")
-    require(workflow["instance_type"] == "mac_mini_m2", "not_personal_m2")
-    require(type(workflow["max_build_duration"]) is int and workflow["max_build_duration"] == 45, "duration")
-    require(workflow["environment"] == {"xcode": "26.4.1", "flutter": "3.47.8"}, "environment")
-    scripts = workflow["scripts"]
-    require(isinstance(scripts, list) and len(scripts) == len(COMMANDS), "scripts_count")
-    for step, command in zip(scripts, COMMANDS):
-        require(isinstance(step, dict) and set(step) == {"name", "script"}, "script_keys")
-        require(isinstance(step["name"], str) and 0 < len(step["name"]) < 100, "script_name")
-        require(step["script"] == command, "unreviewed_workflow_command")
+    labels = {
+        "ios-unsigned-archive": "iOS unsigned archive — manual compile validation (not runtime)",
+        "ios-unsigned-40gib-experiment": "iOS unsigned compile — one 40 GiB logical-space experiment",
+    }
+    require(isinstance(workflows, dict) and set(workflows) == set(labels), "workflow_count")
+    for key, label in labels.items():
+        workflow = workflows[key]
+        require(isinstance(workflow, dict), "workflow_type")
+        require(set(workflow) == {"name", "instance_type", "max_build_duration", "environment", "scripts"}, "workflow_keys")
+        require(workflow["name"] == label, "workflow_label")
+        require(workflow["instance_type"] == "mac_mini_m2", "not_personal_m2")
+        require(type(workflow["max_build_duration"]) is int and workflow["max_build_duration"] == 45, "duration")
+        require(workflow["environment"] == {"xcode": "26.4.1", "flutter": "3.47.8"}, "environment")
+        commands = list(COMMANDS)
+        if key == "ios-unsigned-40gib-experiment":
+            commands[-1] += " --logical-workspace-40gib-experiment"
+        scripts = workflow["scripts"]
+        require(isinstance(scripts, list) and len(scripts) == len(commands), "scripts_count")
+        for step, command in zip(scripts, commands):
+            require(isinstance(step, dict) and set(step) == {"name", "script"}, "script_keys")
+            require(isinstance(step["name"], str) and 0 < len(step["name"]) < 100, "script_name")
+            require(step["script"] == command, "unreviewed_workflow_command")
 
 
 def checked_file(root: Path, relative: str) -> Path:
