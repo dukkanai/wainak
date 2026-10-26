@@ -6,7 +6,12 @@ import 'package:wainak_mobile/src/api/transport.dart';
 class IdentityFixture implements ApiTransport {
   bool verified = false, closed = false, expired = false, failNetwork = false;
   bool holdSignup = false, holdProfile = false, badIdentity = false;
-  Completer<ApiResponse>? pendingSignup, pendingProfile;
+  String? failProfileSaveAt;
+  bool applyBeforeFailure = false,
+      failReadback = false,
+      unrelatedReadback = false;
+  bool holdReadback = false;
+  Completer<ApiResponse>? pendingSignup, pendingProfile, pendingReadback;
   int registrations = 0,
       verifications = 0,
       deletions = 0,
@@ -145,10 +150,20 @@ class IdentityFixture implements ApiTransport {
         pendingProfile = Completer<ApiResponse>();
         return pendingProfile!.future;
       }
+      if (failProfileSaveAt == 'profile') {
+        if (applyBeforeFailure) storedProfile = Map.from(data);
+        throw StateError('Synthetic profile response lost');
+      }
+      storedProfile = Map.from(data);
       return reply(200, {'profile': data});
     }
     if (uri.path == '/v1/me/preferences') {
       lastPreferences = data;
+      if (failProfileSaveAt == 'preferences') {
+        if (applyBeforeFailure) storedPreferences = Map.from(data);
+        throw StateError('Synthetic preferences response lost');
+      }
+      storedPreferences = Map.from(data);
       return reply(200, {'preferences': data});
     }
     if (uri.path == '/v1/me/assessment/answers') {
@@ -159,14 +174,26 @@ class IdentityFixture implements ApiTransport {
       answers++;
       return reply(200, question);
     }
-    if (uri.path == '/v1/me/assessment') return reply(200, question);
-    if (uri.path == '/v1/me')
+    if (uri.path == '/v1/me/assessment') {
+      if (failProfileSaveAt == 'assessment')
+        throw StateError('Synthetic assessment unavailable');
+      return reply(200, question);
+    }
+    if (uri.path == '/v1/me') {
+      if (holdReadback) {
+        pendingReadback = Completer<ApiResponse>();
+        return pendingReadback!.future;
+      }
+      if (failReadback) throw StateError('Synthetic readback unavailable');
       return reply(200, {
-        'id': 'usr_11111111111111111111111111111111',
+        'id': unrelatedReadback
+            ? 'usr_22222222222222222222222222222222'
+            : 'usr_11111111111111111111111111111111',
         'dev_email_verified': true,
         'profile': storedProfile,
         'preferences': storedPreferences,
       });
+    }
     if (uri.path == '/v1/candidates') return reply(200, {'items': []});
     throw StateError('Unimplemented synthetic fixture request');
   }
