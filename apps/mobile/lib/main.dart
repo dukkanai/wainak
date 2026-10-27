@@ -13,6 +13,8 @@ import 'src/identity/client.dart';
 import 'src/identity/app.dart';
 import 'src/native_archive/app.dart';
 import 'src/native_archive/channel.dart';
+import 'src/local_cards/app.dart';
+import 'src/local_cards/controller.dart' show localCardsModeAllowed;
 
 void main() {
   const devEnabled = bool.fromEnvironment('WAINAK_DEV_MODE');
@@ -43,6 +45,23 @@ void main() {
       return;
     }
     runApp(NativeArchiveApp(port: MethodChannelArchiveProbe()));
+    return;
+  }
+  if (mode == 'local_cards') {
+    if (localCardsModeAllowed(
+      developmentEnabled: devEnabled,
+      releaseMode: kReleaseMode,
+      mode: mode,
+    )) {
+      runApp(const LocalCardsApp());
+    } else {
+      runApp(
+        const DisabledBuild(
+          message:
+              'معاينة البطاقات المحلية متاحة للتطوير فقط، وليست مفعّلة في إصدار النشر.',
+        ),
+      );
+    }
     return;
   }
   if (mode == 'fake') {
