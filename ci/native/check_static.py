@@ -13,6 +13,7 @@ EXPECTED_SOURCE = {'archive/archive.go': '20ed943c8e8a4c4c8f1b3c19c422c353067830
 
 EXPECTED_SOURCE_MODULES = {'archive/go.mod': '68e37b3d448d929b2a6ac03a0d0364e851b1b9e1cf6cf67f1ab4e12b7a154823', 'archivebridge/go.mod': '8fe3d9077d27830843a138ad522156fa367a922039e61b50761275c858dedf3e', 'archive/go.sum': 'ce89bc3d29b0b26309dfe62825689c4fa82314f29fecf4bc22088b63d084ec4f', 'archivebridge/go.sum': '40b1ef66457e931191a49c57d4b0b272b4cb1fd632b06d390c74cac5436bb634'}
 EXPECTED_LICENSE_EXCEPTIONS = [{'file': 'README.md', 'path': 'c2sp.org/CCTV/age', 'sha256': 'fdbd4b06044f3803c72bdaf2df7681fdce3a45a326a2898e75640eae906606ad', 'version': 'v0.0.0-20260829155415-4448f2097b2d'}]
+SOURCE_DOCUMENTATION = frozenset({'archive/README.md', 'archivebridge/README.md'})
 
 class InvalidRecipe(ValueError):
     pass
@@ -125,8 +126,9 @@ def validate_lock(lock, directory):
 def validate_source_inventory(repo, hashes):
     """Reject any additional file in a compiled source directory, tracked or not.
 
-    Only the existing notices directory is non-compiler input. The copied host
-    modules use this same allowlist; no wildcard can silently acquire new code.
+    The notices directory and two exact README paths are non-compiler input.
+    README files must be bounded regular UTF-8 text; no Markdown wildcard is
+    permitted. Host modules copy only the separately pinned source allowlist.
     """
     expected=set(hashes)
     found=set()
@@ -141,6 +143,9 @@ def validate_source_inventory(repo, hashes):
                     require(stat.S_ISDIR(info.st_mode),'source notices boundary')
                     continue
                 require(stat.S_ISREG(info.st_mode),'source entry type changed')
+                if relative in SOURCE_DOCUMENTATION:
+                    read_regular(repo/relative,128*1024).decode('utf-8')
+                    continue
                 require(relative in expected or entry.name in ('go.mod','go.sum'),
                         'unreviewed source input present')
                 if relative in expected: found.add(relative)

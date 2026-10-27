@@ -75,6 +75,28 @@ class SourceInventoryTests(unittest.TestCase):
         for relative in self.hashes:
             p=self.root/relative;p.parent.mkdir();p.write_text('package public\n')
     def test_exact_inventory(self):self.assertEqual(c.validate_source_inventory(self.root,self.hashes),set(self.hashes))
+    def test_only_exact_regular_readmes_are_noncompiler_documentation(self):
+        for module in ('archive','archivebridge'):
+            (self.root/module/'README.md').write_text('# وثيقة عامة\n',encoding='utf-8')
+        self.assertEqual(c.validate_source_inventory(self.root,self.hashes),set(self.hashes))
+        for name in ('OTHER.md','README.md.go','README.md.syso','README.MD'):
+            path=self.root/'archive'/name;path.write_text('PUBLIC')
+            try:
+                with self.assertRaises(ValueError):c.validate_source_inventory(self.root,self.hashes)
+            finally:path.unlink()
+    def test_readme_link_directory_and_fifo_are_rejected(self):
+        path=self.root/'archive'/'README.md'
+        path.symlink_to(self.root/'archivebridge'/'b.go')
+        with self.assertRaises(ValueError):c.validate_source_inventory(self.root,self.hashes)
+        path.unlink();path.mkdir()
+        with self.assertRaises(ValueError):c.validate_source_inventory(self.root,self.hashes)
+        path.rmdir();os.mkfifo(path)
+        with self.assertRaises(ValueError):c.validate_source_inventory(self.root,self.hashes)
+    def test_readme_is_bounded_utf8_text(self):
+        path=self.root/'archive'/'README.md'
+        for value in (b'x'*(128*1024+1),b'\xff'):
+            path.write_bytes(value)
+            with self.assertRaises(ValueError):c.validate_source_inventory(self.root,self.hashes)
     def test_extra_go_assembly_syso_and_directory_rejected(self):
         for name in ('extra.go','extra.s','extra.syso','extra.txt'):
             p=self.root/'archive'/name;p.write_text('PUBLIC')
