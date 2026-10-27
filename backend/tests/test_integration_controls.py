@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import os
 import signal
 from pathlib import Path
@@ -32,6 +33,36 @@ class IntegrationControlTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 controls.create_marker(marker, "changed")
             self.assertEqual(marker.read_text(), "resumed")
+            self.assertEqual(list(Path(directory).iterdir()),[marker])
+
+    def test_marker_final_name_is_published_only_after_complete_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker=Path(directory)/'active.resumed'
+            original=controls.os.link
+            inspected=[]
+            def publish(source,destination,**options):
+                self.assertFalse(marker.exists())
+                self.assertEqual(Path(source).read_bytes(),b'resumed')
+                self.assertEqual(Path(source).stat().st_mode & 0o777,0o600)
+                inspected.append(True)
+                return original(source,destination,**options)
+            with mock.patch.object(controls.os,'link',side_effect=publish):
+                controls.create_marker(marker,'resumed')
+            self.assertEqual(inspected,[True])
+            self.assertEqual(marker.read_bytes(),b'resumed')
+            self.assertEqual(list(Path(directory).iterdir()),[marker])
+
+    def test_cleanup_failure_has_a_fixed_stage_without_exception_text(self):
+        progress=controls.diagnostics.Progress()
+        with mock.patch.object(controls,'stop_flutter',side_effect=RuntimeError('private-synthetic-value')), \
+                mock.patch.object(controls,'stop_server'), mock.patch('sys.stdout',new=io.StringIO()) as output:
+            with self.assertRaises(RuntimeError):
+                controls.cleanup_children(None,None,lambda:None,progress)
+        self.assertNotIn('private-synthetic-value',output.getvalue())
+        projected=controls.diagnostics.project(output.getvalue(),1)
+        self.assertEqual(projected['status'],'FAILED')
+        self.assertEqual(projected['failures'][0]['stage'],'cleanup_flutter')
+        self.assertEqual(projected['failures'][0]['code'],'unexpected_error')
 
     def test_marker_symlink_is_not_followed(self):
         with tempfile.TemporaryDirectory() as directory:

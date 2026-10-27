@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from run_flutter_ci import validate_events
 from run_go_checks import cache_inventory, validate_go_events
+from backend.integration.flutter_driver_diagnostics import PREFIX, project as project_driver
 
 
 def stream(events):
@@ -14,6 +15,27 @@ def stream(events):
 
 
 class ResultControls(unittest.TestCase):
+    def diagnostic(self,stage,status='PASS',code='ok'):
+        return PREFIX+json.dumps({'schema':1,'stage':stage,'status':status,'code':code,'error_type':'none'})
+
+    def test_driver_requires_chain_and_harness_completion_and_zero_exit(self):
+        complete=self.diagnostic('complete')+'\n'+self.diagnostic('harness')
+        self.assertEqual(project_driver(complete,0)['status'],'PASS')
+        for output,code in [('',0),(self.diagnostic('complete'),0),(self.diagnostic('harness'),0),
+                            (complete,1),(complete+'\n'+self.diagnostic('harness'),0),
+                            (self.diagnostic('cleanup_flutter','FAILED','flutter_group_survived')+'\n'+complete,0)]:
+            self.assertEqual(project_driver(output,code)['status'],'FAILED')
+
+    def test_driver_diagnostics_never_project_raw_output_or_unknown_fields(self):
+        output='private-synthetic-value\n'+self.diagnostic('harness','FAILED','postgres_checks_failed')
+        result=project_driver(output,1)
+        self.assertNotIn('private-synthetic-value',json.dumps(result))
+        value=json.loads(self.diagnostic('harness')[len(PREFIX):]);value['raw']='private'
+        with self.assertRaises(RuntimeError):project_driver(PREFIX+json.dumps(value),1)
+        value.pop('raw');value['stage']='private-synthetic-value'
+        with self.assertRaises(RuntimeError):project_driver(PREFIX+json.dumps(value),1)
+        with self.assertRaises(RuntimeError):project_driver(PREFIX+'{',1)
+
     def flutter(self, *, skip=False, hidden=False):
         return [
             {'type': 'suite', 'suite': {'id': 0, 'path': '/owned/opt_in_test.dart'}},

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import tempfile
 from ci_process import run_bounded
+from backend.integration.flutter_driver_diagnostics import project as project_driver
 
 ROOT = Path(__file__).resolve().parents[1]
 MOBILE = ROOT / 'apps/mobile'
@@ -130,9 +131,13 @@ def run_checks(tools, flutter, python, fixture_home):
         ('matching HTTP PostgreSQL widgets', 'identity_matching_live_widget_test.dart', 'WAINAK_RUN_MATCHING_WIDGET'),
     ):
         run_gate(flutter, label, ['test/' + test], dict(env, **{flag: '1'}))
-    run_bounded([python, 'backend/integration/run_flutter_postgres.py', '--run-flutter-postgres',
-                 '--mobile-root', MOBILE, '--tools-root', tools], cwd=ROOT, env=env, check=True,
-                seconds=600, cleanup_grace=120)
+    result = run_bounded([python, 'backend/integration/run_flutter_postgres.py', '--run-flutter-postgres',
+                          '--mobile-root', MOBILE, '--tools-root', tools], cwd=ROOT, env=env,
+                         seconds=600, cleanup_grace=120)
+    summary = project_driver(result.stdout, result.returncode)
+    print(json.dumps({'gate': 'native HTTP PostgreSQL driver', **summary}), flush=True)
+    if summary['status'] != 'PASS':
+        raise RuntimeError('Native HTTP PostgreSQL driver failed; see fixed-schema diagnostic above')
     print('PASS: native HTTP PostgreSQL driver completed its required marker protocol.', flush=True)
     run_bounded(['git', 'diff', '--exit-code', '--', 'apps/mobile/pubspec.lock'], cwd=ROOT, check=True)
     print('PASS: Flutter host, explicit preview, authenticated HTTP and durable PostgreSQL gates. No device runtime claim.')

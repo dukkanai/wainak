@@ -15,12 +15,14 @@ import re
 import signal
 import stat
 import subprocess
+import tempfile
 import time
 import unittest
 import urllib.request
 from wsgiref.simple_server import WSGIRequestHandler, make_server
 
 import run_postgres
+import flutter_driver_diagnostics as diagnostics
 
 
 class QuietRequests(WSGIRequestHandler):
@@ -115,20 +117,31 @@ def stop_flutter(process):
     raise RuntimeError("Temporary Flutter process group did not stop")
 
 
-def cleanup_children(process, server, drain):
+def cleanup_children(process, server, drain, progress=None):
     # Never let a client kill/wait/pipe failure bypass server cleanup.
     with run_postgres.cleanup_signals():
         try:
             try:
-                stop_flutter(process)
+                if progress is None:
+                    stop_flutter(process)
+                else:
+                    progress.call('cleanup_flutter', lambda: stop_flutter(process))
             finally:
                 if process is not None and process.stdout is not None:
-                    try:
-                        drain()
-                    finally:
-                        process.stdout.close()
+                    def close_output():
+                        try:
+                            drain()
+                        finally:
+                            process.stdout.close()
+                    if progress is None:
+                        close_output()
+                    else:
+                        progress.call('cleanup_output', close_output)
         finally:
-            stop_server(server)
+            if progress is None:
+                stop_server(server)
+            else:
+                progress.call('cleanup_http', lambda: stop_server(server))
 
 
 def owned_test(mobile_root, relative):
@@ -173,9 +186,17 @@ def validate_marker(path, expected):
 
 
 def create_marker(path, content):
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-    with os.fdopen(fd, "w") as stream:
-        stream.write(content)
+    # Publish a complete, closed file atomically without replacing an existing
+    # marker. Readers poll the final name; it must never expose an empty prefix.
+    fd, staged = tempfile.mkstemp(prefix='.' + path.name + '.', suffix='.pending', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(content.encode('ascii'))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(staged, path, follow_symlinks=False)
+    finally:
+        os.unlink(staged)
 
 
 def safe_failure_output(output):
@@ -195,6 +216,18 @@ def git_state(root):
 
 
 def run_chain(connect, restart_database, temporary, mobile_root, tools_root, relative_test):
+    progress = diagnostics.Progress()
+    try:
+        _run_chain(connect, restart_database, temporary, mobile_root, tools_root, relative_test, progress)
+    except BaseException as error:
+        if not progress.failure_reported:
+            progress.failure(error)
+        raise
+    diagnostics.emit('complete', 'PASS')
+
+
+def _run_chain(connect, restart_database, temporary, mobile_root, tools_root, relative_test, progress):
+    progress.step('preflight')
     if os.geteuid() == 0:
         raise RuntimeError("Run the integration harness as the project owner, not root")
     test = owned_test(mobile_root, relative_test)
@@ -210,8 +243,10 @@ def run_chain(connect, restart_database, temporary, mobile_root, tools_root, rel
             raise RuntimeError("The project-owned Flutter home/cache must already be accessible")
     with connect() as connection:
         connection.execute("TRUNCATE wainak_phase1_dev.accounts CASCADE")
+    progress.step('control_setup')
     control = temporary / "flutter-control"
     control.mkdir(mode=0o700)
+    progress.step('http_start')
     server, port = start_server(connect)
     server_pids = [server.pid]
     completed = []
@@ -233,6 +268,7 @@ def run_chain(connect, restart_database, temporary, mobile_root, tools_root, rel
                 output.append(chunk[:128 * 1024 - output_bytes])
                 output_bytes += len(output[-1])
     try:
+        progress.step('flutter_start')
         # Do not forward the owner connector's environment, DB passwords, tokens,
         # mail configuration or arbitrary network credentials to the build.
         environment = {"PATH": str(tools_root / "flutter/bin") + os.pathsep + os.defpath,
@@ -254,6 +290,7 @@ def run_chain(connect, restart_database, temporary, mobile_root, tools_root, rel
         # fork a multithreaded Python process or inherit locked reader state.
         os.set_blocking(process.stdout.fileno(), False)
         for phase in ("active", "blocked"):
+            progress.step('wait_' + phase)
             ready = control / f"{phase}.ready"
             deadline = time.monotonic() + 120
             while not ready.exists():
@@ -264,6 +301,7 @@ def run_chain(connect, restart_database, temporary, mobile_root, tools_root, rel
                     raise RuntimeError(f"Flutter did not reach the {phase} checkpoint in time")
                 time.sleep(0.1)
             validate_marker(ready, "ready")
+            progress.step('restart_' + phase)
             stop_server(server)
             server = None
             restart_database()
@@ -273,6 +311,7 @@ def run_chain(connect, restart_database, temporary, mobile_root, tools_root, rel
             server_pids.append(server.pid)
             create_marker(control / f"{phase}.resumed", "resumed")
             completed.append(phase)
+        progress.step('flutter_complete')
         deadline = time.monotonic() + 120
         while process.poll() is None:
             drain_output()
@@ -287,19 +326,21 @@ def run_chain(connect, restart_database, temporary, mobile_root, tools_root, rel
             raise RuntimeError("Both real process/database restart checkpoints are required")
         if hashlib.sha256(test.read_bytes()).hexdigest() != test_hash:
             raise RuntimeError("Flutter test source changed during this run")
-        print(json.dumps({"flutter_http_postgres_chain": "passed", "backend": backend_state,
+        success = {"flutter_http_postgres_chain": "passed", "backend": backend_state,
                           "mobile": frontend_state, "test_file": str(relative_test), "test_sha256": test_hash,
                           "loopback_only": True, "application_processes": len(server_pids),
                           "database_restarts_during_flutter": 2, "checkpoints": completed,
-                          "database_credentials_passed_to_flutter": False, "real_auth_or_payment": False}, sort_keys=True))
-    except BaseException:
+                          "database_credentials_passed_to_flutter": False, "real_auth_or_payment": False}
+    except BaseException as error:
+        progress.failure(error)
         drain_output()
         print(safe_failure_output(b"".join(output).decode("utf-8", errors="replace")))
         raise
     finally:
-        cleanup_children(process, server, drain_output)
+        cleanup_children(process, server, drain_output, progress)
         # The enclosing disposable harness removes the private marker directory,
         # secret, volume and container in its existing verified cleanup path.
+    print(json.dumps(success, sort_keys=True))
 
 
 def main():
@@ -317,7 +358,15 @@ def main():
     def extra(connect, restart, temporary):
         return [unittest.FunctionTestCase(lambda: run_chain(connect, restart, temporary, mobile_root, tools_root, args.test_file),
                     description="real Flutter -> HTTP -> PostgreSQL with two durable restarts")]
-    return run_postgres.main(extra_test_factory=extra, argv=["--run-disposable-postgres"])
+    try:
+        diagnostics.emit('harness', 'RUNNING')
+        result = run_postgres.main(extra_test_factory=extra, argv=["--run-disposable-postgres"])
+    except BaseException as error:
+        diagnostics.emit('harness', 'FAILED', diagnostics.error_code(error), error)
+        raise
+    diagnostics.emit('harness', 'PASS' if result == 0 else 'FAILED',
+                     'ok' if result == 0 else 'postgres_checks_failed')
+    return result
 
 
 if __name__ == "__main__":

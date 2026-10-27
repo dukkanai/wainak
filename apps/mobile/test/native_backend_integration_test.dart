@@ -29,7 +29,24 @@ void main() {
       await FileSystemEntity.type(resumed.path, followLinks: false),
       FileSystemEntityType.notFound,
     );
-    await ready.writeAsString('ready', flush: true);
+    // Publish only a closed, complete marker. Creating the final path before
+    // writing lets the Python observer see an empty file after exists().
+    // The private control directory has one Dart writer for each ready name.
+    final staging = await directory.createTemp('.$phase-marker-');
+    try {
+      final pending = await File(
+        '${staging.path}/ready',
+      ).create(exclusive: true);
+      await pending.writeAsString('ready', flush: true);
+      expect(
+        await FileSystemEntity.type(ready.path, followLinks: false),
+        FileSystemEntityType.notFound,
+      );
+      // Both paths are on the same filesystem; rename publishes atomically.
+      await pending.rename(ready.path);
+    } finally {
+      await staging.delete(recursive: true);
+    }
     final deadline = DateTime.now().add(const Duration(seconds: 90));
     while (!await resumed.exists()) {
       if (DateTime.now().isAfter(deadline))
