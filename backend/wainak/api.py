@@ -9,6 +9,20 @@ from .domain import DevelopmentService, DomainError, fail
 MAX_BODY_BYTES = 16_384
 
 
+def relationship_cursor(method, path, query):
+    """Only an exact opaque cursor on this read route may appear in a query.
+
+    Do not decode or normalize: duplicate keys, credentials, encoded delimiters,
+    alternative parameter spellings and query parameters on other routes fail.
+    """
+    if not query:
+        return None
+    if (method == "GET" and path == "/v1/relationships" and isinstance(query, str)
+            and re.fullmatch(r"cursor=rel_[0-9a-f]{32}", query)):
+        return query[len("cursor="):]
+    fail(400, "query_not_supported", "Only the relationship continuation cursor is supported.")
+
+
 def unique_object(pairs):
     result = {}
     for key, value in pairs:
@@ -53,8 +67,7 @@ class DevelopmentApplication:
         # No browser cross-origin use, including write-only requests.
         if environ.get("HTTP_ORIGIN"):
             fail(403, "origin_not_allowed", "Browser cross-origin access is disabled.")
-        if environ.get("QUERY_STRING"):
-            fail(400, "query_not_supported", "This version does not accept query parameters.")
+        cursor = relationship_cursor(method, path, environ.get("QUERY_STRING", ""))
         if method == "GET" and path == "/health":
             return 200, {"status": "ok", "mode": "synthetic_development_only",
                          "durable_storage": self.service.repository.durable}
@@ -74,7 +87,7 @@ class DevelopmentApplication:
             ("GET", "/v1/me/assessment"): lambda: self.service.assessment(actor),
             ("POST", "/v1/me/assessment/answers"): lambda: self.service.answer(actor, data),
             ("GET", "/v1/candidates"): lambda: self.service.candidates(actor),
-            ("GET", "/v1/relationships"): lambda: self.service.list_relationships(actor),
+            ("GET", "/v1/relationships"): lambda: self.service.list_relationships(actor, cursor),
             ("POST", "/v1/relationships"): lambda: self.service.request(actor, data, environ.get("HTTP_IDEMPOTENCY_KEY")),
             ("POST", "/v1/blocks"): lambda: self.service.block(actor, data),
             ("POST", "/v1/reports"): lambda: self.service.report(actor, data),

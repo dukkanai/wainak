@@ -3,7 +3,7 @@
   "info": {
     "title": "Wainak phase-one synthetic development contract",
     "version": "0.1.0-dev",
-    "description": "NOT PRODUCTION. Loopback only; default volatile memory, optional marked disposable PostgreSQL repository; synthetic @example.invalid accounts; no real email, authentication, payments, chat transport, medical data, moderation team, evidence upload, or production deletion pipeline. Current permissions override stale UI state. Unknown fields are rejected. JSON body limit: 16384 bytes. No query parameters or browser Origin headers."
+    "description": "NOT PRODUCTION. Loopback only; default volatile memory, optional marked disposable PostgreSQL repository; synthetic @example.invalid accounts; no real email, authentication, payments, chat transport, medical data, moderation team, evidence upload, or production deletion pipeline. Current permissions override stale UI state. Unknown fields are rejected. JSON body limit: 16384 bytes. The only query parameter is the exact cursor on GET /v1/relationships; other queries and browser Origin headers are rejected."
   },
   "servers": [
     {
@@ -421,7 +421,19 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^rel_[0-9a-f]{32}$"
+            },
+            "description": "Exact next_cursor from the previous page. At most 20 own relationships per page, ordered by ID. Refresh from the first page to see new IDs preceding the cursor; this is not a snapshot across requests."
+          }
+        ]
       },
       "post": {
         "operationId": "request_card_only_relationship",
@@ -1521,11 +1533,24 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Relationship"
-            }
+            },
+            "maxItems": 20
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^rel_[0-9a-f]{32}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
-          "items"
+          "items",
+          "next_cursor"
         ]
       },
       "RelationshipRequest": {

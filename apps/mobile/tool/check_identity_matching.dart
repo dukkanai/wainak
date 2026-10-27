@@ -184,6 +184,7 @@ Future<void> main() async {
           final relation = r.relationships.single;
           final oldRelations = f.reply(200, {
             'items': [f.relationship],
+            'next_cursor': null,
           });
           final oldCandidates = f.reply(200, {
             'items': [f.candidate],

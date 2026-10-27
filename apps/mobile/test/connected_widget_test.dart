@@ -121,6 +121,7 @@ class FixtureApi implements ApiTransport {
       case 'GET /v1/relationships':
         return ok({
           'items': incoming ? [relation] : [],
+          'next_cursor': null,
         });
       case 'POST /v1/relationships/$relationId/respond':
         expect(incoming, isTrue);

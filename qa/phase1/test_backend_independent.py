@@ -88,7 +88,7 @@ class IndependentBackendReview(unittest.TestCase):
                 status, result, _ = self.api(method, path, body, tc)
                 self.assertEqual(status, 404)
                 self.assertEqual(result["error"]["code"], "not_found")
-        self.assertEqual(self.api("GET", "/v1/relationships", token=tc)[1], {"items": []})
+        self.assertEqual(self.api("GET", "/v1/relationships", token=tc)[1], {"items": [], "next_cursor": None})
         self.assertEqual(self.s.relationship(a, rel)["status"], "active_cards")
 
     def test_candidate_and_relationship_responses_are_private_allowlists(self):

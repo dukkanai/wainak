@@ -71,7 +71,7 @@ def build():
                              "peer": nullable(ref("Candidate")), "exclusive_requested_by": nullable(uid),
                              "permissions": obj({"can_send_cards": boolean, "can_send_text": no, "can_send_media": no, "can_disclose_identity": no}),
                              "activation_mode": enum("development_simulation_only")}),
-        "Relationships": obj({"items": array(ref("Relationship"))}),
+        "Relationships": obj({"items": array(ref("Relationship"), maxItems=20), "next_cursor": nullable(rid)}),
         "RelationshipRequest": obj({"candidate_id": uid}),
         "Decision": obj({"decision": enum("accept", "decline")}),
         "Confirm": obj({"confirm": yes}),
@@ -120,7 +120,9 @@ def build():
     route("POST", "/v1/me/assessment/answers", "answer_current_assessment_question", "Assessment", "Answer")
     route("GET", "/v1/candidates", "list_mutually_eligible_candidates", "Candidates")
     route("GET", "/v1/candidates/{candidate_id}", "get_allowed_candidate_projection", "Candidate")
-    route("GET", "/v1/relationships", "list_own_relationships", "Relationships")
+    route("GET", "/v1/relationships", "list_own_relationships", "Relationships",
+          parameters=[{"name": "cursor", "in": "query", "required": False, "schema": rid,
+                       "description": "Exact next_cursor from the previous page. At most 20 own relationships per page, ordered by ID. Refresh from the first page to see new IDs preceding the cursor; this is not a snapshot across requests."}])
     route("POST", "/v1/relationships", "request_card_only_relationship", "Relationship", "RelationshipRequest", status=201,
           parameters=[{"name": "Idempotency-Key", "in": "header", "required": True, "schema": {"type": "string", "pattern": "^[A-Za-z0-9_-]{8,64}$"}}])
     route("GET", "/v1/relationships/{relationship_id}", "get_own_relationship", "Relationship")
@@ -134,7 +136,7 @@ def build():
     route("POST", "/v1/blocks", "block_account_without_payment", "Blocked", "Block")
     route("POST", "/v1/reports", "record_metadata_only_development_report", "ReportReceipt", "Report", status=201)
     return {"openapi": "3.1.0", "info": {"title": "Wainak phase-one synthetic development contract", "version": "0.1.0-dev",
-            "description": "NOT PRODUCTION. Loopback only; default volatile memory, optional marked disposable PostgreSQL repository; synthetic @example.invalid accounts; no real email, authentication, payments, chat transport, medical data, moderation team, evidence upload, or production deletion pipeline. Current permissions override stale UI state. Unknown fields are rejected. JSON body limit: 16384 bytes. No query parameters or browser Origin headers."},
+            "description": "NOT PRODUCTION. Loopback only; default volatile memory, optional marked disposable PostgreSQL repository; synthetic @example.invalid accounts; no real email, authentication, payments, chat transport, medical data, moderation team, evidence upload, or production deletion pipeline. Current permissions override stale UI state. Unknown fields are rejected. JSON body limit: 16384 bytes. The only query parameter is the exact cursor on GET /v1/relationships; other queries and browser Origin headers are rejected."},
             "servers": [{"url": "http://127.0.0.1:8089", "description": "Manual loopback-only preview, never auto-started"}],
             "security": [{"developmentBearer": []}], "paths": paths,
             "components": {"securitySchemes": {"developmentBearer": {"type": "http", "scheme": "bearer",

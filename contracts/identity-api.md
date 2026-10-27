@@ -14,6 +14,9 @@ would require HTTPS and separately approved infrastructure. Send JSON (at most
 Origin (except the strictly CSRF-checked deletion web branch), query credentials,
 Authorization/Bearer, real email addresses or user IDs
 as authority. Native sessions use `X-Session-Token` and are never put in URLs.
+The only supported query is the literal `cursor=rel_<32 lowercase hex>` on
+GET `/v1/relationships`; unknown, duplicate or encoded query parameters are
+rejected. See `phase3-matching.md` for the bounded relationship page contract.
 Every response is `Cache-Control: no-store`. Fake messages exist only in Python
 test memory, never through an HTTP mailbox endpoint.
 

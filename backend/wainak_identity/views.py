@@ -124,7 +124,7 @@ def dispatch(request):
             ("GET", "/v1/me/assessment"): lambda: domain.assessment(actor),
             ("POST", "/v1/me/assessment/answers"): lambda: domain.answer(actor, data),
             ("GET", "/v1/candidates"): lambda: domain.candidates(actor),
-            ("GET", "/v1/relationships"): lambda: domain.list_relationships(actor),
+            ("GET", "/v1/relationships"): lambda: domain.list_relationships(actor, request.relationship_cursor),
             ("POST", "/v1/relationships"): lambda: domain.request(actor, data, request.META.get("HTTP_IDEMPOTENCY_KEY")),
             ("POST", "/v1/blocks"): lambda: domain.block(actor, data),
             ("POST", "/v1/reports"): lambda: report(user, data, request.META.get("HTTP_IDEMPOTENCY_KEY")),

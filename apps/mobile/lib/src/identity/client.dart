@@ -1,5 +1,6 @@
 import 'dart:convert';
 import '../api/transport.dart';
+import '../api/relationship_page.dart';
 
 enum IdentityStage { signedOut, pendingVerification, authenticated }
 
@@ -456,6 +457,7 @@ class IdentityClient {
     String path, {
     Map<String, dynamic>? body,
     String? idempotencyKey,
+    String? relationshipCursor,
   }) async {
     const allowed = {
       'GET /v1/me',
@@ -481,6 +483,13 @@ class IdentityClient {
         !relationshipRead &&
         !relationshipAction)
       throw ArgumentError('Unsupported identity domain operation');
+    if (relationshipCursor != null &&
+        (method != 'GET' || path != '/v1/relationships')) {
+      throw ArgumentError('Cursor is only supported for relationship pages');
+    }
+    final requestPath = relationshipCursor == null
+        ? path
+        : relationshipPagePath(relationshipCursor);
     final needsKey =
         method == 'POST' &&
         (path == '/v1/relationships' || path == '/v1/reports');
@@ -504,7 +513,7 @@ class IdentityClient {
     final epoch = _epoch;
     final reply = await _send(
       method,
-      path,
+      requestPath,
       epoch,
       body: body,
       session: _token,
@@ -514,6 +523,22 @@ class IdentityClient {
     if (reply.status < 200 || reply.status >= 300)
       _reject(reply, epoch, domainError: true);
     return reply.body;
+  }
+
+  Future<RelationshipPage> relationshipsPage({String? cursor}) async {
+    final data = await domain(
+      'GET',
+      '/v1/relationships',
+      relationshipCursor: cursor,
+    );
+    try {
+      return RelationshipPage.fromJson(data, after: cursor);
+    } on FormatException {
+      throw const IdentityFailure(
+        'invalid_matching_response',
+        'صفحة الطلبات غير متوافقة؛ احتفظنا بالقائمة السابقة.',
+      );
+    }
   }
 
   void close() {

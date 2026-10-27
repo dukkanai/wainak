@@ -5,6 +5,7 @@ from collections import Counter
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
 from ci_process import run_bounded
 from backend.integration.flutter_driver_diagnostics import project as project_driver
@@ -16,6 +17,18 @@ DEFAULT_SKIPS = Counter({name: 1 for name in (
     'identity_matching_live_widget_test.dart', 'local_cards_entrypoint_test.dart',
     'native_archive_platform_test.dart',
 )})
+
+
+def validate_matching_probe(output, returncode):
+    lines = output.splitlines()
+    summaries = [line for line in lines if line.startswith('QA_MATCHING_RACES ')]
+    match = re.fullmatch(r'QA_MATCHING_RACES passed=([0-9]{1,3}) failed=0', summaries[0]) if len(summaries) == 1 else None
+    if (returncode or match is None or not lines or lines[-1] != summaries[0]
+            or int(match[1]) < 4
+            or sum(line.startswith('PASS ') for line in lines) != int(match[1])
+            or any(line.startswith('FAIL ') for line in lines)):
+        raise RuntimeError('Independent matching race probe did not pass all required cases')
+    return {'passed': int(match[1]), 'failed': 0}
 
 
 def validate_events(output, returncode, allowed_skips=None):
@@ -119,6 +132,10 @@ def run_checks(tools, flutter, python, fixture_home):
     run_bounded([flutter, 'pub', 'get', '--enforce-lockfile'], cwd=MOBILE, env=env, check=True)
     run_bounded([flutter, 'analyze', '--no-pub'], cwd=MOBILE, env=env, check=True, seconds=180)
     run_gate(flutter, 'default host suite', [], env, DEFAULT_SKIPS)
+    probe = run_bounded([tools / 'flutter/bin/dart', ROOT / 'qa/phase3_matching/matching_race_probe.dart'],
+                        cwd=ROOT, env=env, seconds=90)
+    print(json.dumps({'gate': 'independent matching race probe', 'status': 'PASS',
+                      **validate_matching_probe(probe.stdout, probe.returncode)}), flush=True)
     run_gate(flutter, 'local cards entrypoint', ['--dart-define=WAINAK_DEV_MODE=true',
         '--dart-define=WAINAK_REPOSITORY=local_cards', 'test/local_cards_entrypoint_test.dart'], env)
     run_gate(flutter, 'native archive entrypoint', ['--dart-define=WAINAK_DEV_MODE=true',

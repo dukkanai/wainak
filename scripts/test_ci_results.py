@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-from run_flutter_ci import validate_events
+from run_flutter_ci import validate_events, validate_matching_probe
 from run_go_checks import cache_inventory, validate_go_events
 from backend.integration.flutter_driver_diagnostics import PREFIX, project as project_driver
 
@@ -15,6 +15,16 @@ def stream(events):
 
 
 class ResultControls(unittest.TestCase):
+    def test_matching_probe_requires_real_cases_and_one_successful_summary(self):
+        valid = '\n'.join(['PASS case'] * 4 + ['QA_MATCHING_RACES passed=4 failed=0'])
+        self.assertEqual(validate_matching_probe(valid, 0), {'passed': 4, 'failed': 0})
+        for output, code in [('', 0), ('QA_MATCHING_RACES passed=0 failed=0', 0),
+                             (valid, 1), (valid + '\nQA_MATCHING_RACES passed=4 failed=0', 0),
+                             (valid.replace('PASS case', 'FAIL case', 1), 0),
+                             (valid.replace('passed=4', 'passed=5'), 0)]:
+            with self.assertRaises(RuntimeError):
+                validate_matching_probe(output, code)
+
     def diagnostic(self,stage,status='PASS',code='ok'):
         return PREFIX+json.dumps({'schema':1,'stage':stage,'status':status,'code':code,'error_type':'none'})
 

@@ -3,7 +3,7 @@ import re
 from django.conf import settings
 from django.db import connection, transaction
 from django.http import JsonResponse
-from wainak.api import unique_object
+from wainak.api import relationship_cursor, unique_object
 from wainak.domain import DomainError
 from . import rate_limits
 
@@ -74,7 +74,12 @@ class SyntheticBoundary:
                     return error(403, "csrf_failed")
         elif request.META.get("HTTP_ORIGIN") or request.META.get("HTTP_COOKIE"):
             return error(403, "native_sandbox_only")
-        if request.META.get("QUERY_STRING") or request.META.get("HTTP_AUTHORIZATION"):
+        if request.META.get("HTTP_AUTHORIZATION"):
+            return error(400, "unsupported_credentials_or_query")
+        try:
+            request.relationship_cursor = relationship_cursor(
+                request.method, request.path, request.META.get("QUERY_STRING", ""))
+        except DomainError:
             return error(400, "unsupported_credentials_or_query")
         path = request.path
         if web_page:

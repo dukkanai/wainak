@@ -10,6 +10,7 @@ class HttpJourneyRepository extends JourneyRepository {
   final WainakApiClient api;
   final DateTime Function() _clock;
   bool _disposed = false;
+  int _selectionRevision = 0;
   String? _email;
   String? _requestKey;
   String? _targetId;
@@ -236,9 +237,15 @@ class HttpJourneyRepository extends JourneyRepository {
       _candidate = null;
       return;
     }
+    final revision = ++_selectionRevision;
     final result = await api.candidates();
     final items = (result['items'] as List).cast<Map<String, dynamic>>();
     final relationships = await api.relationships();
+    if (_disposed || _blocked || revision != _selectionRevision) {
+      throw const JourneyFailure(
+        'تغيرت حالة الطلبات؛ تجاهلنا القائمة القديمة.',
+      );
+    }
     final incoming = (relationships['items'] as List)
         .cast<Map<String, dynamic>>()
         .map(RelationshipDto.fromJson)
@@ -273,7 +280,15 @@ class HttpJourneyRepository extends JourneyRepository {
   Future<void> refreshRelationship() => _run(() async {
     final id = _relation?.id;
     if (id == null) return;
+    final revision = _selectionRevision;
     final result = await api.relationship(id);
+    if (_disposed ||
+        revision != _selectionRevision ||
+        (_blocked && result.status != 'blocked')) {
+      throw const JourneyFailure(
+        'تغيرت حالة العلاقة؛ تجاهلنا الاستجابة القديمة.',
+      );
+    }
     if (!_disposed) {
       _relation = result;
       _candidate = result.peer;
@@ -284,7 +299,17 @@ class HttpJourneyRepository extends JourneyRepository {
       _card = null;
   });
   Future<void> _loadCards() async {
-    final response = await api.cards(_relation!.id);
+    final revision = _selectionRevision;
+    final relationId = _relation!.id;
+    final response = await api.cards(relationId);
+    if (_disposed ||
+        _blocked ||
+        revision != _selectionRevision ||
+        _relation?.id != relationId) {
+      throw const JourneyFailure(
+        'تغيرت حالة العلاقة؛ تجاهلنا البطاقات القديمة.',
+      );
+    }
     if (response['answers_transport'] != 'not_implemented' ||
         response['server_stores_dialogue_answers'] != false) {
       throw const FormatException('Unsupported card transport');
@@ -341,6 +366,7 @@ class HttpJourneyRepository extends JourneyRepository {
   Future<void> block() => _run(() async {
     if (_targetId == null)
       throw const JourneyFailure('لا يوجد ملف معروف للحظر.');
+    _selectionRevision++;
     final receipt = await api.block(_targetId!);
     if (receipt['blocked'] != true)
       throw const FormatException('Unexpected block receipt');
@@ -378,6 +404,7 @@ class HttpJourneyRepository extends JourneyRepository {
     if (!_disposed) _clear();
   });
   void _clear() {
+    _selectionRevision++;
     _account = null;
     _assessment = null;
     _candidate = null;
@@ -394,6 +421,7 @@ class HttpJourneyRepository extends JourneyRepository {
 
   @override
   void dispose() {
+    _selectionRevision++;
     _disposed = true;
     api.close();
     super.dispose();

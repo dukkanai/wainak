@@ -178,6 +178,7 @@ void main() {
       await openMatch(t, f, view: 'requests');
       final old = f.reply(200, {
         'items': [f.relationship],
+        'next_cursor': null,
       });
       f.holdRelationships = true;
       await tapMatch(t, 'matching-refresh');

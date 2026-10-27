@@ -30,9 +30,17 @@ the allauth pending-verification 401 flow as a domain-authenticated session.
 Input, response fields, assessment branching and error shapes otherwise remain as
 specified in identity-api.md and the phase1 contract. Unknown fields are rejected.
 No client-supplied purchased/subscribed/permission value has authority.
-Candidate lists cap20 without a total; relationship lists currently return all
-own records without pagination. This is a small synthetic sandbox limitation, not
-a scalable bounded-list claim. Do not silently truncate safety access in the UI.
+Candidate lists cap20 without a total. Relationship lists return at most20 own
+records with `next_cursor` (an own relationship ID or null). Continue through
+`GET /v1/relationships?cursor=rel_<32 lowercase hex>`; only this literal query is
+accepted. Other query keys, duplicate/encoded parameters and query credentials
+remain rejected. Pages have stable ascending ID order, not chronological order
+or a snapshot across requests. Refresh from page one to see newly inserted
+earlier IDs. Each page recomputes current peer visibility and actions; retain
+previously loaded rows if a refresh or continuation fails. Pagination bounds the
+response, while the current repository still loads the small synthetic dataset;
+this is not a production database scalability claim. Do not silently truncate
+safety access in the UI.
 
 ## Identity-only relationship projection additions
 

@@ -23,12 +23,15 @@ class IdentityMatchingPane extends StatefulWidget {
 class _IdentityMatchingPaneState extends State<IdentityMatchingPane> {
   IdentityMatchingRepository get repository => widget.repository;
   bool busy = false, loaded = false;
+  bool loadingMore = false, pageFailed = false;
   String? error;
   String notice = '';
   int _operation = 0;
   @override
   void initState() {
     super.initState();
+    loaded =
+        widget.view == MatchingView.requests && repository.hasRelationshipPage;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) refresh();
     });
@@ -45,6 +48,7 @@ class _IdentityMatchingPaneState extends State<IdentityMatchingPane> {
     String success = '',
     bool marksLoaded = false,
     VoidCallback? onSuccess,
+    bool nextPage = false,
   }) async {
     if (busy || !mounted) return;
     final operation = ++_operation;
@@ -52,6 +56,8 @@ class _IdentityMatchingPaneState extends State<IdentityMatchingPane> {
       busy = true;
       error = null;
       notice = '';
+      loadingMore = nextPage;
+      pageFailed = false;
     });
     try {
       await action();
@@ -63,15 +69,22 @@ class _IdentityMatchingPaneState extends State<IdentityMatchingPane> {
       onSuccess?.call();
     } on IdentityFailure catch (failure) {
       if (mounted && operation == _operation)
-        setState(() => error = failure.message);
+        setState(() {
+          error = failure.message;
+          pageFailed = nextPage;
+        });
     } catch (_) {
       if (mounted && operation == _operation)
-        setState(
-          () => error = 'لم نؤكد العملية؛ حدّث الحالة دون تكرار تلقائي.',
-        );
+        setState(() {
+          error = 'لم نؤكد العملية؛ حدّث الحالة دون تكرار تلقائي.';
+          pageFailed = nextPage;
+        });
     } finally {
       if (mounted && operation == _operation) {
-        setState(() => busy = false);
+        setState(() {
+          busy = false;
+          loadingMore = false;
+        });
         widget.onSessionChanged();
       }
     }
@@ -82,6 +95,12 @@ class _IdentityMatchingPaneState extends State<IdentityMatchingPane> {
         ? repository.refreshCandidates
         : repository.refreshRelationships,
     marksLoaded: true,
+  );
+  void loadMore() => run(
+    repository.loadNextRelationships,
+    success: 'اكتمل تحميل الصفحة التالية من الطلبات.',
+    marksLoaded: true,
+    nextPage: true,
   );
   Future<bool> confirm(String title, String body, String label) async =>
       await showDialog<bool>(
@@ -255,9 +274,11 @@ class _IdentityMatchingPaneState extends State<IdentityMatchingPane> {
         'بيانات اصطناعية فقط. الترشيح ليس تزكية أو ضمان توافق. لا محادثة أو دفع أو صور أو كشف هوية في هذه المرحلة.',
       ),
       if (busy)
-        const Notice(
-          'جارٍ التحقق من الخادم؛ لا نكرر الطلب تلقائيًا.',
-          key: Key('matching-busy'),
+        Notice(
+          loadingMore
+              ? 'جارٍ تحميل الصفحة التالية؛ تبقى الطلبات المحملة محفوظة.'
+              : 'جارٍ التحقق من الخادم؛ لا نكرر الطلب تلقائيًا.',
+          key: const Key('matching-busy'),
           live: true,
         ),
       ExcludeFocus(
@@ -310,6 +331,22 @@ class _IdentityMatchingPaneState extends State<IdentityMatchingPane> {
                 if (loaded)
                   for (final entry in repository.relationships.indexed)
                     relationshipCard(entry.$2, entry.$1 + 1),
+                if (loaded && repository.hasRelationshipPage)
+                  Notice(
+                    'عدد الطلبات المحملة: ${repository.relationships.length}. '
+                    '${repository.hasMoreRelationships ? 'توجد طلبات أخرى؛ استخدم تحميل المزيد.' : 'اكتمل تحميل الطلبات الحالية.'}',
+                    key: const Key('matching-page-status'),
+                    live: true,
+                  ),
+                if (repository.hasMoreRelationships)
+                  matchingButton(
+                    pageFailed
+                        ? 'إعادة محاولة تحميل المزيد من الطلبات'
+                        : 'تحميل المزيد من الطلبات',
+                    'matching-load-more',
+                    loadMore,
+                    secondary: true,
+                  ),
               ],
               if (repository.lastSafety case final target?) ...[
                 const Notice(

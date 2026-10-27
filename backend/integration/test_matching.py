@@ -1,7 +1,9 @@
 """Authenticated matching only. No dialogue payload or entitlement fixture endpoint."""
 import json
+import copy
 import threading
 import unittest
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from django.db import connection, connections, transaction
@@ -75,6 +77,89 @@ class AuthMatchingTests(unittest.TestCase):
         code, replay = self.respond(b, rel)
         self.status(code, 200, replay)
         self.assertEqual(replay["available_actions"], accepted["available_actions"])
+
+    def test_many_authenticated_relationships_are_bounded_stable_pages_with_later_safety(self):
+        a, ma, b, mb, original = self.pair()
+        # Seed many independently owned, verified synthetic peers without paying
+        # for a hundred unrelated password-hash/login flows in this list test.
+        peer_ids, relation_ids = [], [original['id']]
+        with transaction.atomic():
+            with service().repository.transaction() as state:
+                template = state.accounts[ma['domain_id']]
+                for index in range(104):
+                    actor = 'usr_' + uuid.uuid4().hex
+                    identifier = 'rel_' + uuid.uuid4().hex
+                    peer_ids.append(actor)
+                    relation_ids.append(identifier)
+                    account = copy.deepcopy(template)
+                    account.update(id=actor, email=f'page-{index}@example.invalid')
+                    state.accounts[actor] = account
+                    # Store only canonical domain fields, never a response projection.
+                    state.relationships[identifier] = {
+                        'id': identifier, 'initiator_id': actor, 'recipient_id': mb['domain_id'],
+                        'status': 'requested', 'exclusive_requested_by': None}
+            users = [User(email=f'page-{index}@example.invalid', domain_id=actor, password='!')
+                     for index, actor in enumerate(peer_ids)]
+            User.objects.bulk_create(users)
+            EmailAddress.objects.bulk_create([EmailAddress(user=user, email=user.email, verified=True, primary=True)
+                                             for user in users])
+        expected, seen, cursor, first_cursor = sorted(relation_ids), [], None, None
+        while True:
+            path = '/v1/relationships' + ('' if cursor is None else '?cursor=' + cursor)
+            response = self.client.generic('GET', path, HTTP_HOST='localhost', HTTP_X_SESSION_TOKEN=b)
+            self.status(response.status_code, 200)
+            self.assertLess(len(response.content), 65536)
+            page = json.loads(response.content)
+            self.assertLessEqual(len(page['items']), 20)
+            self.assertTrue(all(item['peer'] is not None for item in page['items']))
+            self.assertTrue(all(item['direction'] == 'incoming' for item in page['items']))
+            seen.extend(item['id'] for item in page['items'])
+            cursor = page['next_cursor']
+            if first_cursor is None:
+                first_cursor = cursor
+                connections.close_all()
+                baseline.RESTART_DATABASE()
+            if cursor is None:
+                break
+        self.assertEqual(seen, expected)
+        self.assertEqual(len(set(seen)), 105)
+        foreign_cursor = next(identifier for identifier in expected if identifier != original['id'])
+        code, rejected = self.call('GET', '/v1/relationships?cursor=' + foreign_cursor, token=a)
+        self.status(code, 400, rejected)
+        self.assertEqual(rejected['error']['code'], 'invalid_relationship_cursor')
+        code, accepted = self.call('POST', '/v1/relationships/' + seen[-1] + '/respond', {'decision': 'accept'}, b)
+        self.status(code, 200, accepted)
+        self.assertEqual(accepted['status'], 'accepted_pending_activation')
+        code, declined = self.call('POST', '/v1/relationships/' + seen[-2] + '/respond', {'decision': 'decline'}, b)
+        self.status(code, 200, declined)
+        self.assertEqual(declined['status'], 'declined')
+        last = self.detail(b, seen[-3])
+        code, blocked = self.call('POST', '/v1/blocks', {'target_id': last['initiator_id']}, b)
+        self.status(code, 200, blocked)
+        code, reported = self.call('POST', '/v1/reports', {'target_id': last['initiator_id'],
+            'relationship_id': last['id'], 'category': 'harassment'}, b, HTTP_IDEMPOTENCY_KEY='page-safety-report')
+        self.status(code, 201, reported)
+        self.assertFalse(reported['evidence_uploaded'])
+
+    def test_relationship_cursor_does_not_open_other_queries_or_credentials(self):
+        a, ma, b, mb, rel = self.pair()
+        cursor = rel['id']
+        for suffix in ('?cursor=', '?cursor=' + cursor + '&cursor=' + cursor,
+                       '?cursor=' + cursor + '&limit=20', '?cursor=' + cursor + '&token=secret',
+                       '?%63ursor=' + cursor, '?cursor=%72' + cursor[1:], '?health=diabetes'):
+            code, body = self.call('GET', '/v1/relationships' + suffix, token=b)
+            self.status(code, 400, body)
+            self.assertEqual(body['error']['code'], 'unsupported_credentials_or_query')
+        for method, path in (('POST', '/v1/relationships'), ('GET', '/v1/candidates'),
+                             ('GET', '/_allauth/app/v1/auth/session'), ('GET', '/v1/relationships/')):
+            code, body = self.call(method, path + '?cursor=' + cursor, token=b)
+            self.status(code, 400, body)
+        code, body = self.call('GET', '/v1/relationships?cursor=' + cursor, token=b,
+                               HTTP_AUTHORIZATION='Bearer forbidden')
+        self.status(code, 400, body)
+        code, body = self.call('GET', '/v1/relationships?cursor=' + cursor, token=b)
+        self.status(code, 200, body)
+        self.assertEqual(body, {'items': [], 'next_cursor': None})
 
     def test_stale_recipient_can_decline_but_not_accept_or_smuggle_fields(self):
         a, ma, b, mb, rel = self.pair()

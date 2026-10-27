@@ -18,6 +18,9 @@ class MatchingFixture extends IdentityFixture {
       rejectActions = false,
       denyCandidates = false;
   bool holdCandidates = false, holdRelationships = false, holdAction = false;
+  bool failRelationships = false;
+  List<Map<String, dynamic>>? relationshipRows;
+  Map<String, dynamic>? relationshipPageOverride;
   Completer<ApiResponse>? pendingCandidates,
       pendingRelationships,
       pendingAction;
@@ -25,6 +28,19 @@ class MatchingFixture extends IdentityFixture {
   String relationStatus = 'requested';
   final matchingCalls = <Map<String, dynamic>>[];
   final requestKeys = <String, String>{};
+  Map<String, dynamic> relationshipPage(String? cursor) {
+    final rows = relationshipRows ?? (hasRelation ? [relationship] : []);
+    final start = cursor == null
+        ? 0
+        : rows.indexWhere((row) => row['id'] == cursor) + 1;
+    final end = (start + 20).clamp(0, rows.length);
+    final page = rows.sublist(start, end);
+    return {
+      'items': page,
+      'next_cursor': end < rows.length ? page.last['id'] : null,
+    };
+  }
+
   Map<String, dynamic> get candidate => {
     'id': targetId,
     'alias': 'طرف اختبار',
@@ -97,6 +113,7 @@ class MatchingFixture extends IdentityFixture {
     matchingCalls.add({
       'method': method,
       'path': uri.path,
+      'query': uri.query,
       'key': headers['Idempotency-Key'],
       'body': data,
       'header_names': headers.keys.toSet(),
@@ -124,13 +141,16 @@ class MatchingFixture extends IdentityFixture {
       });
     }
     if (uri.path == '/v1/relationships' && method == 'GET') {
+      if (failRelationships) throw StateError('Synthetic page failure');
       if (holdRelationships) {
         pendingRelationships = Completer<ApiResponse>();
         return pendingRelationships!.future;
       }
-      return reply(200, {
-        'items': hasRelation ? [relationship] : [],
-      });
+      return reply(
+        200,
+        relationshipPageOverride ??
+            relationshipPage(uri.queryParameters['cursor']),
+      );
     }
     if (uri.path == '/v1/relationships' && method == 'POST') {
       final key = headers['Idempotency-Key'];

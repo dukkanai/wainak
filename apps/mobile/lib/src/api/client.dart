@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'transport.dart';
+import 'relationship_page.dart';
 
 class ApiFailure implements Exception {
   const ApiFailure(this.code, this.message);
@@ -258,8 +259,36 @@ class WainakApiClient {
     '/v1/me/assessment/answers',
     body: {'question_id': questionId, 'option_id': optionId},
   );
-  Future<Map<String, dynamic>> relationships() =>
-      _request('GET', '/v1/relationships');
+  Future<RelationshipPage> relationshipsPage({String? cursor}) async {
+    final data = await _request('GET', relationshipPagePath(cursor));
+    try {
+      return RelationshipPage.fromJson(data, after: cursor);
+    } on FormatException {
+      throw const ApiFailure('invalid_response', 'صفحة الطلبات غير متوافقة.');
+    }
+  }
+
+  /// Preserve the legacy complete-list contract without an unbounded response
+  /// or silently hiding a relevant incoming request on a later page.
+  Future<Map<String, dynamic>> relationships() async {
+    final epoch = _sessionEpoch;
+    final items = <Map<String, dynamic>>[];
+    String? cursor;
+    for (var pageNumber = 0; pageNumber < 50; pageNumber++) {
+      final page = await relationshipsPage(cursor: cursor);
+      if (_closed || epoch != _sessionEpoch) {
+        throw const ApiFailure('stale_response', 'تغيرت الجلسة؛ حدّث الطلبات.');
+      }
+      items.addAll(page.items);
+      cursor = page.nextCursor;
+      if (cursor == null) return {'items': items, 'next_cursor': null};
+    }
+    throw const ApiFailure(
+      'relationship_page_limit',
+      'تجاوز سجل الطلبات حد هذه المعاينة؛ لم نعرض قائمة مبتورة. استخدم قائمة الطلبات في مسار الحسابات.',
+    );
+  }
+
   Future<Map<String, dynamic>> candidates() =>
       _request('GET', '/v1/candidates');
   Future<RelationshipDto> requestRelationship(

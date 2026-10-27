@@ -75,6 +75,18 @@ Relationship fields: `id`, `initiator_id`, `recipient_id`, `status`, `peer`
 (allowed Candidate or null), `exclusive_requested_by` (user ID or null),
 `permissions`, `activation_mode:development_simulation_only`.
 
+`GET /v1/relationships` returns `items` (at most 20) and `next_cursor` (an own
+relationship ID or null). Continue with exactly `?cursor=rel_<32 lowercase hex>`;
+duplicate/unknown keys, encoded spellings, credentials in the query, and queries
+on other routes remain rejected. The cursor must belong to the authenticated
+actor; unknown and foreign cursors return the same `invalid_relationship_cursor`
+error. Pages use ascending relationship ID order, which survives repository and
+database restarts. This order is not a chronological promise or a multi-request
+snapshot: refresh from page one to discover new IDs preceding an existing cursor.
+State, peer visibility and safety actions are computed anew on each request.
+Bounded pages fit the native 64 KiB response limit; clients retain previously
+loaded rows when a refresh or continuation fails.
+
 State transitions:
 
 ```text

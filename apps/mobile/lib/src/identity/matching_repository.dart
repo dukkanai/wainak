@@ -249,6 +249,8 @@ class IdentityMatchingRepository {
   final _requestKeys = <String, String>{}, _reportKeys = <String, String>{};
   List<MatchCandidate> _candidates = [];
   List<MatchRelationship> _relationships = [];
+  String? _nextRelationshipCursor;
+  bool _hasRelationshipPage = false;
   MatchSafetyContext? _lastSafety;
   bool get current =>
       !_closed &&
@@ -259,6 +261,8 @@ class IdentityMatchingRepository {
       current ? List.unmodifiable(_candidates) : const [];
   List<MatchRelationship> get relationships =>
       current ? List.unmodifiable(_relationships) : const [];
+  bool get hasMoreRelationships => current && _nextRelationshipCursor != null;
+  bool get hasRelationshipPage => current && _hasRelationshipPage;
   List<String> get pendingRequestTargets =>
       current ? List.unmodifiable(_requestKeys.keys) : const [];
   MatchSafetyContext? get lastSafety => current ? _lastSafety : null;
@@ -284,6 +288,8 @@ class IdentityMatchingRepository {
     _pendingMutations++;
     _candidates = [];
     _relationships = [];
+    _nextRelationshipCursor = null;
+    _hasRelationshipPage = false;
     return ++_mutationRevision;
   }
 
@@ -345,16 +351,18 @@ class IdentityMatchingRepository {
     _candidates = items;
   }
 
-  Future<void> refreshRelationships() async {
-    _current();
-    _relationships = [];
+  Future<void> refreshRelationships() => _readRelationships(append: false);
+
+  Future<void> loadNextRelationships() => _readRelationships(append: true);
+
+  Future<void> _readRelationships({required bool append}) async {
     _readAllowed();
+    final cursor = append ? _nextRelationshipCursor : null;
+    if (append && cursor == null) return;
     final revision = _mutationRevision, read = ++_relationshipRead;
-    final data = await client.domain('GET', '/v1/relationships');
+    final page = await client.relationshipsPage(cursor: cursor);
     _readCurrent(revision, read, _relationshipRead);
-    _keys(data, {'items'});
-    if (data['items'] is! List) _badProjection();
-    final items = (data['items'] as List)
+    final items = page.items
         .map(
           (v) => MatchRelationship.fromJson(
             v,
@@ -363,9 +371,15 @@ class IdentityMatchingRepository {
           ),
         )
         .toList();
-    if (items.map((r) => r.id).toSet().length != items.length) _badProjection();
-    _relationships =
-        items; // All sandbox records; never truncate safety history.
+    if (append) {
+      final known = _relationships.map((r) => r.id).toSet();
+      if (items.any((r) => known.contains(r.id))) _badProjection();
+    }
+    // Commit list and cursor together only after validation and stale guards.
+    // Failed refresh/page reads leave previously loaded safety actions visible.
+    _relationships = append ? [..._relationships, ...items] : items;
+    _nextRelationshipCursor = page.nextCursor;
+    _hasRelationshipPage = true;
   }
 
   MatchSafetyContext candidateContext(MatchCandidate candidate) {
@@ -576,6 +590,8 @@ class IdentityMatchingRepository {
     _mutationRevision++;
     _candidates = [];
     _relationships = [];
+    _nextRelationshipCursor = null;
+    _hasRelationshipPage = false;
     _lastSafety = null;
     _requestKeys.clear();
     _reportKeys.clear();

@@ -28,7 +28,7 @@ class Fixture implements ApiTransport{
   if(path=='/identity/v1/me')return response(200,{'id':'11111111-1111-4111-8111-111111111111','domain_id':actor,'email':'qa@example.invalid','email_verified':true,'email_is_identity_verification':false,'mode':'synthetic_identity_sandbox'});
   if(path=='/v1/relationships'&&method=='GET'){
    if(holdRelations){relationsPending=Completer<ApiResponse>();return relationsPending!.future;}
-   return response(200,{'items':[relation(incoming:incoming,status:blocked?'blocked':'requested',redacted:blocked)]});
+   return response(200,{'items':[relation(incoming:incoming,status:blocked?'blocked':'requested',redacted:blocked)],'next_cursor':null});
   }
   if(path=='/v1/candidates'){
    if(holdCandidates){candidatesPending=Completer<ApiResponse>();return candidatesPending!.future;}
@@ -75,7 +75,7 @@ Future<void> main()async{
   try{
    await r.refreshRelationships();final context=r.relationshipContext(r.relationships.single);
    f.holdRelations=true;final pending=tolerateStale(r.refreshRelationships());await waitStarted(()=>f.relationsPending!=null);
-   await blockAndRelease(r,context,()=>f.relationsPending!.complete(response(200,{'items':[relation()]})));
+   await blockAndRelease(r,context,()=>f.relationsPending!.complete(response(200,{'items':[relation()],'next_cursor':null})));
    await pending;
    require(r.relationships.every((x)=>x.peer==null&&!x.can(MatchAction.cancel)),'Old peer/actions restored');
   }finally{r.close();c.close();}

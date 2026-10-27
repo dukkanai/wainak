@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import re
 import secrets
 import threading
 import uuid
@@ -18,6 +19,7 @@ from functools import wraps
 from .repository import MemoryRepository
 
 POLICY_VERSION = "dev-2026-10-24"
+RELATIONSHIP_PAGE_SIZE = 20
 MARITAL = {"single", "married", "divorced", "widowed"}
 GOALS = {"build_family", "companionship"}
 REPORT_CATEGORIES = {"harassment", "threat", "impersonation", "child_safety", "other_safety"}
@@ -361,9 +363,19 @@ class DevelopmentService:
         return self._view_relationship(actor, rel)
 
     @locked
-    def list_relationships(self, actor):
+    def list_relationships(self, actor, cursor=None):
         self._account(actor)
-        return {"items": [self._view_relationship(actor, r) for r in self.relationships.values() if actor in (r["initiator_id"], r["recipient_id"])]}
+        # Stable IDs, rather than dictionary insertion order, survive a database
+        # round trip. Cursor validation is actor-scoped and reveals no other pair.
+        identifiers = sorted(identifier for identifier, relationship in self.relationships.items()
+                             if actor in (relationship["initiator_id"], relationship["recipient_id"]))
+        if cursor is not None and (not isinstance(cursor, str)
+                or re.fullmatch(r"rel_[0-9a-f]{32}", cursor) is None or cursor not in identifiers):
+            fail(400, "invalid_relationship_cursor", "Refresh the relationship list before continuing.")
+        start = identifiers.index(cursor) + 1 if cursor is not None else 0
+        page = identifiers[start:start + RELATIONSHIP_PAGE_SIZE]
+        return {"items": [self._view_relationship(actor, self.relationships[identifier]) for identifier in page],
+                "next_cursor": page[-1] if start + len(page) < len(identifiers) else None}
 
     @locked
     def relationship(self, actor, identifier):
