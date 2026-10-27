@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import '../app.dart' show Notice, Panel, Choice, ActionButton;
 import '../theme.dart';
 import 'client.dart';
+import 'profile_save.dart';
 import 'matching_repository.dart';
 import 'matching_pane.dart';
 
@@ -648,25 +649,34 @@ class _IdentityJourneyState extends State<IdentityJourney> {
               'age_range',
               'راجع حدود العمر المفضلة.',
             );
-          await client.domain(
-            'PUT',
-            '/v1/me/profile',
-            body: {
+          final generation = _generation;
+          final session = client.sessionGeneration;
+          profileSaved = false;
+          assessment = null;
+          selected = null;
+          final result = await saveIdentityProfile(
+            client,
+            profile: {
               ...profileData,
               'country': country,
               'discoverable': discoverable,
             },
+            preferences: {
+              ...preferenceData,
+              'min_age': minAge,
+              'max_age': maxAge,
+            },
+            isCurrent: () => mounted && generation == _generation,
           );
-          await client.domain(
-            'PUT',
-            '/v1/me/preferences',
-            body: {...preferenceData, 'min_age': minAge, 'max_age': maxAge},
-          );
-          final result = await client.domain('GET', '/v1/me/assessment');
-          if (!mounted) return;
+          if (!mounted || generation != _generation) return;
+          if (session != client.sessionGeneration || !client.authenticated) {
+            throw const IdentityFailure(
+              'stale_response',
+              'تغيرت الجلسة؛ لم نعرض نتيجة الحفظ السابقة.',
+            );
+          }
           assessment = result;
           profileSaved = true;
-          selected = null;
         }, success: 'أكد الخادم حفظ الملف والتفضيلات الاصطناعية.'),
       ),
       if (profileSaved) ...questions(),
