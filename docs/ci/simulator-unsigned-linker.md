@@ -1,5 +1,7 @@
 # Strict unsigned simulator compilation — stage8
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Base: `cf4a5e9c8872b79de568bbeae342b3c8dc27e9af`.
 This local repair preserves compile-only acceptance; it does not authorize
 signing, publication, another cloud run, simulator execution, or app release.

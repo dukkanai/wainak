@@ -1,5 +1,7 @@
 # Phase 2 private identity PIPE fixture — independent QA
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Date: 2026-10-24 UTC. Development fixture only; no deployment or production approval.
 
 ## Exact source and scope

@@ -1,5 +1,7 @@
 # Phase 2 native synthetic identity — independent QA
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Date: 2026-10-24 UTC. **The tested native development slice passed the checks
 listed below. This is not production, release, store, full-project or all-platform
 approval.** No open P0/P1 finding remains in this reviewed slice; unimplemented and

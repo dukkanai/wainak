@@ -1,5 +1,7 @@
 # Phase3 bounded implementation plan
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](STATUS.md).
+
 Baseline: locally integrated main `b5f63ef0090be2513833a86e22c6c7032514c9f7`.
 Work occurs on separate backend/mobile/QA development branches. No main merge,
 remote push, deployment, live DB migration, real email or new persistent key.

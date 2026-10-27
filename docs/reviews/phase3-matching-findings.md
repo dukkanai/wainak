@@ -1,5 +1,7 @@
 # Phase 3 independent findings (development only)
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 ## P1 — same-session stale results restore blocked peer data/actions
 
 Status: **CLOSED on the independently tested final mobile a271d98/backend 3bc638f pair**.

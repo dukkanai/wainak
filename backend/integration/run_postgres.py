@@ -6,11 +6,13 @@ Requires Docker, the already-present pinned image, and optional psycopg dependen
 """
 
 import argparse
+from contextlib import contextmanager
 import importlib.util
 import json
 import os
 from pathlib import Path
 import secrets
+import signal
 import subprocess
 import sys
 import tempfile
@@ -23,16 +25,16 @@ IMAGE="postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4
 LABEL="com.wainak.disposable-postgres-test"
 
 
-def command(args,check=True):
-    result=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=90)
+def command(args,check=True,timeout=90):
+    result=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=timeout)
     if check and result.returncode:
         # Do not echo arbitrary Docker output or connection configuration.
         raise RuntimeError(f"Disposable harness command failed ({args[0]} {args[1]}, exit {result.returncode}).")
     return result
 
 
-def metadata(kind,name):
-    result=command(["docker",kind,"inspect",name],check=False)
+def metadata(kind,name,timeout=90):
+    result=command(["docker",kind,"inspect",name],check=False,timeout=timeout)
     if result.returncode:
         missing=("no such object","no such container","no such volume")
         if any(message in result.stderr.lower() for message in missing):
@@ -41,7 +43,40 @@ def metadata(kind,name):
     return json.loads(result.stdout)[0]
 
 
+@contextmanager
+def termination_for_cleanup():
+    """Default TERM must unwind finally; preserve the private fixture handler."""
+    previous=signal.getsignal(signal.SIGTERM)
+    changed=previous == signal.SIG_DFL
+    def interrupted(*_):
+        signal.signal(signal.SIGTERM,signal.SIG_IGN)
+        raise KeyboardInterrupt("Disposable fixture cancelled")
+    if changed:
+        signal.signal(signal.SIGTERM,interrupted)
+    try:
+        yield
+    finally:
+        if changed:
+            signal.signal(signal.SIGTERM,previous)
+
+
+@contextmanager
+def cleanup_signals():
+    """Complete bounded cleanup despite repeated cancellation; restore handlers."""
+    previous={sig:signal.signal(sig,signal.SIG_IGN) for sig in (signal.SIGTERM,signal.SIGINT)}
+    try:
+        yield
+    finally:
+        for sig,handler in previous.items():
+            signal.signal(sig,handler)
+
+
 def main(extra_test_factory=None, argv=None):
+    with termination_for_cleanup():
+        return run_disposable(extra_test_factory=extra_test_factory,argv=argv)
+
+
+def run_disposable(extra_test_factory=None, argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-disposable-postgres",action="store_true")
     args=parser.parse_args(argv)
@@ -122,23 +157,24 @@ def main(extra_test_factory=None, argv=None):
             print(json.dumps({"postgres_version":version,"driver_version":psycopg.__version__,"test_count":result.testsRun,
                 "tests_passed":success,"published_ports":False,"network_mode":"none","synthetic_only":True},sort_keys=True))
         finally:
-            container=metadata("container",name)
-            if container:
-                if container["Config"].get("Labels",{}).get(LABEL)!=tag:
-                    raise RuntimeError("Refusing cleanup of a container not owned by this test")
-                if container["State"]["Running"]:
-                    # Only this newly-created, privately nested socket directory.
-                    # Allow the creating user to remove it after PostgreSQL stops.
-                    command(["docker","exec","--user","0",name,"chmod","0777","/var/run/postgresql"])
-                command(["docker","rm","--force",name])
-            info=metadata("volume",volume)
-            if info:
-                if info.get("Labels",{}).get(LABEL)!=tag:
-                    raise RuntimeError("Refusing cleanup of a volume not owned by this test")
-                command(["docker","volume","rm",volume])
-            if metadata("container",name) or metadata("volume",volume):
-                raise RuntimeError("Disposable resources were not fully removed")
-            print("Verified removal of this test's container and volume; temporary secret/socket directory is removed on exit.")
+            with cleanup_signals():
+                container=metadata("container",name,timeout=10)
+                if container:
+                    if container["Config"].get("Labels",{}).get(LABEL)!=tag:
+                        raise RuntimeError("Refusing cleanup of a container not owned by this test")
+                    if container["State"]["Running"]:
+                        # Only this newly-created, privately nested socket directory.
+                        # Allow the creating user to remove it after PostgreSQL stops.
+                        command(["docker","exec","--user","0",name,"chmod","0777","/var/run/postgresql"],timeout=10)
+                    command(["docker","rm","--force",name],timeout=10)
+                info=metadata("volume",volume,timeout=10)
+                if info:
+                    if info.get("Labels",{}).get(LABEL)!=tag:
+                        raise RuntimeError("Refusing cleanup of a volume not owned by this test")
+                    command(["docker","volume","rm",volume],timeout=10)
+                if metadata("container",name,timeout=10) or metadata("volume",volume,timeout=10):
+                    raise RuntimeError("Disposable resources were not fully removed")
+                print("Verified removal of this test's container and volume; temporary secret/socket directory is removed on exit.")
     if temporary.exists():
         raise RuntimeError("Temporary test directory was not removed")
     print("Verified removal of temporary test directory; no persistent credentials created.")

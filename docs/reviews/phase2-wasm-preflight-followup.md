@@ -1,5 +1,7 @@
 # Wasm preflight follow-up — exact mobile 482f7de
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Date: 2026-10-24 UTC. This addendum supersedes only the open historical Wasm
 preflight failure in the mobile QA report; it does not rewrite the earlier run
 or grant browser/runtime/authentication/release approval.

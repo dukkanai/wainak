@@ -1,5 +1,7 @@
 # Phase 6 — Android SDK and cross-built AAR QA
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 2026-10-25 UTC. **Scoped compile-only acceptance, with disclosed advisory and
 scanner limitations. Not Android execution, APK acceptance or production approval.**
 

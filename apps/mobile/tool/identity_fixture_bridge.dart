@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'private_fixture_protocol.dart';
 import 'identity_fixture_path.dart';
+import 'identity_fixture_runtime.dart';
 
 class FixtureFailure implements Exception {
   const FixtureFailure(this.code);
@@ -29,25 +30,19 @@ class IdentityFixtureBridge {
   bool _protocolFailed = false, _finished = false;
   late final Uri baseUri;
   static Future<IdentityFixtureBridge> start({
-    String python =
-        '/home/chatbot/wainak-dev/auth-tools-phase2/venv/bin/python',
+    String? python,
     String? script,
-    String home = '/home/chatbot/wainak-dev/mobile-tools/home',
+    String? home,
   }) async {
+    final runtime = resolveFixtureRuntime(python: python, home: home);
     final selectedScript = await resolveFixtureScript(explicit: script);
     final Process process;
     try {
       process = await Process.start(
-        python,
+        runtime.python,
         [selectedScript.path, '--run-disposable-identity-fixture'],
         includeParentEnvironment: false,
-        environment: {
-          'HOME': home,
-          'PATH': '/usr/bin:/bin',
-          'LANG': 'C.UTF-8',
-          'PYTHONDONTWRITEBYTECODE': '1',
-          'PYTHONUNBUFFERED': '1',
-        },
+        environment: runtime.childEnvironment,
       );
     } catch (_) {
       throw const FixtureFailure('start_failed');

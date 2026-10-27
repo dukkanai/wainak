@@ -1,5 +1,7 @@
 # Native archive mobile spike — 2026-10-24
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](STATUS.md).
+
 ## Scope and evidence boundary
 
 Mobile branch `dev/phase6-native-archive-20261024` starts at main

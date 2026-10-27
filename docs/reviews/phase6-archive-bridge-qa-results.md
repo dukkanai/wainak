@@ -1,5 +1,7 @@
 # Phase 6 — independent synthetic Go archive bridge QA
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 2026-10-24, ostath. **Host Go feasibility accepted within the bounded synthetic
 scope below. Android/JNI/AAR/unsigned APK acceptance is NOT established.**
 No main merge, push, deployment, signing identity, real history, real recovery key,

@@ -1,5 +1,7 @@
 # Phase 2 — synthetic identity sandbox (development only)
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](STATUS.md).
+
 This branch extends, rather than replaces, the phase 1 development contracts.
 It does **not** enable a public service or production authentication deployment.
 Only an explicitly created disposable PostgreSQL database is accepted. Existing

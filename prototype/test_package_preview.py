@@ -162,7 +162,7 @@ class PackagingTests(unittest.TestCase):
             self.assertEqual(row,{'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data)})
         self.assert_no_staging_files()
     def test_each_output_leaf_symlink_is_rejected_without_external_overwrite(self):
-        self.releases.mkdir()
+        self.releases.mkdir(mode=0o700)
         for name in self.output_names():
             with self.subTest(name=name):
                 leaf=self.releases/name;leaf.symlink_to(self.external/'font-OFL.txt')
@@ -173,7 +173,7 @@ class PackagingTests(unittest.TestCase):
                     self.assertEqual(sorted(x.name for x in self.releases.iterdir()),[name])
                 finally:leaf.unlink()
     def test_each_output_fifo_is_rejected_without_open_wait(self):
-        self.releases.mkdir()
+        self.releases.mkdir(mode=0o700)
         for name in self.output_names():
             with self.subTest(name=name):
                 leaf=self.releases/name;os.mkfifo(leaf)
@@ -182,7 +182,7 @@ class PackagingTests(unittest.TestCase):
                     self.assertEqual(sorted(x.name for x in self.releases.iterdir()),[name])
                 finally:leaf.unlink()
     def test_each_output_hardlink_is_rejected_without_modifying_shared_inode(self):
-        self.releases.mkdir()
+        self.releases.mkdir(mode=0o700)
         for name in self.output_names():
             with self.subTest(name=name):
                 leaf=self.releases/name;os.link(self.external/'font-OFL.txt',leaf)
@@ -193,7 +193,7 @@ class PackagingTests(unittest.TestCase):
                     self.assertEqual(sorted(x.name for x in self.releases.iterdir()),[name])
                 finally:leaf.unlink()
     def test_writable_by_others_output_directory_is_rejected(self):
-        self.releases.mkdir();self.releases.chmod(0o777)
+        self.releases.mkdir(mode=0o700);self.releases.chmod(0o777)
         with self.assertRaises(ValueError):self.package()
         self.assertEqual(list(self.releases.iterdir()),[])
     def test_existing_leaf_changed_during_staging_is_rejected(self):
@@ -217,7 +217,7 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(before,{name:(self.releases/name).read_bytes() for name in self.output_names()})
         self.assert_no_staging_files()
     def test_output_directory_swapped_before_replace_cannot_write_external_directory(self):
-        self.releases.mkdir();original=p.os.replace;swapped=False
+        self.releases.mkdir(mode=0o700);original=p.os.replace;swapped=False
         moved=self.prototype/'moved-releases'
         def replace(*args,**kwargs):
             nonlocal swapped

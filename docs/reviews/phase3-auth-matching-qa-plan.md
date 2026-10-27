@@ -1,5 +1,7 @@
 # Phase 3 authenticated matching / introduction — independent QA gates
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Baseline: `b5f63ef0090be2513833a86e22c6c7032514c9f7`, 2026-10-24.
 Status: plan only, **no phase 3 candidate has passed yet**. Every result must name
 its exact backend/mobile commits, test source and runtime job. Old merged results

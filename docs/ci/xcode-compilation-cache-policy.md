@@ -1,5 +1,7 @@
 # Stage6: command-scoped Xcode compilation-cache policy
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Base: 7fcf56b741248e24472bcac8ff0947bbabd3576b. This local candidate is not
 authorization to publish or run an eleventh cloud attempt.
 

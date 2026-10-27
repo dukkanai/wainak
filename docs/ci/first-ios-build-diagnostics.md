@@ -1,5 +1,7 @@
 # First manual iOS build: failure and diagnostic-only follow-up
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 ## Observed result
 
 One authorized Codemagic Mac M2 build ran against `7add32fbe30ba3f0e299a63fa557206dff18a34d`:

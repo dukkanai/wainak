@@ -1,5 +1,7 @@
 # Phase 4 — local-only card preview, not a messaging channel
 
+Status note: this document records its original phase and evidence. For the combined source, current modes and portable test setup, use [README.md](README.md) and [project status](../../docs/STATUS.md). Historical run results do not transfer to later source changes.
+
 Base: local main `5f3433b23d8a29999c24943414ff1fdbcc40f46d`. Isolated development branch `dev/phase4-local-cards-20261024`; no main merge, deployment or new provider is included.
 
 ## Agreed boundary before implementation

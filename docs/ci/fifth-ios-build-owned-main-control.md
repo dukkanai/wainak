@@ -1,5 +1,7 @@
 # Fifth iOS attempt: validate upstream's owned main-module control
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 ## Observed evidence and limits
 
 Build `6adddc764a72334e32e4f795` used exact source

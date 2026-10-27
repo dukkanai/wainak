@@ -1,5 +1,7 @@
 # iOS / native archive preparation verification
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Date: 2026-10-25 UTC. Scope: the development commit containing this report, based on `120a0c24970427438af7c693e772b95050b3fcfc`. **Source/configuration preparation only; no cloud job was started.**
 
 ## Exact integrated checks

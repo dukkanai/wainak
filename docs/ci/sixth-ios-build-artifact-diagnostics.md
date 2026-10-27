@@ -1,5 +1,7 @@
 # Sixth iOS attempt: complete bounded artifact evidence
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Build `6adde0f94a72334e32e4f8b9` used exact commit
 `8c459243ff25cb3239b32a6f90c7107baeefec43` and failed on 2026-10-25 at
 11:03:06 UTC. Native duration was 147.998 seconds; failure stage was

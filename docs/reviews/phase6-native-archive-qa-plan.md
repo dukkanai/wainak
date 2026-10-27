@@ -1,5 +1,7 @@
 # Phase6 Android unsigned archive build spike — QA gates
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Plan only, 2026-10-24. No phase6 tests/builds independently run yet.
 Phase5 archive anchor:8155772cf0a006078be433f45353c651d9ffe451.
 Its independent Linux report is committed at8f5ee50edf140e9defa3c64ee5f38ed1819626c0.

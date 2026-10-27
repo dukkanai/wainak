@@ -1,5 +1,7 @@
 # Mobile development verification — 2026-10-24
 
+Status note: this document records its original phase and evidence. For the combined source, current modes and portable test setup, use [README.md](README.md) and [project status](../../docs/STATUS.md). Historical run results do not transfer to later source changes.
+
 ## Exact scope
 
 Branch: dev/phase1-mobile-api-20261024. The handoff records the final commit.

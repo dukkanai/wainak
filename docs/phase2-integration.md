@@ -1,5 +1,7 @@
 # Phase-two local integration checkpoint
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](STATUS.md).
+
 This branch combines the development backend, native Flutter auth UI, and independent
 QA history. It is **not a deployment or production approval**. Only synthetic
 `@example.invalid` accounts, in-memory fake mail, and disposable PostgreSQL are used.

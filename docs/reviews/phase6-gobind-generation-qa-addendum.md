@@ -1,5 +1,7 @@
 # Phase 6 — gobind source-generation QA addendum
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 2026-10-24. This follows `phase6-native-scaffold-qa-results.md` without changing
 its mobile/Go candidates or promoting source generation to native execution.
 

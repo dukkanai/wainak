@@ -1,5 +1,7 @@
 # Phase 6 — independent Flutter native-archive scaffold QA
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 2026-10-24, ostath. **Headless Flutter scaffold checks PASS; actual Android
 native integration remains BLOCKED/NOT RUN.** This report complements, but does
 not extend into native execution, `phase6-archive-bridge-qa-results.md`.

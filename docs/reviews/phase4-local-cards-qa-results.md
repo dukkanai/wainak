@@ -1,5 +1,7 @@
 # Phase 4 standalone local card preview — independent QA
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 2026-10-24 UTC. Candidate `acbc72a78074bf3be3628dc8dff10a54c9dcecde`,
 `dev/phase4-local-cards-20261024`, `/home/chatbot/wainak-dev/mobile-local-cards-phase4`.
 Baseline main remains `5f3433b23d8a29999c24943414ff1fdbcc40f46d`.

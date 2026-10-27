@@ -1,5 +1,6 @@
 import importlib.util
 import os
+import signal
 from pathlib import Path
 import sys
 import tempfile
@@ -104,6 +105,45 @@ class IntegrationControlTests(unittest.TestCase):
         with mock.patch.object(controls.os, "killpg", side_effect=ProcessLookupError):
             controls.stop_flutter(process)
         process.wait.assert_called_once_with(timeout=10)
+
+    def test_exited_flutter_leader_does_not_hide_live_descendants(self):
+        process=mock.Mock()
+        process.poll.return_value=0
+        with mock.patch.object(controls.os,"killpg",side_effect=[None,None,ProcessLookupError]) as kill:
+            controls.stop_flutter(process)
+        self.assertEqual([call.args[1] for call in kill.call_args_list],
+                         [signal.SIGTERM,signal.SIGKILL,0])
+
+    def test_default_termination_unwinds_and_restores_handler(self):
+        original=signal.getsignal(signal.SIGTERM)
+        signal.signal(signal.SIGTERM,signal.SIG_DFL)
+        cleaned=[]
+        try:
+            with self.assertRaises(KeyboardInterrupt):
+                with controls.run_postgres.termination_for_cleanup():
+                    try:
+                        os.kill(os.getpid(),signal.SIGTERM)
+                    finally:
+                        with controls.run_postgres.cleanup_signals():
+                            os.kill(os.getpid(),signal.SIGTERM)
+                            cleaned.append(True)
+            self.assertEqual(cleaned,[True])
+            self.assertEqual(signal.getsignal(signal.SIGTERM),signal.SIG_DFL)
+        finally:
+            signal.signal(signal.SIGTERM,original)
+
+    def test_private_fixture_custom_termination_handler_is_preserved(self):
+        seen=[]
+        callback=lambda *_: seen.append(True)
+        original=signal.signal(signal.SIGTERM,callback)
+        try:
+            with controls.run_postgres.termination_for_cleanup():
+                os.kill(os.getpid(),signal.SIGTERM)
+                self.assertIs(signal.getsignal(signal.SIGTERM),callback)
+            self.assertEqual(seen,[True])
+            self.assertIs(signal.getsignal(signal.SIGTERM),callback)
+        finally:
+            signal.signal(signal.SIGTERM,original)
 
 
 if __name__ == "__main__":

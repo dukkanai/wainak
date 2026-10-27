@@ -1,5 +1,7 @@
 # Phase5 synthetic Linux archive — independent QA results
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 2026-10-24. **Bounded Linux feasibility gates passed, with disclosed dependency
 advisories and explicit untested native/production scope.** This is not a general
 security approval, cryptographic audit, deployment or main-merge authorization.

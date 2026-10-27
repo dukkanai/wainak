@@ -1,5 +1,7 @@
 # Phase 3 authenticated introductions — independent QA
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 2026-10-24 UTC. Development-only candidate pair, not an integrated main merge:
 
 - Backend `3bc638f8884cc9d8da586d649f96c34a53476e1b`,

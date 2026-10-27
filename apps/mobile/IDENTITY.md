@@ -16,6 +16,7 @@ This mode is native-only; web and invalid origins fail closed. A device's localh
 - Registration with fixture email/password, adult/Muslim declarations and policy versions; 401 pending verification is distinct from authenticated access.
 - Session-bound fake-email code verification/resend; login, session refresh, logout, global revocation, owned pending deletion and recent-password authenticated deletion.
 - Account/profile/preferences hydration on login preserves existing gender, marital status, declared wives, marriage goal and unedited preference lists. New empty accounts use an explicitly described female/single sample; phase3 exposes a synthetic gender selector while preserving unedited values. Three adaptive reflection questions use backend option IDs.
+- Profile and preference saves are separate writes, not a transaction. Partial failure names confirmed writes, retains the submitted draft, uses read-only reconciliation without automatic write retries, and never transfers a prior-session outcome to a new account.
 - Auth transitions advance a generation; old pending replies cannot replace verified sessions. Delete/revoke confirmation is bound to the generation when opened, not whichever account is current later. Password/code controllers clear promptly, and disposed clients reject late responses.
 - Busy forms exclude keyboard focus as well as pointer actions. Arabic/RTL, light/dark theme and existing48-target/16-helper tokens are retained. Layout tests exist but their execution must be checked in the evidence report.
 
@@ -57,3 +58,9 @@ Live tests now require either an explicit bridge script argument or WAINAK_IDENT
 The live driver/widget test writes only nonsecret TEST_FIXTURE_PROVENANCE path+SHA256 to test evidence. No email/password/code/token is logged. Keep the selected fixture source frozen during a run. Run dart --old_gen_heap_size=128 tool/check_identity_fixture_selection.dart for nine path-selection checks without any fixture or DB execution. Existing non-live tests do not need the variable.
 
 The metadata verifier uses O_NOFOLLOW/O_NONBLOCK and fstat before reading. Its output is bounded32KiB; a timeout terminates and awaits only that owned metadata child (TERM, then bounded KILL fallback), never the PostgreSQL fixture. FIFO rejection and forced timeout cleanup are covered by the light path checks.
+
+## Portable fixture runtime (unified source)
+
+The bridge additionally requires `WAINAK_IDENTITY_FIXTURE_PYTHON` and `WAINAK_IDENTITY_FIXTURE_HOME`, or explicit `python`/`home` arguments. Python must be an absolute executable path; venv interpreter symlinks retain their selected path. The home must be an existing private `0700` directory at its canonical path. There are no host-specific defaults. See [the current mobile guide](README.md) for all three fixture variables.
+
+Only the selected home, fixed system PATH/language, and Python no-bytecode/unbuffered/no-user-site flags enter the child environment. The parent environment and credential/import overrides are not inherited. `test/identity_fixture_runtime_test.dart` checks rejection and precedence, private-path validation, immutable environment projection, and an actual small Python child without starting a fixture or database. These checks do not prove a selected interpreter or fixture source trustworthy.

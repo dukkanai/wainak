@@ -1,5 +1,7 @@
 # Phase 2 mobile identity evidence — 2026-10-24
 
+Status note: this document records its original phase and evidence. For the combined source, current modes and portable test setup, use [README.md](README.md) and [project status](../../docs/STATUS.md). Historical run results do not transfer to later source changes.
+
 Candidate branch: `dev/phase2-mobile-auth-20261024`, based on phase1 `efd0421d559af6ee50ce04b887c7c40481d01aa0`. Backend application: `93dd42f2141d551e86ec55861bc66802be247bef`; additive private fixture: `144937a34e88e3b558b0c9a007d36d529c5621a1`. This report does not imply main merge, deployment, store acceptance or production security approval.
 
 ## Passed on the candidate source

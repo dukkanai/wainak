@@ -1,5 +1,7 @@
 # Phase 5 synthetic Linux history archive — independent QA design gates
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 2026-10-24. Baseline main: `5f3433b23d8a29999c24943414ff1fdbcc40f46d`.
 Acceptance plan prepared before runtime QA; commit-specific results are recorded separately.
 

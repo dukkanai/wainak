@@ -85,7 +85,7 @@ def stop_server(process):
 
 
 def stop_flutter(process):
-    if process is None or process.poll() is not None:
+    if process is None:
         return
     try:
         os.killpg(process.pid, signal.SIGTERM)
@@ -99,21 +99,36 @@ def stop_flutter(process):
         except ProcessLookupError:
             pass
         process.wait(timeout=10)
+    # A direct child can exit before its descendants. They still belong to the
+    # exact session created by this harness, never an unrelated process group.
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+    deadline=time.monotonic()+2
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(process.pid,0)
+        except ProcessLookupError:
+            return
+        time.sleep(.05)
+    raise RuntimeError("Temporary Flutter process group did not stop")
 
 
 def cleanup_children(process, server, drain):
     # Never let a client kill/wait/pipe failure bypass server cleanup.
-    try:
+    with run_postgres.cleanup_signals():
         try:
-            stop_flutter(process)
+            try:
+                stop_flutter(process)
+            finally:
+                if process is not None and process.stdout is not None:
+                    try:
+                        drain()
+                    finally:
+                        process.stdout.close()
         finally:
-            if process is not None and process.stdout is not None:
-                try:
-                    drain()
-                finally:
-                    process.stdout.close()
-    finally:
-        stop_server(server)
+            stop_server(server)
 
 
 def owned_test(mobile_root, relative):

@@ -1,5 +1,7 @@
 # Phase 4 local card preview — independent QA acceptance plan
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 2026-10-24. Baseline main: `5f3433b23d8a29999c24943414ff1fdbcc40f46d`.
 Design plan drafted before execution; exact runtime results belong in a separate commit-specific QA report.
 

@@ -1,5 +1,7 @@
 # Phase 2 additive deletion/web QA plan
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Date: 2026-10-24. **NOT RUN / source pending.** This is separate from the
 verified baseline backend `dee6ec30085e3b3e2a12ea25c912967f27f1dcd7` and QA
 `c3e1b62063e0fcb1b3b809196682db205550fc0a`. Do not transfer the66/57 results.

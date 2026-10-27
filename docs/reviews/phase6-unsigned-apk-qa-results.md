@@ -1,5 +1,7 @@
 # Phase 6: unsigned Android archive-build spike — independent QA
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Date: 2026-10-25 UTC. Scope: Linux-hosted synthetic, unsigned arm64 Android
 compile/artifact feasibility, not an Android runtime or release acceptance.
 

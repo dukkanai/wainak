@@ -1,5 +1,7 @@
 # Phase 3 — authenticated matching and introduction requests
 
+Status note: this document records its original phase and evidence. For the combined source, current modes and portable test setup, use [README.md](README.md) and [project status](../../docs/STATUS.md). Historical run results do not transfer to later source changes.
+
 Isolated mobile branch: dev/phase3-mobile-matching-20261024, based on local main b5f63ef0090be2513833a86e22c6c7032514c9f7. Backend contract: contracts/phase3-matching.md from backend3bc638f8884cc9d8da586d649f96c34a53476e1b. Development only; no main merge, publish or deployment is included in this slice.
 
 ## UI flow and identity boundaries
@@ -43,8 +45,8 @@ Default widget suite keeps all live fixtures opt-in:
 
     flutter test --no-pub --concurrency=1 --reporter=expanded
 
-Actual two-session matching UI, only in an authorized isolated fixture window:
+Actual two-session matching UI, after setting all three portable fixture variables described in README.md and selecting the combined backend checkout:
 
-    WAINAK_IDENTITY_FIXTURE_SCRIPT=/home/chatbot/wainak-dev/backend-matching-phase3/backend/integration/serve_identity_fixture.py WAINAK_RUN_MATCHING_WIDGET=1 flutter test --no-pub --concurrency=1 --reporter=expanded test/identity_matching_live_widget_test.dart
+    WAINAK_RUN_MATCHING_WIDGET=1 flutter test --no-pub --concurrency=1 --reporter=expanded test/identity_matching_live_widget_test.dart
 
 The test starts the reviewed private fixture only inside its test body, after compilation. Two independent allauth sessions are created with synthetic example.invalid identities and RAM-only private-pipe verification. Profile/self-assessment setup is API-driven; matching request/retry/recipient acceptance/report/block are widget-driven. One wrapper intentionally drops a real HTTP request response after the server replies, then verifies an explicit same-key retry creates no duplicate. No fabricated recipient response, admin activation endpoint or conversation content is used. Test logs expose only the fixture script path/hash provenance; no passwords/codes/tokens or real mail. Normal cleanup/stream EOF/child exit are required.

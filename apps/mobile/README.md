@@ -1,63 +1,105 @@
-# Wainak mobile — phase 1 development slice
+# تطبيق وينك للهاتف
 
-Arabic/RTL Flutter foundation for Android and iOS, with a local-review web target. Development only, not a store-ready application. App identifiers remain `invalid.example.wainak`; no production deployment, purchase or identity verification is configured.
+تطبيق Flutter عربي مع اتجاه RTL وخط محلي. تجمع النسخة الحالية أساس الحسابات والمطابقة وإصلاح الحفظ الجزئي، ومعاينة البطاقات المحلية، وتجربة جسر الأرشيف الأصلي. هذه شرائح تطوير مستقلة؛ لم تُفعّل المراسلة أو الدفع أو خدمة حسابات عامة، ولا تعني نتيجة الاختبارات قبولًا للمتاجر.
 
-## Explicit modes — no silent fallback
+نسخة Flutter المثبتة للتحقق وCI هي `3.47.8`، وبداخلها Dart `3.13.7`. تبقى معرفات التطبيقات `invalid.example.wainak` مؤقتة. يستخدم التطبيق `lib/main.dart` نقطة دخول واحدة تختار الوضع صراحة.
 
-Without `--dart-define=WAINAK_DEV_MODE=true`, the entry point is inert.
+## أوضاع التشغيل
 
-- `WAINAK_REPOSITORY=fake` (default): offline in-memory synthetic journey, one reflection/card, local peer/activation simulation. No server or administrator receives its actions. Data disappears when the repository/process ends.
-- `WAINAK_REPOSITORY=api`: `ConnectedWainakApp` → `JourneyRepository` → `HttpJourneyRepository` → `WainakApiClient` → `NativeApiTransport`. Requires explicit `WAINAK_API_BASE_URL` with loopback hostname `127.0.0.1`, `localhost` or `::1`. The app refuses other origins in this phase. Unsupported configurations and web API mode fail closed; they never substitute fake data.
+دون `WAINAK_DEV_MODE=true` تظهر شاشة عربية معطلة ولا تنشأ جلسة أو قناة بيانات. مع تفعيل التطوير، يحدد `WAINAK_REPOSITORY` أحد الأوضاع التالية:
 
-Native development example (requires a suitable device/desktop target whose loopback reaches the separately authorized development backend):
+- `fake`: رحلة اصطناعية محلية في الذاكرة، وهو الافتراضي عند تفعيل التطوير دون اختيار وضع. القبول والتفعيل وحالة الرد هنا محاكاة، ولا يصل شيء إلى خادم أو شريك.
+- `api`: الرحلة القديمة المتصلة بخادم التطوير عبر HTTP أصلي. تتضمن قواعد الطلب والقبول والتفعيل التجريبي ومكتبة البطاقات؛ لا تنقل إجابات الحوار. تتطلب عنوان loopback صريحًا، ولا تعمل على الويب.
+- `identity`: رحلة الحسابات والمطابقة عبر Django/allauth. تتضمن التسجيل بالبريد الاصطناعي والتحقق والدخول والخروج والحذف والملف والتفضيلات والطلبات والحظر. قبول الطلب يتوقف قبل تفعيل المحادثة أو الدفع. الجلسات في الذاكرة؛ ليست مصادقة إنتاجية. التفاصيل في [دليل الهوية](IDENTITY.md) و[المطابقة](PHASE3_MATCHING.md).
+- `local_cards`: أربع بطاقات عربية مستقلة بإجابات جاهزة ومعاينة محلية واضحة، دون اتصال أو تاريخ إجابات أو ارتباط بحساب. يرفض وضع release ويمسح الاختيار عند حدود الإخفاء والخروج. التفاصيل في [دليل البطاقات](LOCAL_CARDS.md).
+- `native_archive`: تجربة محدودة لجسر الأرشيف باستخدام سجلين اصطناعيين. Android يتطلب محركًا أصليًا مبنيًا ومتحققًا منه؛ iOS يتطلب أيضًا `WAINAK_IOS_ARCHIVE_PREVIEW=true`. يرفض الويب وrelease والمنصات غير المدعومة، ويعرض فشلًا صريحًا عند غياب المحرك بدل محاكاة نجاح. هذه ليست مراسلة مشفرة أو نسخًا احتياطيًا لمحادثات حقيقية. التفاصيل في [دليل تجربة الأرشيف الأصلي](../../docs/phase6-mobile-native-archive.md).
 
-```sh
-flutter run --dart-define=WAINAK_DEV_MODE=true \
-  --dart-define=WAINAK_REPOSITORY=api \
-  --dart-define=WAINAK_API_BASE_URL=http://127.0.0.1:8089
+الأوضاع لا تتحول إلى بعضها تلقائيًا عند الفشل. تحفظ تجربة البطاقات مستقلة عن الحسابات، ولا يمنح فتحها استحقاقًا أو موافقة شريك. الخادم يقرر أهلية الإجراءات؛ حواجز الواجهة لا تحل محل صلاحياته.
+
+## أمثلة التطوير
+
+من مجلد `apps/mobile`، مع SDK المثبت والاعتماديات المحددة في `pubspec.lock`:
+
+```bash
+flutter pub get
 ```
 
-No server is started by the app. No token is embedded or persisted. An Android emulator's localhost is not the host computer; this example does not configure networking or expose ports. Web has no API transport implementation.
+معاينة البطاقات المحلية:
 
-## Connected development journey
+```bash
+flutter run --dart-define=WAINAK_DEV_MODE=true --dart-define=WAINAK_REPOSITORY=local_cards
+```
 
-Declarations (18+, Muslim, terms and privacy) → generated `@example.invalid` account → explicit development email-verification simulation → synthetic female/unmarried profile, sample country, preferred age range and opt-in discoverability → three adaptive backend reflection questions → actual eligible candidate projection → outgoing request or incoming accept/decline → independent initiator activation simulation → backend card catalogue.
+واجهة الحسابات مع خادم تطوير شُغّل بشكل منفصل:
 
-Acceptance must come from the recipient's independent session. The sender cannot simulate their decision in API mode. The recipient waits/refreshes for initiator activation. Changing preferences or navigating back cannot retarget an existing relationship's report/block actions to a different candidate.
+```bash
+flutter run --dart-define=WAINAK_DEV_MODE=true --dart-define=WAINAK_REPOSITORY=identity --dart-define=WAINAK_API_BASE_URL=http://127.0.0.1:8089
+```
 
-The current backend **does not implement exchange/storage of dialogue answers**. API mode therefore has no send button and labels selected card answers as local previews, never delivered messages. Photo/identity disclosure remains unavailable, regardless of acceptance or activation. No purchase occurs.
+لا يبدأ التطبيق خادمًا. عنوان loopback على هاتف أو محاكي يشير إلى ذلك الجهاز، وليس إلى حاسوب المطور. المثال لا يفتح منافذ ولا يضبط تحويل اتصال، ولا يجيز استعمال عنوان إنتاج أو بيانات حقيقية. الهوية تقبل بيانات `@example.invalid` ضمن بيئة الاختبار فقط.
 
-Report and block are independent and free, including a known target after block. API reports are metadata recorded in a development backend, not evidence uploads or notifications to a live moderation team. Deletion calls the backend, invalidates the session and clears declarations before new registration; it does not cancel store subscriptions or imply a marriage ended.
+## التحقق المحلي
 
-Do not enter personal information. The sample female/single profile and three countries are not the complete global product. Terms/privacy are development explanations, not approved legal documents. Backend authorization remains authoritative; UI guards never replace it.
+تشغل الفحوص بتزامن واحد على المضيف المحدود الذاكرة:
 
-## Transport and interruption handling
-
-Tokens live only in the API client. Session epochs reject stale registration/401/delete responses. Busy screens suppress double actions; close disposes the client, while network uncertainty is shown without automatic retries or fabricated receipts. Relationship creation reuses its request idempotency key. Native requests use UTF-8 byte Content-Length, disallow redirects, cap responses at 64 KiB, and have a total 15-second deadline. Each request's client is closed on completion/timeout. HTTP 401 returns to unchecked declarations.
-
-## Checks and accessibility
-
-```sh
-flutter pub get --offline
-dart format --output=none --set-exit-if-changed lib test
+```bash
 flutter analyze --no-pub
-flutter test --no-pub --concurrency=1
-# Opt-in real native HTTP integration; launches and cleans a 127.0.0.1 ephemeral server:
-WAINAK_BACKEND_ROOT=/absolute/authorized/backend-checkout \
-  flutter test --no-pub --concurrency=1 test/native_backend_integration_test.dart
 ```
 
-The native integration test is skipped unless explicitly supplied an authorized checkout or an authorized loopback fixture URL. It creates two synthetic sessions, exercises actual adaptive questions/request/recipient acceptance/activation/cards/report/block/delete, and terminates the temporary memory-only WSGI server in finally. It does not exercise the optional PostgreSQL adapter.
+```bash
+flutter test --no-pub --concurrency=1 --reporter=expanded
+```
 
-Noto Sans Arabic/OFL is bundled. Light/dark tokens use body 18, helpers 16 and targets at least 48 logical pixels. Text scale is not clamped; layouts scroll with Arabic framework localizations. Tests include 320-wide / 200% text and cancellation/repeated/late-response flows. See `VERIFICATION.md` for exact executed results and cold-build memory limitations; source test presence alone is not proof of a pass.
+تختبر المجموعة الافتراضية الواجهات والعملاء والحدود دون بدء PostgreSQL أو تفعيل دخول حي. بعض اختبارات الربط ونقطة الدخول تستلزم اختيارًا صريحًا، لذلك يجب قراءة عدد الاختبارات المتخطاة ولا تعتبر نجاح المجموعة دليلًا على تنفيذها.
 
-Not yet validated: Android APK/device (SDK/Java absent), iOS (Mac/Xcode absent), VoiceOver/TalkBack/NVDA, manual visual review or store acceptance. Not implemented: production authentication/age assurance, real email, billing/restoration, dialogue transport, media/disclosure, complete exclusivity/marriage UI, evidence retention/moderation, durable mobile sessions or production security operations. Independent exact-build security and accessibility review remain release blockers.
+فحص دخول معاينة البطاقات:
 
+```bash
+flutter test --no-pub --concurrency=1 --dart-define=WAINAK_DEV_MODE=true --dart-define=WAINAK_REPOSITORY=local_cards test/local_cards_entrypoint_test.dart
+```
 
-## Disposable persistence integration fixture
+فحص دخول جسر Android وفشل المحرك الغائب في بيئة widgets:
 
-The optional reviewed backend harness may set WAINAK_TEST_BASE_URL and WAINAK_TEST_CONTROL_DIR instead of WAINAK_BACKEND_ROOT. The native test does not start/own that server. It checks the exact loopback origin, retains tokens only in memory and uses constant active/blocked marker files to coordinate two harness-owned server/DB restarts. The harness must create a fresh private directory and remove all temporary resources in finally. No administrative restart endpoint is added to the API. Results must be recorded separately from the already executed memory-backend journey.
+```bash
+flutter test --no-pub --concurrency=1 --dart-define=WAINAK_DEV_MODE=true --dart-define=WAINAK_REPOSITORY=native_archive test/native_archive_entry_test.dart
+```
 
-## Synthetic native archive spike
+فحص اختيار معاينة iOS وفشل المحرك الغائب:
 
-See ../../docs/phase6-mobile-native-archive.md. Explicit native_archive development mode is Android-only and fail-closed without its verified Go AAR. This branch is configured UNSIGNED, including debug. Android SDK download404 blocks Kotlin/JNI/AAR/APK checks; Dart fixture tests are not native execution. No picker, user recovery key or real history is implemented.
+```bash
+flutter test --no-pub --concurrency=1 --dart-define=WAINAK_DEV_MODE=true --dart-define=WAINAK_REPOSITORY=native_archive --dart-define=WAINAK_IOS_ARCHIVE_PREVIEW=true test/native_archive_platform_test.dart
+```
+
+هذه فحوص Flutter على المضيف؛ لا تشغّل Android أو iOS ولا تعد اختبارًا لمحرك الأرشيف الأصلي.
+
+## ربط الحسابات بقاعدة مؤقتة
+
+الاختبارات الحية تستخدم `tool/identity_fixture_bridge.dart` لبدء خدمة اختبار مؤقتة وقاعدة PostgreSQL معزولة. تظل رموز البريد الوهمي وكلمات المرور ورموز الجلسات في أنابيب خاصة وذاكرة الاختبار، ولا توضع في معاملات الأوامر أو ملفات النتائج.
+
+حدد هذه المتغيرات الثلاثة من بيئة أدواتك؛ لا توجد مسارات افتراضية لمضيف المطور:
+
+- `WAINAK_IDENTITY_FIXTURE_SCRIPT`: المسار المطلق والنهائي إلى `backend/integration/serve_identity_fixture.py` في نسخة المصدر المراد اختبارها. يجب أن يكون ملفًا عاديًا مملوكًا للمشغل وغير قابل لكتابة المجموعة أو الآخرين.
+- `WAINAK_IDENTITY_FIXTURE_PYTHON`: المسار المطلق إلى Python في بيئة تحتوي اعتماديات الحسابات وPostgreSQL المقفلة. يسمح برابط مفسر venv مع الاحتفاظ بمساره كي لا يفقد بيئته.
+- `WAINAK_IDENTITY_FIXTURE_HOME`: دليل مؤقت مخصص للاختبار، موجود بصلاحيات `0700` وبمسار نهائي دون روابط. لا تستخدم مجلد المستخدم الحقيقي. تمرر هذه القيمة إلى `HOME` للعملية الفرعية فقط؛ لا يُغير الاختبار بيئة المضيف.
+
+لا ترث العملية الفرعية البيئة العامة. تمرر فقط دليلها المخصص ومسار أدوات النظام واللغة وضوابط Python، وتمنع `PYTHONPATH` وموقع حزم المستخدم وسائر متغيرات الاعتماد أو الأسرار. الاختيار الصريح للأدوات لا يجعل مفسرًا أو نسخة مصدر غير موثوقين آمنين.
+
+بعد تجهيز هذه المتغيرات واعتماديات الخادم، يشغل كل اختبار على حدة:
+
+```bash
+WAINAK_RUN_IDENTITY_WIDGET=1 flutter test --no-pub --concurrency=1 test/identity_live_widget_test.dart
+```
+
+```bash
+WAINAK_RUN_MATCHING_WIDGET=1 flutter test --no-pub --concurrency=1 test/identity_matching_live_widget_test.dart
+```
+
+يجب التحقق من إنهاء الخدمة والقاعدة المؤقتتين، لا من نجاح الواجهة وحده. اقرأ [بروتوكول fixture](../../backend/integration/IDENTITY_PIPE.md) و[دليل التكامل](../../backend/integration/README.md) لتجهيز البيئة. اختبارات المسار القديم مع PostgreSQL لها أداة منفصلة [FLUTTER_CHAIN.md](../../backend/integration/FLUTTER_CHAIN.md).
+
+## الوصول وحالة البناء
+
+تستخدم الواجهات العربية وتسميات دلالية وخط Noto Sans Arabic المرخص، وتدعم الاتجاه الصحيح والوضعين الفاتح والداكن والنص المكبر. تشمل اختبارات widgets عرضًا قدره 320 بكسل، وتكبير النص إلى 200%، وحالات انقطاع واستجابة متأخرة وحفظ جزئي. لم يثبت بذلك نجاح قارئ شاشة على هاتف فعلي؛ VoiceOver وTalkBack ما زالا ضمن قبول الأجهزة.
+
+يوجد دليل تاريخي لبناء APK غير موقع لتجربة الأرشيف على مصدر أقدم، وتجارب تجميع iOS منفصلة. لا تنقل نتائجها إلى النسخة المجمعة الحالية تلقائيًا. تقارير `VERIFICATION.md` و`IDENTITY_VERIFICATION.md` تسجل إصداراتها وتواريخها، وليست وصفًا حيًا لاكتمال جميع المنصات.
+
+المتبقي للإنتاج يشمل النقل المشفر بين جهازين، والدفع، والبريد وHTTPS، والحفظ الآمن الدائم للجلسات والمفاتيح، ورفع أدلة البلاغات ومراجعتها، ومكتبة المحتوى الكاملة، وقبول الأجهزة والمتاجر. يحدد [سجل حالة المشروع](../../docs/STATUS.md) نتائج النسخة الموحدة وحدودها.

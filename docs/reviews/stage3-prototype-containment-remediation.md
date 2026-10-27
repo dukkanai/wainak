@@ -1,5 +1,7 @@
 # Prototype packaging containment remediation — stage 3
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 ## Scope and status
 
 This separate local branch is based on

@@ -1,5 +1,7 @@
 # Phase 2 Flutter auth — independent QA plan
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Date:2026-10-24. **NOT RUN; mobile source/commit pending.**
 Backend reference is93dd42f2141d551e86ec55861bc66802be247bef, not a production
 service. Backend103/57 and web mocked-Node4 results do not certify a new Flutter

@@ -1,5 +1,7 @@
 # Stage5: native-stage lifetime and resource receipts (local candidate)
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Base: eacbcf13c0061253bc9366d1b4b1221dfe591eae. This is a local repair candidate,
 not permission to publish or start another cloud job.
 

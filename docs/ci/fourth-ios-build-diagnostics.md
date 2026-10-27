@@ -1,5 +1,7 @@
 # Fourth iOS attempt: bounded diagnostics across the native recipe
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Build `6addcee34a72334e32e4f476` on exact source
 `493e7c027d66e66c6bac388313b2753d1e4e11f8` failed on 2026-10-25 at
 09:46:57 UTC. The recorded native stage was `unmodified-upstream-apple-bind`,

@@ -1,5 +1,7 @@
 # Native symbol reader selection — stage 4
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 ## Scope and status
 
 This isolated change is based on stage 1 commit

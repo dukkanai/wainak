@@ -1,5 +1,7 @@
 # Additive deletion slice — sandbox only
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](STATUS.md).
+
 Baseline `dee6ec30085e3b3e2a12ea25c912967f27f1dcd7` remains independently
 testable. Baseline QA `c3e1b62063e0fcb1b3b809196682db205550fc0a` does not
 automatically approve this addition. No main merge, public hosting, SMTP,

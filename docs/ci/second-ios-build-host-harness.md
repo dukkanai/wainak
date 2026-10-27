@@ -1,5 +1,7 @@
 # Second iOS CI attempt: host-harness correction, not an iOS success
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 ## Observed cloud result
 
 The second manually authorized Codemagic run, `6add93a54a72334e32e4e9eb`, tested

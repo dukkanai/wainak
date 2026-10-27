@@ -1,5 +1,7 @@
 # One cloud logical-space experiment
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 Base: `1377a9a142abc1532199f76831e568c7a425d9b8`.
 This branch prepares a specifically approved **40 GiB logical workspace limit**
 for one separately authorized, manually launched cloud experiment. It does not

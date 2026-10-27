@@ -1,5 +1,7 @@
 # Third iOS CI attempt: preserve the source-relative ABI test
 
+> سجل تاريخي لنسخة محددة: النتائج والحدود أدناه تصف وقت إعداد هذا التقرير، ولا تمثل تلقائيًا النسخة الحالية. المرجع الحالي: [حالة المشروع](../STATUS.md).
+
 ## Observed failure
 
 Codemagic build `6adda3ad4a72334e32e4ec63`, commit
