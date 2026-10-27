@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-10-27",
-  "state": "prepared_not_executed",
+  "state": "filesystem_cleanup_complete",
   "scope": "/home/chatbot/wainak-dev",
   "preconditions": [
     "Unified source passed required checks and is retained in Git.",
@@ -314,5 +314,7 @@
     "/home/chatbot/wainak-dev/node-tools-phase2-20261024/node-v24.19.0-linux-x64.tar.xz",
     "/home/chatbot/wainak-dev/node-tools-phase2-20261024/npm-cache",
     "/home/chatbot/wainak-dev/node-tools-phase2-20261024/provenance.json"
-  ]
+  ],
+  "result": "cleanup-result-20261027.json",
+  "acceptance": "unification-ci-20261027.json"
 }

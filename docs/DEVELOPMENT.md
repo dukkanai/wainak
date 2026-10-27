@@ -17,7 +17,7 @@
 
 تستخدم الاختبارات Python 3.14، وNode 24 للنموذج، وFlutter الموافق لملفات التثبيت الحالية. تثبت حزم Python من `backend/requirements-identity.lock` و`backend/requirements-postgres.txt` مع البصمات، وحزم JavaScript من `prototype/package-lock.json`، وحزم Flutter من `apps/mobile/pubspec.lock`، وGo من ملفات `go.mod` و`go.sum`.
 
-نسخة Go المطلوبة حاليًا 1.27.3. لا يفترض اختبار Go أن تنزيل toolchain أحدث مقبول ضمنيًا؛ استخدم الأداة المحددة و`GOTOOLCHAIN=local`. نسخ Apple وFlutter الخاصة ببناء iOS مصدرها `ci/ios-host-pins.json`؛ لا تنقل قبول SDK أو artifact قديم إلى نسخة أخرى دون تحقق.
+نسخة Go المطلوبة حاليًا 1.27.3. تتطلب اختبارات كاشف السباقات مترجم C مثل GCC ومكتبات تطوير libc؛ توفرها بيئة Ubuntu المستخدمة في CI. لا يفترض اختبار Go أن تنزيل toolchain أحدث مقبول ضمنيًا؛ استخدم الأداة المحددة و`GOTOOLCHAIN=local`. نسخ Apple وFlutter الخاصة ببناء iOS مصدرها `ci/ios-host-pins.json`؛ لا تنقل قبول SDK أو artifact قديم إلى نسخة أخرى دون تحقق.
 
 تشغل الاختبارات محليًا بتوازٍ محدود، وFlutter بـ`--concurrency=1`. حساب CI المستضاف مستقل عن السيرفر ولا يستعمل أسراره. تجهز صور Docker والتبعيات المطلوبة قبل الاختبار؛ مشغلات PostgreSQL المعزولة لا تقبل قاعدة أو DSN إنتاجيًا.
 
