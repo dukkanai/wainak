@@ -1,0 +1,31 @@
+{
+  "archive_core_commit": "8155772cf0a006078be433f45353c651d9ffe451",
+  "files": {
+    "archive/archive.go": "20ed943c8e8a4c4c8f1b3c19c422c3530678302b408884c8c311b71efa0d639e",
+    "archive/archive_test.go": "ec0aa6352375e556b411ff0bfcc33c27acf8d90f7ae9877fbdc33fb42d51ead0",
+    "archive/go.mod": "c3bd446633baa66cb706bc4206d47f98d8577711902fd589deabe60827dec765",
+    "archive/go.sum": "34888e0441f33af3f157560938b3ed164e13b70f112e59115d53d8d84f806ad7",
+    "archive/interop_test.go": "739831ea30f84e2b3119f7a4314f0a3a3c073ae84e39e2ae63e7dafd77cd10d5",
+    "archive/notices/Go-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "archive/notices/c2sp.org_CCTV_age@v0.0.0-20260829155415-4448f2097b2d-README.md": "fdbd4b06044f3803c72bdaf2df7681fdce3a45a326a2898e75640eae906606ad",
+    "archive/notices/filippo.io_age@v1.3.2-LICENSE": "c5d65279d02955c0fc2294ae417c3add650d228f4f5c82bd6d531fc26c89cd96",
+    "archive/notices/filippo.io_edwards25519@v1.2.0-LICENSE": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+    "archive/notices/filippo.io_hpke@v0.4.0-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "archive/notices/filippo.io_nistec@v0.0.4-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "archive/notices/github.com_rogpeppe_go-internal@v1.16.0-LICENSE": "4835612df0098ca95f8e7d9e3bffcb02358d435dbb38057c844c99d7f725eb20",
+    "archive/notices/golang.org_x_crypto@v0.55.0-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "archive/notices/golang.org_x_net@v0.57.0-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "archive/notices/golang.org_x_sys@v0.47.0-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "archive/notices/golang.org_x_term@v0.45.0-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "archive/notices/golang.org_x_text@v0.41.0-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "archive/notices/golang.org_x_tools@v0.49.0-LICENSE": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+    "archivebridge/bridge.go": "3cf7dcf2f25454bcf3c16dd3a6189382babcb93fe7fb2913a60383aeb48df415",
+    "archivebridge/bridge_test.go": "c58856dcf372791b03553924111ae9c403afb0501ceacf3bc230a6ffafdc52a1",
+    "archivebridge/go.mod": "d72492892242c09e058a9db79edf24a504c642e909c866d20b6389ba1a2070ca",
+    "archivebridge/go.sum": "0cd5a4ea7bd6848ddb2855e1bd666257bb281cc122c4f90047da02ff995360b3"
+  },
+  "mobile_base_commit": "120a0c24970427438af7c693e772b95050b3fcfc",
+  "schema": 1,
+  "scope": "22 unchanged public source/test/module/notice files; no binaries, history, old host-specific runners or credentials",
+  "source_commit": "5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff"
+}

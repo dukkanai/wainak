@@ -1,0 +1,429 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-10-27",
+  "purpose": "Historical evidence index before cleanup; not acceptance of the unified candidate. No raw logs, runtime state, credentials or report content are included.",
+  "source_root_label": "wainak-dev",
+  "receipt_entries": [
+    {
+      "source": "integration-evidence-20261024/b5f63ef0090be2513833a86e22c6c7032514c9f7/legacy-exact-results.json",
+      "bytes": 8509,
+      "sha256": "68e1f9e89de05fa38112a798487b93285dffbe54080d6f7a4565f8ef184f9950",
+      "passed": true,
+      "commit": "b5f63ef0090be2513833a86e22c6c7032514c9f7"
+    },
+    {
+      "source": "integration-evidence-20261024/b5f63ef0090be2513833a86e22c6c7032514c9f7/pre-main-safety-audit.json",
+      "bytes": 1164,
+      "sha256": "69fada6de109c610ff7ff2c1401c8b5fa62881c771d0b6fba9df5d2f3cfe4c34",
+      "candidate": "b5f63ef0090be2513833a86e22c6c7032514c9f7"
+    },
+    {
+      "source": "integration-evidence-20261024/b5f63ef0090be2513833a86e22c6c7032514c9f7/source-manifest.json",
+      "bytes": 59470,
+      "sha256": "7c866b1f7ce3addc39da71c82790bc80e7071b5eaa962681e946d1ff5192c4e3",
+      "commit": "b5f63ef0090be2513833a86e22c6c7032514c9f7"
+    },
+    {
+      "source": "integration-evidence-20261024/e27677a8ca0665a842359f3a23488ab18bb119f5/source-manifest.json",
+      "bytes": 59422,
+      "sha256": "67c6ac64c758c8eb8f4b887da9fc9bf5a19b5cc629a4a8e9bc6b916101ca0543",
+      "commit": "e27677a8ca0665a842359f3a23488ab18bb119f5"
+    },
+    {
+      "source": "integration-phase3-evidence-20261024/5f3433b23d8a29999c24943414ff1fdbcc40f46d/backend-source-manifest.json",
+      "bytes": 60126,
+      "sha256": "c310f438f0b556f12f9cf9a8a296f29a5f1c7450b5baea9c07aba30a18241a0a",
+      "commit": "3bc638f8884cc9d8da586d649f96c34a53476e1b"
+    },
+    {
+      "source": "integration-phase3-evidence-20261024/5f3433b23d8a29999c24943414ff1fdbcc40f46d/combined-source-manifest.json",
+      "bytes": 63667,
+      "sha256": "3fab8b0b6e8044a2ee3f89f5619fe1a7b4ac249ef300fc43a9dc7de5e929bc49",
+      "commit": "5f3433b23d8a29999c24943414ff1fdbcc40f46d"
+    },
+    {
+      "source": "integration-phase3-evidence-20261024/5f3433b23d8a29999c24943414ff1fdbcc40f46d/mobile-source-manifest.json",
+      "bytes": 61178,
+      "sha256": "bada92970471148272d0112dc1818940cabc485d34de84423afade9e3b4b1cb4",
+      "commit": "a271d98e47c63931bd3d43cf2404e0ae0d67ca39"
+    },
+    {
+      "source": "integration-phase3-evidence-20261024/5f3433b23d8a29999c24943414ff1fdbcc40f46d/qa-source-manifest.json",
+      "bytes": 61159,
+      "sha256": "dcd1d95af92c034c406228d3f5a7793c5ff253ec01c9cb78f299639deea05dc4",
+      "commit": "a3220cfd68c8a4224e93f287961ff2716aa0cfed"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/build-20261025T011256Z-9419fed7/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/build-20261025T013406Z-78c967d2/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/build-20261025T013406Z-78c967d2/result.json",
+      "bytes": 1620,
+      "sha256": "abc6448ce71f187bba435c4a3c7fe530adb53eddabe5f72d88fe3b43c40fcee3",
+      "head": "120a0c24970427438af7c693e772b95050b3fcfc"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/buildscript-20261025T011104Z-d55ba045/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/buildscript-20261025T011104Z-d55ba045/result.json",
+      "bytes": 1237,
+      "sha256": "0573c60b2ddefbb6dfc621ccc957873915922eb18552bf32d484534f9531a413",
+      "head": "120a0c24970427438af7c693e772b95050b3fcfc"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/dependencies-20261025T010640Z-6e6af45f/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/dependencies-20261025T010640Z-6e6af45f/result.json",
+      "bytes": 3839,
+      "sha256": "2a69499992aa5557bfa4ea18397e27d50fcfc69a5f9d26ac445cfaa8533e9912",
+      "head": "c74b972c9252145f315dc6c934872322be1f2d8e"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/plan-20261025T005127Z-bfb4edd4/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/plan-20261025T005530Z-5bec84d0/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/plan-20261025T005752Z-0ca09ff5/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/plan-20261025T010330Z-8b7db42f/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/plan-20261025T010552Z-ae292e00/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/plan-20261025T010953Z-4463918f/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/plan-20261025T010953Z-4463918f/result.json",
+      "bytes": 1622,
+      "sha256": "f4f6eedca3996f3891bae2395537303e2b038468c7b7a7896f839553af361cbb",
+      "head": "120a0c24970427438af7c693e772b95050b3fcfc"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/report-20261025T014154Z-3409cd02/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/report-20261025T014817Z-634d3a5a/plugin-source-manifest.json",
+      "bytes": 8436,
+      "sha256": "aadc8a7c4375ffc25514d102d8c759a43e362f0652984396ae17c1150d52f7c7"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/apk-builds/report-20261025T014817Z-634d3a5a/result.json",
+      "bytes": 1422,
+      "sha256": "877f8c238af96817044d4ae4b71384ec2109b31fd026d80ed15f0eecff2cc317",
+      "head": "120a0c24970427438af7c693e772b95050b3fcfc"
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/identity-stage2-widgets-20261026T0814/result.json",
+      "bytes": 7032,
+      "sha256": "b22adf32afa4220229afe140d15280608bc990b980348fcff953670d73e7d976",
+      "source_unchanged": true,
+      "status": "PASS"
+    },
+    {
+      "source": "phase3-integration-qa-evidence/5f3433b23d8a29999c24943414ff1fdbcc40f46d/backend-result.json",
+      "bytes": 2313,
+      "sha256": "f54848e305c3c14d4ac3e1ef470efd87460545fe56d8c88107f24953bda62379",
+      "passed": true,
+      "cleanup_equal": true,
+      "commit": "5f3433b23d8a29999c24943414ff1fdbcc40f46d"
+    },
+    {
+      "source": "phase3-integration-qa-evidence/5f3433b23d8a29999c24943414ff1fdbcc40f46d/final-audit.json",
+      "bytes": 2713,
+      "sha256": "3939a36c2f5a0b8a1edd39d8f4dd489df11447dbc5e6d5765c5100ef91038ec9",
+      "commit": "5f3433b23d8a29999c24943414ff1fdbcc40f46d"
+    },
+    {
+      "source": "phase3-integration-qa-evidence/5f3433b23d8a29999c24943414ff1fdbcc40f46d/mobile-result.json",
+      "bytes": 3533,
+      "sha256": "969e7e2a33652ebde57cb99347f3446e1e3c71ec7c79ab137375950b240d7738",
+      "passed": true,
+      "cleanup_equal": true,
+      "commit": "5f3433b23d8a29999c24943414ff1fdbcc40f46d"
+    },
+    {
+      "source": "phase3-integration-qa-evidence/5f3433b23d8a29999c24943414ff1fdbcc40f46d/source-manifest.json",
+      "bytes": 29711,
+      "sha256": "aab61b91e26b1df2bf607872029a185d03ae0fb7d364c59baede0f5f0f03a692"
+    },
+    {
+      "source": "phase3-qa-evidence/68e06c8f256737c2dd093904fbb61631a9f46048/mobile-cold-result.json",
+      "bytes": 1351,
+      "sha256": "55b597a2b90a08499fae9b4ad335f8b850abdca6dca46b1c095b5ada4be17b0c",
+      "passed": true,
+      "commit": "68e06c8f256737c2dd093904fbb61631a9f46048"
+    },
+    {
+      "source": "phase3-qa-evidence/68e06c8f256737c2dd093904fbb61631a9f46048/mobile-live-result.json",
+      "bytes": 935,
+      "sha256": "fd142ac76cb6b98e84818fa587e09490e6f4a78a8cdcc99a29bd7e32f92977dd",
+      "passed": false,
+      "backend_commit": "3bc638f8884cc9d8da586d649f96c34a53476e1b",
+      "mobile_commit": "68e06c8f256737c2dd093904fbb61631a9f46048"
+    },
+    {
+      "source": "phase3-qa-evidence/68e06c8f256737c2dd093904fbb61631a9f46048/mobile-source-manifest.json",
+      "bytes": 14536,
+      "sha256": "dd238804ca5f83d3c3d2bac7c7573349b5789a7dbd9c2c5811d7f83418c4314e"
+    },
+    {
+      "source": "phase3-qa-evidence/a271d98e47c63931bd3d43cf2404e0ae0d67ca39/final-audit.json",
+      "bytes": 746,
+      "sha256": "fb660055d83fd4784c1f6ffae3356614f72604d70df749a5b48cf01af6a846c3"
+    },
+    {
+      "source": "phase3-qa-evidence/a271d98e47c63931bd3d43cf2404e0ae0d67ca39/final-cold-live-result.json",
+      "bytes": 1986,
+      "sha256": "d9d92b70be24428c31c02818bd8085da7009020ffa993a43510a679f62722f80",
+      "passed": true,
+      "backend_commit": "3bc638f8884cc9d8da586d649f96c34a53476e1b",
+      "mobile_commit": "a271d98e47c63931bd3d43cf2404e0ae0d67ca39"
+    },
+    {
+      "source": "phase3-qa-evidence/a271d98e47c63931bd3d43cf2404e0ae0d67ca39/source-manifest.json",
+      "bytes": 14536,
+      "sha256": "4fc57aefdc84fa595965cd58369cc7664be0e6fae1e1a8f8bea955ce561919ff"
+    },
+    {
+      "source": "phase4-qa-evidence/acbc72a78074bf3be3628dc8dff10a54c9dcecde/final-audit.json",
+      "bytes": 1558,
+      "sha256": "9b9fc5b2096d7b08c5edb90fdbacaada00b1bcc3fb0e5477d81dd434d89158e8",
+      "candidate": "acbc72a78074bf3be3628dc8dff10a54c9dcecde"
+    },
+    {
+      "source": "phase4-qa-evidence/acbc72a78074bf3be3628dc8dff10a54c9dcecde/result.json",
+      "bytes": 2878,
+      "sha256": "c6046bc056053c65bcbcec2ebb69a44c47dfa84cd2243211d2ea0f2a69b54d9c",
+      "passed": true,
+      "cleanup_equal": true,
+      "tracked_files": 266,
+      "candidate": "acbc72a78074bf3be3628dc8dff10a54c9dcecde"
+    },
+    {
+      "source": "phase4-qa-evidence/acbc72a78074bf3be3628dc8dff10a54c9dcecde/source-manifest.json",
+      "bytes": 30519,
+      "sha256": "654090803ac5d8318d5ac16eb5f839d448d91909e00b7c627628a07fbce1c75f"
+    },
+    {
+      "source": "phase5-qa-evidence/8155772cf0a006078be433f45353c651d9ffe451/candidate-results.json",
+      "bytes": 597,
+      "sha256": "0b128882d560d3417666a520ba2dd3f80df010ea3db3460f44c471a29fe9d34a",
+      "source_unchanged": true,
+      "tracked_files": 283,
+      "commit": "8155772cf0a006078be433f45353c651d9ffe451"
+    },
+    {
+      "source": "phase5-qa-evidence/8155772cf0a006078be433f45353c651d9ffe451/final-audit.json",
+      "bytes": 1850,
+      "sha256": "59808d77c8b3b20490c4178e10105656d5a3813c47f5ba2db2354ef616ecc317",
+      "candidate": "8155772cf0a006078be433f45353c651d9ffe451"
+    },
+    {
+      "source": "phase5-qa-evidence/8155772cf0a006078be433f45353c651d9ffe451/final-security-results.json",
+      "bytes": 2084,
+      "sha256": "21dca42d030d7461e6893916651e3ca6729064b2b966d00705d3323866b373e5",
+      "candidate": "8155772cf0a006078be433f45353c651d9ffe451",
+      "status": "PASS_WITH_DISCLOSED_ADVISORIES"
+    },
+    {
+      "source": "phase5-qa-evidence/8155772cf0a006078be433f45353c651d9ffe451/independent-results.json",
+      "bytes": 17055,
+      "sha256": "6fde4518face6e049bb0c259851632c0357c81afa27ede204fd31cea3ee86590",
+      "candidate": "8155772cf0a006078be433f45353c651d9ffe451",
+      "qa_head": "47c10d7b6d8095b117794631c64ea00a07529363",
+      "status": "PASS"
+    },
+    {
+      "source": "phase5-qa-evidence/8155772cf0a006078be433f45353c651d9ffe451/source-manifest.json",
+      "bytes": 32368,
+      "sha256": "ee778445cc7886910d209272ae67ae7a07fc9965357867aa27eb19bd07403b16"
+    },
+    {
+      "source": "phase6-mobile-qa-evidence/eb8d521157597ac114ba905c699ad7ad68185b43/final-audit.json",
+      "bytes": 596,
+      "sha256": "0247fa7b834470ee1e6020a3760339026f50b0d15d5ad40d39e8de4cb7144e90",
+      "source_files": 270,
+      "candidate": "eb8d521157597ac114ba905c699ad7ad68185b43",
+      "status": "PASS"
+    },
+    {
+      "source": "phase6-mobile-qa-evidence/eb8d521157597ac114ba905c699ad7ad68185b43/results.json",
+      "bytes": 2387,
+      "sha256": "6331d99b26d76312568e1e91ad3bb25d43348dc39ff756f586024e4c24a3044c",
+      "source_files": 270,
+      "candidate": "eb8d521157597ac114ba905c699ad7ad68185b43",
+      "qa_head": "0dc2a61a6c964e9adda3ad50710ab9a90e194234",
+      "status": "PASS"
+    },
+    {
+      "source": "phase6-mobile-qa-evidence/eb8d521157597ac114ba905c699ad7ad68185b43/source-manifest.json",
+      "bytes": 31253,
+      "sha256": "729aaaa8476f58faf671e8fc08353485891208d7bbb90e947bf536e9426511f9"
+    },
+    {
+      "source": "phase6-qa-evidence/5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff/final/candidate-source-manifest.json",
+      "bytes": 33052,
+      "sha256": "a1a8cfdbfd49eecf38be166d95be6f6de8c41fd1ea160116032c18eb8fb5b20f"
+    },
+    {
+      "source": "phase6-qa-evidence/5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff/final/final-audit.json",
+      "bytes": 2229,
+      "sha256": "dd7aa785c62ea51740b72bb2afa4b0f2374a5d3981ae80ac8b35484d2957b7f1",
+      "candidate": "5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff",
+      "status": "PASS"
+    },
+    {
+      "source": "phase6-qa-evidence/5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff/final/independent-bridge-results.json",
+      "bytes": 3352,
+      "sha256": "f53639cccb56e36ba74e9ab0e7c2a3331a8543eaa6c0197ed7b33a3497317a6f",
+      "source_files": 290,
+      "candidate": "5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff",
+      "qa_head": "4e63016cdd540e89f83a5816a93fd12fd9df7f01",
+      "status": "PASS"
+    },
+    {
+      "source": "phase6-qa-evidence/5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff/final/qa-source-manifest.json",
+      "bytes": 33740,
+      "sha256": "4480d4b1febc8d41f203982f963261c97d28bd1c5c1f973079814f82cef1fcd0"
+    },
+    {
+      "source": "phase6-qa-evidence/5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff/final/security-summary.json",
+      "bytes": 1123,
+      "sha256": "fef2fccbe13bf60f2b140d129a5c435b041ac345b32c77c0805674a23f8c2bd8",
+      "candidate": "5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff"
+    },
+    {
+      "source": "phase6-qa-evidence/5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff/host-test-results.json",
+      "bytes": 19620,
+      "sha256": "6351f5e0a468aa9f486f9e25b20adcc2ee275bf96454cbf592629f619fb180ad",
+      "candidate": "5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff",
+      "status": "INCOMPLETE"
+    },
+    {
+      "source": "phase6-qa-evidence/5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff/independent-bridge-results.json",
+      "bytes": 2839,
+      "sha256": "b75c29dd23d844647bd32b4c18c8ef1b26827fbf054894c24fb92207b3fefe80",
+      "candidate": "5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff",
+      "qa_head": "97bf1da2920be1e6c552cb6e9240b403dcb4dc6e",
+      "status": "FAIL"
+    }
+  ],
+  "preserved_artifacts": [
+    {
+      "file": "artifacts/android-unsigned-archive-probe.apk",
+      "bytes": 83305322,
+      "sha256": "ce504fa821a36da21b469cd52e305a6889462a4e959caea4a852370b483d9292",
+      "historical_only": true
+    },
+    {
+      "file": "artifacts/android-archivebridge-reference.aar",
+      "bytes": 3038256,
+      "sha256": "05a6410ff782676cb656e801c03c16af86ae0175dd7e813ea7be3a8ed4f8d95a",
+      "historical_only": true
+    }
+  ],
+  "preserved_source_overlays": [
+    {
+      "file": "untracked-source/mobile-native-build-phase6/apps/mobile/android/gradle/verification-metadata.xml",
+      "bytes": 257618,
+      "sha256": "51b08d6ccac86d53574a78e3384a660f189950fb66c397264b59e1cab6a4c00c"
+    },
+    {
+      "file": "untracked-source/qa-integration-b5f63ef/apps/mobile/test/qa_identity_eligibility_test.dart",
+      "bytes": 2568,
+      "sha256": "55e2eccecf00a220dde4154e27c216f3a4a0eac1f1e25cca75faf39d08f007d1"
+    },
+    {
+      "file": "untracked-source/qa-integration-b5f63ef/apps/mobile/test/qa_legacy_live_widget_test.dart",
+      "bytes": 9332,
+      "sha256": "ac8cbe2dbee9d9f396835bcafa75eb2856d48ca1a64a7d766ac322eb46caaa71"
+    },
+    {
+      "file": "untracked-source/qa-mobile-863b4d5/apps/mobile/test/qa_busy_keyboard_test.dart",
+      "bytes": 2592,
+      "sha256": "4a04edf98bd5d4e13a91d25af226ae52e6b1d4cd5efedad48376292034bb08b6"
+    },
+    {
+      "file": "untracked-source/qa-mobile-863b4d5/apps/mobile/test/qa_live_postgres_test.dart",
+      "bytes": 9332,
+      "sha256": "ac8cbe2dbee9d9f396835bcafa75eb2856d48ca1a64a7d766ac322eb46caaa71"
+    },
+    {
+      "file": "untracked-source/qa-mobile-efd0421/apps/mobile/test/qa_busy_keyboard_test.dart",
+      "bytes": 2592,
+      "sha256": "4a04edf98bd5d4e13a91d25af226ae52e6b1d4cd5efedad48376292034bb08b6"
+    },
+    {
+      "file": "untracked-source/qa-mobile-efd0421/apps/mobile/test/qa_live_postgres_test.dart",
+      "bytes": 9332,
+      "sha256": "ac8cbe2dbee9d9f396835bcafa75eb2856d48ca1a64a7d766ac322eb46caaa71"
+    },
+    {
+      "file": "untracked-source/qa-mobile-matching-68e06c8/qa/phase3_matching/matching_race_probe.dart",
+      "bytes": 7428,
+      "sha256": "1de4c4259a5e36fc4e19a586a050ebfb654f6a6e4b81be461baf7e65ebb6e1de"
+    },
+    {
+      "file": "untracked-source/qa-mobile-matching-a271d98/qa/phase3_matching/matching_race_probe.dart",
+      "bytes": 7428,
+      "sha256": "1de4c4259a5e36fc4e19a586a050ebfb654f6a6e4b81be461baf7e65ebb6e1de"
+    }
+  ],
+  "preserved_tool_provenance": [
+    {
+      "source": "archive-tools-phase5-20261024/installation.json",
+      "bytes": 535,
+      "sha256": "1b755f7bae12def3392da13eef237f9c310cf5dfb51ca0ac930b455f79211a8b",
+      "preserved_private": true
+    },
+    {
+      "source": "archive-tools-phase5-20261024/toolchain-provenance.json",
+      "bytes": 691,
+      "sha256": "321de493012e7218a5b49448a463241811216d9d854ed05fe4e18cf4254e0ec1",
+      "preserved_private": true
+    },
+    {
+      "source": "node-tools-phase2-20261024/provenance.json",
+      "bytes": 855,
+      "sha256": "0fcbe8ed4d8ffded5b2d8264d332756edd7444f0c190234a07fcd29e6db410d4",
+      "preserved_private": true
+    },
+    {
+      "source": "native-archive-tools-phase6-20261024/bootstrap-manifest.json",
+      "bytes": 309,
+      "sha256": "cd53165a056da992bb77b6122df6c21372c39ada514d7aa4d82089efdf58b9d2",
+      "preserved_private": true
+    }
+  ]
+}

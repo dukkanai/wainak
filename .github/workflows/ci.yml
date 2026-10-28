@@ -28,7 +28,7 @@ jobs:
       - name: Check published file boundaries and known secret patterns
         run: python3 scripts/check_publication.py
       - name: Check Python syntax
-        run: python3 -m compileall -q ops scripts prototype/package_preview.py
+        run: python3 -m compileall -q ops scripts backend contracts qa ci prototype/package_preview.py
       - name: Check JavaScript syntax
         run: node --check prototype/dist/app.js
 
@@ -44,6 +44,8 @@ jobs:
         with:
           python-version: '3.14'
       - run: python3 -m unittest discover -s ops -p test_manage.py -v
+      - name: Prototype packaging containment regressions
+        run: python3 -m unittest discover -s prototype -p test_package_preview.py -v
 
   recovery:
     name: Isolated database recovery
@@ -81,3 +83,113 @@ jobs:
           WAINAK_PREVIEW_URL: file://${{ github.workspace }}/prototype/releases/wainak-preview.html
           WAINAK_CHROME: /usr/bin/google-chrome
         run: npm test
+
+  backend:
+    name: Backend contracts and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Backend unit, API and fixture controls
+        run: PYTHONPATH=backend python3 -m unittest discover -s backend/tests -v
+      - name: Independent domain and runner controls
+        run: |
+          PYTHONPATH=backend python3 -m unittest discover -s qa/phase1 -p 'test_*.py' -v
+          python3 -m unittest discover -s qa/phase3_matching -p test_matching_runner.py -v
+      - name: OpenAPI contract matches implementation
+        run: python3 contracts/build_contract.py --check
+      - name: Account deletion browser script controls
+        run: node --test backend/tests/test_web_deletion_script.mjs
+
+  matching:
+    name: Authenticated matching integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Install hashed identity test dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/identity-venv"
+          "$RUNNER_TEMP/identity-venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir --only-binary=:all: --no-deps --require-hashes --index-url https://pypi.org/simple -r backend/requirements-identity.lock
+      - name: Acquire exact disposable database image
+        run: docker pull postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
+      - name: Test exact checked-out commit with independent regressions
+        run: >-
+          "$RUNNER_TEMP/identity-venv/bin/python" qa/phase3_matching/run_matching_independent.py
+          --backend-root "$GITHUB_WORKSPACE" --expected-backend-commit "$(git rev-parse HEAD)"
+          --run-disposable-identity --include-existing-qa
+
+  mobile:
+    name: Flutter development tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Install hashed identity test dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/identity-venv"
+          "$RUNNER_TEMP/identity-venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir --only-binary=:all: --no-deps --require-hashes --index-url https://pypi.org/simple -r backend/requirements-identity.lock
+      - name: Acquire exact disposable database image
+        run: docker pull postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
+      - name: Bootstrap pinned official Flutter SDK
+        run: python3 scripts/bootstrap_flutter.py --tools-root "$RUNNER_TEMP/flutter-tools"
+      - name: Analyze and run host, opt-in and live HTTP gates
+        run: >-
+          python3 scripts/run_flutter_ci.py --tools-root "$RUNNER_TEMP/flutter-tools"
+          --identity-python "$RUNNER_TEMP/identity-venv/bin/python"
+
+  archive:
+    name: Archive and bridge tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Host tests, CLI interoperability, independent QA and race detector
+        run: python3 scripts/run_go_checks.py
+      - name: Dependency locks remain unchanged
+        run: git diff --exit-code -- archive/go.mod archive/go.sum archivebridge/go.mod archivebridge/go.sum qa/phase5_archive/go.mod qa/phase5_archive/go.sum
+
+  native-guards:
+    name: Native build guard tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: CI result validator negative controls
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+      - name: Configuration and native source consistency
+        run: |
+          python3 ci/check_preparation.py
+          python3 ci/native/build.py --check
+          python3 ci/ios/build.py --check
+      - name: Build lifecycle, resource and artifact guards
+        run: |
+          python3 -m unittest discover -s ci/tests -p 'test_*.py' -v
+          python3 -m unittest discover -s ci/native -p 'test_*.py' -v
+          python3 -m unittest discover -s qa/phase6_native_build -p 'test_*.py' -v

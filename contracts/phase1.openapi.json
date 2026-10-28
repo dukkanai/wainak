@@ -1,0 +1,1836 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Wainak phase-one synthetic development contract",
+    "version": "0.1.0-dev",
+    "description": "NOT PRODUCTION. Loopback only; default volatile memory, optional marked disposable PostgreSQL repository; synthetic @example.invalid accounts; no real email, authentication, payments, chat transport, medical data, moderation team, evidence upload, or production deletion pipeline. Current permissions override stale UI state. Unknown fields are rejected. JSON body limit: 16384 bytes. The only query parameter is the exact cursor on GET /v1/relationships; other queries and browser Origin headers are rejected."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8089",
+      "description": "Manual loopback-only preview, never auto-started"
+    }
+  ],
+  "security": [
+    {
+      "developmentBearer": []
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "development_health",
+        "summary": "development health",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/dev/accounts": {
+      "post": {
+        "operationId": "create_synthetic_account",
+        "summary": "create synthetic account",
+        "responses": {
+          "201": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Registration"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Register"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/dev/verify-email": {
+      "post": {
+        "operationId": "simulate_email_verification",
+        "summary": "simulate email verification",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifySimulation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "operationId": "get_own_account",
+        "summary": "get own account",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete_own_synthetic_account",
+        "summary": "delete own synthetic account",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deleted"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Delete"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/profile": {
+      "put": {
+        "operationId": "replace_own_profile",
+        "summary": "replace own profile",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Profile"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/preferences": {
+      "put": {
+        "operationId": "replace_own_preferences",
+        "summary": "replace own preferences",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Preferences"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/assessment": {
+      "get": {
+        "operationId": "get_own_assessment",
+        "summary": "get own assessment",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Assessment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/assessment/answers": {
+      "post": {
+        "operationId": "answer_current_assessment_question",
+        "summary": "answer current assessment question",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Assessment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Answer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/candidates": {
+      "get": {
+        "operationId": "list_mutually_eligible_candidates",
+        "summary": "list mutually eligible candidates",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Candidates"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/candidates/{candidate_id}": {
+      "get": {
+        "operationId": "get_allowed_candidate_projection",
+        "summary": "get allowed candidate projection",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Candidate"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^usr_[0-9a-f]{32}$"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/relationships": {
+      "get": {
+        "operationId": "list_own_relationships",
+        "summary": "list own relationships",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relationships"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^rel_[0-9a-f]{32}$"
+            },
+            "description": "Exact next_cursor from the previous page. At most 20 own relationships per page, ordered by ID. Refresh from the first page to see new IDs preceding the cursor; this is not a snapshot across requests."
+          }
+        ]
+      },
+      "post": {
+        "operationId": "request_card_only_relationship",
+        "summary": "request card only relationship",
+        "responses": {
+          "201": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relationship"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelationshipRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{8,64}$"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/relationships/{relationship_id}": {
+      "get": {
+        "operationId": "get_own_relationship",
+        "summary": "get own relationship",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relationship"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "relationship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rel_[0-9a-f]{32}$"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/relationships/{relationship_id}/respond": {
+      "post": {
+        "operationId": "recipient_respond_to_request",
+        "summary": "recipient respond to request",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relationship"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "relationship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rel_[0-9a-f]{32}$"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/relationships/{relationship_id}/cancel": {
+      "post": {
+        "operationId": "initiator_cancel_pending_request",
+        "summary": "initiator cancel pending request",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relationship"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empty"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "relationship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rel_[0-9a-f]{32}$"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/dev/relationships/{relationship_id}/activate": {
+      "post": {
+        "operationId": "simulate_initiator_entitlement",
+        "summary": "simulate initiator entitlement",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relationship"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationSimulation"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "relationship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rel_[0-9a-f]{32}$"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/relationships/{relationship_id}/exclusive/request": {
+      "post": {
+        "operationId": "request_exclusivity",
+        "summary": "request exclusivity",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relationship"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Confirm"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "relationship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rel_[0-9a-f]{32}$"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/relationships/{relationship_id}/exclusive/respond": {
+      "post": {
+        "operationId": "respond_to_exclusivity",
+        "summary": "respond to exclusivity",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relationship"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "relationship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rel_[0-9a-f]{32}$"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/relationships/{relationship_id}/end": {
+      "post": {
+        "operationId": "end_relationship",
+        "summary": "end relationship",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relationship"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Confirm"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "relationship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rel_[0-9a-f]{32}$"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/relationships/{relationship_id}/cards": {
+      "get": {
+        "operationId": "read_sample_library_cards_without_answers",
+        "summary": "read sample library cards without answers",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cards"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "relationship_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rel_[0-9a-f]{32}$"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/blocks": {
+      "post": {
+        "operationId": "block_account_without_payment",
+        "summary": "block account without payment",
+        "responses": {
+          "200": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Blocked"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Block"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reports": {
+      "post": {
+        "operationId": "record_metadata_only_development_report",
+        "summary": "record metadata only development report",
+        "responses": {
+          "201": {
+            "description": "Development result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Rejected input, authorization, transition, or internal error; do not treat as success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Report"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "developmentBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Ephemeral opaque development session. Not production authentication; invalidated at deletion or process exit."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Register": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": "string",
+            "pattern": "^[a-z0-9._-]{1,64}@example\\.invalid$",
+            "maxLength": 100
+          },
+          "birth_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "is_muslim": {
+            "type": "boolean",
+            "const": true
+          },
+          "terms_version": {
+            "type": "string",
+            "enum": [
+              "dev-2026-10-24"
+            ]
+          },
+          "privacy_version": {
+            "type": "string",
+            "enum": [
+              "dev-2026-10-24"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "birth_date",
+          "is_muslim",
+          "terms_version",
+          "privacy_version"
+        ]
+      },
+      "Profile": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gender": {
+            "type": "string",
+            "enum": [
+              "male",
+              "female"
+            ]
+          },
+          "country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "marital_status": {
+            "type": "string",
+            "enum": [
+              "single",
+              "married",
+              "divorced",
+              "widowed"
+            ]
+          },
+          "declared_wives": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4
+          },
+          "marriage_goal": {
+            "type": "string",
+            "enum": [
+              "build_family",
+              "companionship"
+            ]
+          },
+          "discoverable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "gender",
+          "country",
+          "marital_status",
+          "declared_wives",
+          "marriage_goal",
+          "discoverable"
+        ]
+      },
+      "Preferences": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "min_age": {
+            "type": "integer",
+            "minimum": 18,
+            "maximum": 120
+          },
+          "max_age": {
+            "type": "integer",
+            "minimum": 18,
+            "maximum": 120
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            },
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "marital_statuses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "single",
+                "married",
+                "divorced",
+                "widowed"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 4,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "min_age",
+          "max_age",
+          "countries",
+          "marital_statuses"
+        ]
+      },
+      "Account": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-f]{32}$"
+          },
+          "alias": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 18,
+            "maximum": 120
+          },
+          "dev_email_verified": {
+            "type": "boolean"
+          },
+          "consents": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "terms_version": {
+                "type": "string"
+              },
+              "privacy_version": {
+                "type": "string"
+              },
+              "accepted_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "terms_version",
+              "privacy_version",
+              "accepted_at"
+            ]
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Profile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Preferences"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "eligible_for_discovery": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "synthetic_development_only"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "alias",
+          "email",
+          "age",
+          "dev_email_verified",
+          "consents",
+          "profile",
+          "preferences",
+          "eligible_for_discovery",
+          "mode"
+        ]
+      },
+      "Registration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/Account"
+          },
+          "access_token": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "synthetic_development_only"
+            ]
+          }
+        },
+        "required": [
+          "account",
+          "access_token",
+          "token_type",
+          "mode"
+        ]
+      },
+      "Candidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-f]{32}$"
+          },
+          "alias": {
+            "type": "string"
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 18,
+            "maximum": 120
+          },
+          "country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "marital_status": {
+            "type": "string",
+            "enum": [
+              "single",
+              "married",
+              "divorced",
+              "widowed"
+            ]
+          },
+          "marriage_goal": {
+            "type": "string",
+            "enum": [
+              "build_family",
+              "companionship"
+            ]
+          },
+          "rating": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "insufficient_data"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "synthetic": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "id",
+          "alias",
+          "age",
+          "country",
+          "marital_status",
+          "marriage_goal",
+          "rating",
+          "synthetic"
+        ]
+      },
+      "Candidates": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "maxItems": 20
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "synthetic_development_only"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "mode"
+        ]
+      },
+      "Question": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "family_plan",
+              "parenting",
+              "life_priorities",
+              "communication"
+            ]
+          },
+          "prompt_ar": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "prompt_ar",
+          "options"
+        ]
+      },
+      "Assessment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "answers": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "family_plan": {
+                "type": "string",
+                "enum": [
+                  "children",
+                  "discuss_together",
+                  "prefer_not_to_say"
+                ]
+              },
+              "parenting": {
+                "type": "string",
+                "enum": [
+                  "shared_planning",
+                  "discuss_roles",
+                  "not_applicable"
+                ]
+              },
+              "life_priorities": {
+                "type": "string",
+                "enum": [
+                  "home",
+                  "work",
+                  "family",
+                  "prefer_not_to_say"
+                ]
+              },
+              "communication": {
+                "type": "string",
+                "enum": [
+                  "quiet_time",
+                  "listen_first",
+                  "scheduled_talk"
+                ]
+              }
+            }
+          },
+          "next_question": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Question"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "answered_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "disclaimer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "answers",
+          "next_question",
+          "answered_count",
+          "complete",
+          "disclaimer"
+        ]
+      },
+      "Answer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "question_id": {
+            "type": "string",
+            "enum": [
+              "family_plan",
+              "parenting",
+              "life_priorities",
+              "communication"
+            ]
+          },
+          "option_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "question_id",
+          "option_id"
+        ]
+      },
+      "Relationship": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rel_[0-9a-f]{32}$"
+          },
+          "initiator_id": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-f]{32}$"
+          },
+          "recipient_id": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-f]{32}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "requested",
+              "accepted_pending_activation",
+              "active_cards",
+              "exclusive_cards",
+              "frozen",
+              "declined",
+              "cancelled",
+              "ended",
+              "blocked"
+            ]
+          },
+          "peer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Candidate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exclusive_requested_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^usr_[0-9a-f]{32}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "permissions": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "can_send_cards": {
+                "type": "boolean"
+              },
+              "can_send_text": {
+                "type": "boolean",
+                "const": false
+              },
+              "can_send_media": {
+                "type": "boolean",
+                "const": false
+              },
+              "can_disclose_identity": {
+                "type": "boolean",
+                "const": false
+              }
+            },
+            "required": [
+              "can_send_cards",
+              "can_send_text",
+              "can_send_media",
+              "can_disclose_identity"
+            ]
+          },
+          "activation_mode": {
+            "type": "string",
+            "enum": [
+              "development_simulation_only"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "initiator_id",
+          "recipient_id",
+          "status",
+          "peer",
+          "exclusive_requested_by",
+          "permissions",
+          "activation_mode"
+        ]
+      },
+      "Relationships": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Relationship"
+            },
+            "maxItems": 20
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^rel_[0-9a-f]{32}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ]
+      },
+      "RelationshipRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-f]{32}$"
+          }
+        },
+        "required": [
+          "candidate_id"
+        ]
+      },
+      "Decision": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "decline"
+            ]
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "Confirm": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "confirm"
+        ]
+      },
+      "Empty": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "required": []
+      },
+      "VerifySimulation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "simulate_verified": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "simulate_verified"
+        ]
+      },
+      "ActivationSimulation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "simulate_entitlement": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "simulate_entitlement"
+        ]
+      },
+      "Block": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "target_id": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-f]{32}$"
+          }
+        },
+        "required": [
+          "target_id"
+        ]
+      },
+      "Blocked": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "blocked": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "blocked"
+        ]
+      },
+      "Report": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "target_id": {
+            "type": "string",
+            "pattern": "^usr_[0-9a-f]{32}$"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "harassment",
+              "threat",
+              "impersonation",
+              "child_safety",
+              "other_safety"
+            ]
+          },
+          "relationship_id": {
+            "type": "string",
+            "pattern": "^rel_[0-9a-f]{32}$"
+          }
+        },
+        "required": [
+          "target_id",
+          "category"
+        ]
+      },
+      "ReportReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rpt_[0-9a-f]{32}$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recorded_development_only"
+            ]
+          },
+          "evidence_uploaded": {
+            "type": "boolean",
+            "const": false
+          },
+          "notice": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "evidence_uploaded",
+          "notice"
+        ]
+      },
+      "Delete": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "confirmation": {
+            "type": "string",
+            "enum": [
+              "DELETE"
+            ]
+          }
+        },
+        "required": [
+          "confirmation"
+        ]
+      },
+      "Deleted": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "const": true
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "synthetic_development_only"
+            ]
+          },
+          "notice": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "deleted",
+          "mode",
+          "notice"
+        ]
+      },
+      "Cards": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title_ar": {
+                  "type": "string"
+                },
+                "prompt_ar": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "free": {
+                  "type": "boolean",
+                  "const": true
+                }
+              },
+              "required": [
+                "id",
+                "title_ar",
+                "prompt_ar",
+                "options",
+                "free"
+              ]
+            }
+          },
+          "answers_transport": {
+            "type": "string",
+            "enum": [
+              "not_implemented"
+            ]
+          },
+          "server_stores_dialogue_answers": {
+            "type": "boolean",
+            "const": false
+          }
+        },
+        "required": [
+          "items",
+          "answers_transport",
+          "server_stores_dialogue_answers"
+        ]
+      },
+      "Health": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "synthetic_development_only"
+            ]
+          },
+          "durable_storage": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status",
+          "mode",
+          "durable_storage"
+        ]
+      }
+    }
+  }
+}

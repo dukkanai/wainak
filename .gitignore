@@ -17,10 +17,20 @@ credentials/
 *.p12
 *.pfx
 *.dump
-*.sql
 *.log
 .DS_Store
 .dart_tool/
+.gradle/
+.venv/
 .flutter-plugins-dependencies
 build/
 coverage/
+*.apk
+*.aab
+*.aar
+*.ipa
+*.xcarchive/
+*.xcframework/
+
+# Disposable native/iOS CI tools, logs and unsigned artifacts stay local.
+/.ci-work/

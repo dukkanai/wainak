@@ -1,0 +1,550 @@
+package archivebridge
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"math"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	history "wainak.local/historyarchive"
+)
+
+// Independent tests contain public synthetic literals only. Runtime keys and
+// ciphertext are never formatted in assertions or written to a file.
+var qaRecords = []byte(`[{"event_id":"event_one","occurred_at":"2026-10-24T00:00:00Z","card_id":"sample_card","response_id":"sample_defer"}]`)
+
+func qaOpen(t *testing.T, r *registry) (int64, int64) {
+	t.Helper()
+	h, e := r.open()
+	if e != nil {
+		t.Fatal("fixture open failed")
+	}
+	t.Cleanup(func() { r.close(h) })
+	ep, e := r.epoch(h)
+	if e != nil || ep != 1 {
+		t.Fatal("initial epoch")
+	}
+	return h, ep
+}
+func qaCipher(t *testing.T, r *registry, h, ep int64) []byte {
+	t.Helper()
+	b, e := r.export(h, ep, qaRecords)
+	if e != nil || len(b) == 0 {
+		t.Fatal("fixture export failed")
+	}
+	return b
+}
+func qaCount(t *testing.T, r *registry, h, ep int64, n int) {
+	t.Helper()
+	b, e := r.snapshot(h, ep)
+	if e != nil {
+		t.Fatal("snapshot failed")
+	}
+	var v historyView
+	if json.Unmarshal(b, &v) != nil || v.Profile != Profile || !v.Synthetic || len(v.Records) != n {
+		t.Fatal("history invariant")
+	}
+	for _, row := range v.Records {
+		if !row.Imported || row.AuthenticatedAuthor {
+			t.Fatal("authority annotation")
+		}
+	}
+}
+func qaIdle(t *testing.T, r *registry) {
+	t.Helper()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.active != 0 || r.opening != 0 {
+		t.Fatal("reservation leaked")
+	}
+}
+func qaAwait(t *testing.T, ch <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(3 * time.Second):
+		t.Fatal("test stage timeout")
+	}
+}
+func qaResult(t *testing.T, ch <-chan error) error {
+	t.Helper()
+	select {
+	case e := <-ch:
+		return e
+	case <-time.After(3 * time.Second):
+		t.Fatal("test worker timeout")
+		return nil
+	}
+}
+func qaPause(r *registry, stage string) (<-chan struct{}, func()) {
+	entered, release := make(chan struct{}, 4), make(chan struct{})
+	var once sync.Once
+	r.stage = func(s string) {
+		if s == stage {
+			entered <- struct{}{}
+			<-release
+		}
+	}
+	return entered, func() { once.Do(func() { close(release) }) }
+}
+
+func TestQAPublicSyntheticRoundtrip(t *testing.T) {
+	h, e := NewSyntheticSession()
+	if e != nil {
+		t.Fatal("public open")
+	}
+	defer Close(h)
+	ep, e := Epoch(h)
+	if e != nil {
+		t.Fatal("public epoch")
+	}
+	c, e := ExportHistory(h, ep, qaRecords)
+	if e != nil {
+		t.Fatal("public export")
+	}
+	if ImportHistory(h, ep, c) != nil {
+		t.Fatal("public import")
+	}
+	v, e := HistorySnapshot(h, ep)
+	if e != nil || !bytes.Contains(v, []byte(`"authenticated_author":false`)) {
+		t.Fatal("public projection")
+	}
+	next, e := Cancel(h, ep)
+	if e != nil || next != ep+1 {
+		t.Fatal("public cancel")
+	}
+	if _, e = HistorySnapshot(h, ep); e == nil {
+		t.Fatal("old epoch accepted")
+	}
+	if Close(h) != nil || Close(h) != nil {
+		t.Fatal("idempotent close")
+	}
+	if _, e = Epoch(h); e == nil {
+		t.Fatal("closed handle accepted")
+	}
+}
+
+func TestQAInvalidHandlesAndEpochs(t *testing.T) {
+	r := newRegistry()
+	h, ep := qaOpen(t, r)
+	for _, bad := range []int64{0, -1, math.MinInt64, math.MaxInt64} {
+		if _, e := r.epoch(bad); e == nil {
+			t.Fatal("invalid epoch lookup")
+		}
+		if _, e := r.export(bad, ep, qaRecords); e == nil {
+			t.Fatal("invalid handle export")
+		}
+		if e := r.importHistory(bad, ep, []byte("synthetic_invalid")); e == nil {
+			t.Fatal("invalid handle import")
+		}
+		if _, e := r.snapshot(bad, ep); e == nil {
+			t.Fatal("invalid handle snapshot")
+		}
+	}
+	for _, bad := range []int64{0, -1, 2, math.MaxInt64} {
+		if _, e := r.snapshot(h, bad); e == nil {
+			t.Fatal("wrong epoch accepted")
+		}
+	}
+	qaIdle(t, r)
+}
+
+func TestQAConstructorCapacityAndOverflow(t *testing.T) {
+	r := newRegistry()
+	var hs []int64
+	for i := 0; i < 8; i++ {
+		h, _ := qaOpen(t, r)
+		hs = append(hs, h)
+	}
+	if _, e := r.open(); e != errCapacity {
+		t.Fatal("context limit")
+	}
+	r.close(hs[0])
+	h, e := r.open()
+	if e != nil || h <= hs[7] {
+		t.Fatal("handle reused")
+	}
+	r.close(h)
+	x := newRegistry()
+	x.next = math.MaxInt64 - 1
+	last, e := x.open()
+	if e != nil || last != math.MaxInt64 {
+		t.Fatal("last valid handle")
+	}
+	x.close(last)
+	if _, e = x.open(); e != errCapacity {
+		t.Fatal("overflow did not fail closed")
+	}
+	qaIdle(t, r)
+	qaIdle(t, x)
+}
+
+func TestQAConstructorReservesBeforeKeyGeneration(t *testing.T) {
+	r := newRegistry()
+	entered, release := qaPause(r, "open_reserved")
+	defer release()
+	results := make(chan error, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			h, e := r.open()
+			if e == nil {
+				r.close(h)
+			}
+			results <- e
+		}()
+	}
+	qaAwait(t, entered)
+	qaAwait(t, entered)
+	r.mu.Lock()
+	active, opening := r.active, r.opening
+	r.mu.Unlock()
+	if active != 2 || opening != 2 {
+		t.Fatal("constructor not reserved")
+	}
+	if _, e := r.open(); e != errBusy {
+		t.Fatal("third key generation not bounded")
+	}
+	release()
+	if qaResult(t, results) != nil || qaResult(t, results) != nil {
+		t.Fatal("reserved opens failed")
+	}
+	qaIdle(t, r)
+}
+
+func TestQAEpochOverflowClosesContext(t *testing.T) {
+	r := newRegistry()
+	h, _ := qaOpen(t, r)
+	r.sessions[h].epoch = math.MaxInt64
+	if _, e := r.cancel(h, math.MaxInt64); e != errCapacity {
+		t.Fatal("epoch wrapped")
+	}
+	if _, e := r.epoch(h); e != errStale {
+		t.Fatal("overflow context retained")
+	}
+	qaIdle(t, r)
+}
+
+func TestQAClosedWorkerRetainsGlobalSlot(t *testing.T) {
+	r := newRegistry()
+	h1, e1 := qaOpen(t, r)
+	h2, e2 := qaOpen(t, r)
+	h3, e3 := qaOpen(t, r)
+	entered, release := qaPause(r, "export_before_publish")
+	defer release()
+	results := make(chan error, 2)
+	go func() { _, e := r.export(h1, e1, qaRecords); results <- e }()
+	qaAwait(t, entered)
+	if r.close(h1) != nil {
+		t.Fatal("close failed")
+	}
+	go func() { _, e := r.export(h2, e2, qaRecords); results <- e }()
+	qaAwait(t, entered)
+	if _, e := r.snapshot(h3, e3); e != errBusy {
+		t.Fatal("close released live worker slot")
+	}
+	if _, e := r.open(); e != errBusy {
+		t.Fatal("constructor bypassed occupied work bound")
+	}
+	release()
+	a, b := qaResult(t, results), qaResult(t, results)
+	if !((a == nil && b == errStale) || (b == nil && a == errStale)) {
+		t.Fatal("worker completion outcomes")
+	}
+	qaIdle(t, r)
+	qaCount(t, r, h3, e3, 0)
+}
+
+func TestQACancelDoesNotReleasePerHandleWork(t *testing.T) {
+	r := newRegistry()
+	h, ep := qaOpen(t, r)
+	entered, release := qaPause(r, "export_before_publish")
+	defer release()
+	result := make(chan error, 1)
+	go func() {
+		b, e := r.export(h, ep, qaRecords)
+		if e != nil && b != nil {
+			result <- errInvalid
+			return
+		}
+		result <- e
+	}()
+	qaAwait(t, entered)
+	next, e := r.cancel(h, ep)
+	if e != nil || next != ep+1 {
+		t.Fatal("cancel")
+	}
+	if _, e = r.cancel(h, ep); e != errStale {
+		t.Fatal("stale cancel changed new scope")
+	}
+	if _, e = r.snapshot(h, next); e != errBusy {
+		t.Fatal("old work released per-context slot")
+	}
+	release()
+	if qaResult(t, result) != errStale {
+		t.Fatal("old export published")
+	}
+	qaIdle(t, r)
+	qaCount(t, r, h, next, 0)
+}
+
+func TestQAExportOwnsInputAfterCopy(t *testing.T) {
+	r := newRegistry()
+	h, ep := qaOpen(t, r)
+	input := append([]byte(nil), qaRecords...)
+	entered, release := qaPause(r, "export_after_copy")
+	defer release()
+	done := make(chan struct{})
+	var c []byte
+	var e error
+	go func() { c, e = r.export(h, ep, input); close(done) }()
+	qaAwait(t, entered)
+	copy(input, bytes.ReplaceAll(input, []byte("event_one"), []byte("event_two")))
+	release()
+	qaAwait(t, done)
+	if e != nil || r.importHistory(h, ep, c) != nil {
+		t.Fatal("owned export failed")
+	}
+	rows := r.sessions[h].history.View()
+	if len(rows) != 1 || rows[0].Record.EventID != "event_one" {
+		t.Fatal("input alias changed operation")
+	}
+	qaIdle(t, r)
+}
+
+func TestQAImportOwnsInputAfterCopy(t *testing.T) {
+	r := newRegistry()
+	h, ep := qaOpen(t, r)
+	c := qaCipher(t, r, h, ep)
+	entered, release := qaPause(r, "import_after_copy")
+	defer release()
+	result := make(chan error, 1)
+	go func() { result <- r.importHistory(h, ep, c) }()
+	qaAwait(t, entered)
+	for i := range c {
+		c[i] = 0
+	}
+	release()
+	if qaResult(t, result) != nil {
+		t.Fatal("caller ciphertext mutation affected copied import")
+	}
+	qaCount(t, r, h, ep, 1)
+	qaIdle(t, r)
+}
+
+func TestQASnapshotOutputDoesNotAliasHistory(t *testing.T) {
+	r := newRegistry()
+	h, ep := qaOpen(t, r)
+	if r.importHistory(h, ep, qaCipher(t, r, h, ep)) != nil {
+		t.Fatal("fixture import")
+	}
+	b, e := r.snapshot(h, ep)
+	if e != nil {
+		t.Fatal("snapshot")
+	}
+	for i := range b {
+		b[i] = 0
+	}
+	qaCount(t, r, h, ep, 1)
+	qaIdle(t, r)
+}
+
+func TestQAPublishGuardsAfterInvalidation(t *testing.T) {
+	for _, stage := range []string{"export_before_publish", "snapshot_before_publish"} {
+		for _, closeIt := range []bool{false, true} {
+			name := stage + "/cancel"
+			if closeIt {
+				name = stage + "/close"
+			}
+			t.Run(name, func(t *testing.T) {
+				r := newRegistry()
+				h, ep := qaOpen(t, r)
+				entered, release := qaPause(r, stage)
+				defer release()
+				result := make(chan error, 1)
+				go func() {
+					var b []byte
+					var e error
+					if stage == "export_before_publish" {
+						b, e = r.export(h, ep, qaRecords)
+					} else {
+						b, e = r.snapshot(h, ep)
+					}
+					if b != nil {
+						result <- errInvalid
+						return
+					}
+					result <- e
+				}()
+				qaAwait(t, entered)
+				if closeIt {
+					r.close(h)
+				} else {
+					r.cancel(h, ep)
+				}
+				release()
+				if qaResult(t, result) != errStale {
+					t.Fatal("invalidated plaintext/ciphertext result returned")
+				}
+				qaIdle(t, r)
+			})
+		}
+	}
+}
+
+func TestQAImportInvalidationIsAtomic(t *testing.T) {
+	for _, closeIt := range []bool{false, true} {
+		name := "cancel"
+		if closeIt {
+			name = "close"
+		}
+		t.Run(name, func(t *testing.T) {
+			r := newRegistry()
+			h, ep := qaOpen(t, r)
+			c := qaCipher(t, r, h, ep)
+			store := r.sessions[h].history
+			entered, release := qaPause(r, "import_before_commit")
+			defer release()
+			result := make(chan error, 1)
+			go func() { result <- r.importHistory(h, ep, c) }()
+			qaAwait(t, entered)
+			if closeIt {
+				r.close(h)
+			} else {
+				r.cancel(h, ep)
+			}
+			release()
+			if qaResult(t, result) != errStale || len(store.View()) != 0 {
+				t.Fatal("invalidated import committed")
+			}
+			qaIdle(t, r)
+		})
+	}
+}
+
+func TestQACommittedHistorySurvivesCancel(t *testing.T) {
+	r := newRegistry()
+	h, ep := qaOpen(t, r)
+	if r.importHistory(h, ep, qaCipher(t, r, h, ep)) != nil {
+		t.Fatal("fixture import")
+	}
+	next, e := r.cancel(h, ep)
+	if e != nil {
+		t.Fatal("cancel")
+	}
+	qaCount(t, r, h, next, 1)
+	qaIdle(t, r)
+}
+
+func TestQACrossOwnerAndCatalogDespiteSameKey(t *testing.T) {
+	r := newRegistry()
+	a, ea := qaOpen(t, r)
+	b, eb := qaOpen(t, r)
+	c, ec := qaOpen(t, r)
+	r.sessions[b].key = r.sessions[a].key
+	r.sessions[c].key = r.sessions[a].key
+	r.sessions[c].owner = r.sessions[a].owner
+	other, e := history.NewCatalog(sampleVersion, map[string][]string{"sample_card": {"other_option", "other_defer"}})
+	if e != nil {
+		t.Fatal("fixture catalog")
+	}
+	store, e := history.NewMemoryHistory(r.sessions[c].owner, other)
+	if e != nil {
+		t.Fatal("fixture store")
+	}
+	r.sessions[c].catalog = other
+	r.sessions[c].history = store
+	cipher := qaCipher(t, r, a, ea)
+	if r.importHistory(b, eb, cipher) == nil {
+		t.Fatal("foreign owner accepted despite same key")
+	}
+	if r.importHistory(c, ec, cipher) == nil {
+		t.Fatal("foreign allowlist accepted despite same key/version")
+	}
+	qaCount(t, r, b, eb, 0)
+	qaCount(t, r, c, ec, 0)
+	qaIdle(t, r)
+}
+
+func TestQAAuthenticatedEOFAndReplayKeepPriorStore(t *testing.T) {
+	r := newRegistry()
+	h, ep := qaOpen(t, r)
+	good := qaCipher(t, r, h, ep)
+	if r.importHistory(h, ep, good) != nil {
+		t.Fatal("fixture import")
+	}
+	variants := [][]byte{nil, good[:len(good)-1], append(append([]byte(nil), good...), 0), append([]byte(nil), good...)}
+	variants[3][len(variants[3])-1] ^= 1
+	for _, bad := range variants {
+		if r.importHistory(h, ep, bad) == nil {
+			t.Fatal("bad archive accepted")
+		}
+		qaCount(t, r, h, ep, 1)
+	}
+	if r.importHistory(h, ep, good) != errConflict {
+		t.Fatal("replay accepted")
+	}
+	qaCount(t, r, h, ep, 1)
+	qaIdle(t, r)
+}
+
+func TestQAStrictDTOAndNoAuthorityFields(t *testing.T) {
+	r := newRegistry()
+	h, ep := qaOpen(t, r)
+	inputs := [][]byte{
+		nil, []byte("null"), []byte(`{}`), []byte(`[] []`), []byte(`[null]`), []byte(`[[]]`), []byte(`[{"event_id":"x","event_id":"x"}]`),
+		bytes.Replace(qaRecords, []byte(`"event_id"`), []byte(`"event_id":"x","event_\u0069d"`), 1),
+		bytes.Replace(qaRecords, []byte(`"event_id"`), []byte(`"Event_ID"`), 1),
+		bytes.Replace(qaRecords, []byte(`"event_one"`), []byte(`null`), 1),
+		bytes.Replace(qaRecords, []byte(`"event_one"`), []byte(`"\ud800"`), 1),
+		bytes.Replace(qaRecords, []byte(`"sample_defer"`), []byte(`"not_allowlisted"`), 1),
+		bytes.Replace(qaRecords, []byte(`"2026-10-24T00:00:00Z"`), []byte(`"2026-10-24T00:00:00+00:00"`), 1),
+		append([]byte{'[', '"', 255}, ']'), bytes.Repeat([]byte(" "), history.MaxPlaintext+1),
+	}
+	for _, field := range []string{"key", "owner_ref", "schema_version", "catalog_version", "access_token", "outbox", "trusted", "entitlement", "authenticated_author", "imported"} {
+		inputs = append(inputs, bytes.Replace(qaRecords, []byte(`}]`), []byte(`,"`+field+`":"synthetic"}]`), 1))
+	}
+	for _, input := range inputs {
+		if b, e := r.export(h, ep, input); e == nil || b != nil {
+			t.Fatal("hostile DTO accepted")
+		}
+	}
+	many := []byte("[" + strings.Repeat(string(qaRecords[1:len(qaRecords)-1])+",", history.MaxRecords) + string(qaRecords[1:len(qaRecords)-1]) + "]")
+	if _, e := r.export(h, ep, many); e == nil {
+		t.Fatal("record count bound bypass")
+	}
+	if r.importHistory(h, ep, make([]byte, history.MaxCiphertext+1)) == nil {
+		t.Fatal("ciphertext cap bypass")
+	}
+	qaIdle(t, r)
+	qaCount(t, r, h, ep, 0)
+}
+
+func TestQAEncryptedUnknownAuthorityDoesNotRestore(t *testing.T) {
+	r := newRegistry()
+	h, ep := qaOpen(t, r)
+	s := r.sessions[h]
+	// A valid same-key archive with a valid core row is still history-only.
+	snap := history.Snapshot{SchemaVersion: history.SchemaVersion, OwnerRef: s.owner, CatalogVersion: sampleVersion, Records: []history.Record{{EventID: "event_one", OccurredAt: "2026-10-24T00:00:00Z", CardID: "sample_card", ResponseID: "sample_defer"}}}
+	cipher, e := history.Seal(context.Background(), snap, s.catalog, s.key.Recipient())
+	if e != nil || r.importHistory(h, ep, cipher) != nil {
+		t.Fatal("valid history fixture")
+	}
+	out, e := r.snapshot(h, ep)
+	if e != nil {
+		t.Fatal("projection")
+	}
+	var top map[string]json.RawMessage
+	if json.Unmarshal(out, &top) != nil || len(top) != 3 {
+		t.Fatal("projection top-level allowlist")
+	}
+	var rows []map[string]json.RawMessage
+	if json.Unmarshal(top["records"], &rows) != nil || len(rows) != 1 || len(rows[0]) != 6 {
+		t.Fatal("projection row allowlist")
+	}
+	qaCount(t, r, h, ep, 1)
+	qaIdle(t, r)
+}

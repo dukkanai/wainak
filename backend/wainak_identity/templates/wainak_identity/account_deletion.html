@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token_value }}">
+  <title>وينك — حذف الحساب / Wainak — Account deletion</title>
+  <style nonce="{{ nonce }}">
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.65; }
+    body { max-width: 44rem; margin: auto; padding: 1.25rem; }
+    h1 { font-size: 1.65rem; } label { display: block; margin-block: .75rem .25rem; }
+    input:not([type=checkbox]), button { box-sizing: border-box; min-height: 3rem; font: inherit; padding: .55rem; }
+    input:not([type=checkbox]) { width: 100%; } input[type=checkbox] { width: 1.5rem; height: 1.5rem; vertical-align: middle; }
+    button { margin: .4rem 0; } fieldset { border: 1px solid; padding: 1rem; }
+    :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+    .notice { border: 2px solid; padding: .8rem; } [hidden] { display: none !important; }
+    #status { min-height: 3rem; } .en { direction: ltr; text-align: left; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>حذف حساب وينك <span lang="en">/ Delete your Wainak account</span></h1>
+  <p class="notice">بيئة تطوير محلية فقط: استخدم حسابات example.invalid التجريبية. لا بريد حقيقي أو نشر عام.
+    <span lang="en">Local development only. Synthetic example.invalid accounts; no real mail or public service.</span></p>
+  <p>حذف البيانات الخاصة والجلسات من قاعدة الاختبار نهائي. قد تبقى سجلات مختصرة للعلاقات والحذف وحدود الاستخدام؛ تبقى رسائل البريد الوهمي في ذاكرة الاختبار حتى انتهائه. لا يلغي اشتراك متجر ولا يسترجع محادثات.
+    <span lang="en">Private profile and session deletion is permanent in this test DB. Minimal relationship/deletion/rate records may remain; fake-mail snapshots remain until fixture exit. This does not cancel store subscriptions or recover messages.</span></p>
+  <p>كلمة المرور مطلوبة. التسجيل غير المتحقق يمكن حذفه من جلسته المعلقة المملوكة لك؛ إدخال البريد وحده لا يكفي.
+    <span lang="en">Your password is required. An unverified registration can be deleted from your owned pending session; email alone is never enough.</span></p>
+  <noscript><p>هذه النسخة التجريبية تحتاج JavaScript. مسار طلب الحذف غير المنشور موثق في عقد API. <span lang="en">This local fixture requires JavaScript. The unpublished deletion API is documented separately.</span></p></noscript>
+  <form id="deletion-form" method="post" action="/account-deletion" autocomplete="on">
+    <fieldset id="controls">
+      <legend>إثبات ملكية الحساب <span lang="en">/ Prove account access</span></legend>
+      <label for="email">البريد الإلكتروني <span lang="en">/ Email</span></label>
+      <input id="email" type="email" dir="ltr" autocomplete="username" maxlength="100" required>
+      <label for="password">كلمة المرور <span lang="en">/ Password</span></label>
+      <input id="password" type="password" dir="ltr" autocomplete="current-password" required>
+      <button id="login" type="submit">تسجيل الدخول <span lang="en">/ Sign in</span></button>
+      <div id="verification" hidden>
+        <p>الجلسة معلقة. تأكيد البريد اختياري لحذف هذا التسجيل المعلق، وليس إثبات هوية أو عمر.
+          <span lang="en">Pending session. Email verification is optional to erase this pending registration; it is not identity or age proof.</span></p>
+        <label for="code">رمز البريد الوهمي <span lang="en">/ Fake-mail code</span></label>
+        <input id="code" type="text" dir="ltr" autocomplete="one-time-code" maxlength="32">
+        <button id="verify" type="button">تأكيد البريد <span lang="en">/ Verify email</span></button>
+        <button id="resend" type="button">إعادة الرمز <span lang="en">/ Resend code</span></button>
+      </div>
+      <div id="deletion" hidden>
+        <label for="confirm"><input id="confirm" type="checkbox"> أفهم وأطلب حذف الحساب نهائيًا <span lang="en">/ I understand and request permanent account deletion</span></label>
+        <button id="delete" type="button">حذف حسابي <span lang="en">/ Delete my account</span></button>
+        <button id="logout" type="button">إنهاء الجلسة <span lang="en">/ Sign out</span></button>
+      </div>
+    </fieldset>
+  </form>
+  <p id="status" role="status" aria-live="polite" aria-atomic="true"></p>
+  <p>استعادة كلمة المرور عبر هذه الصفحة وتدقيق قارئ الشاشة/المتصفح لم يُنجزا بعد. لا تدّعي هذه الصفحة اعتماد المتاجر.
+    <span lang="en">Web password recovery and real browser/screen-reader verification are not implemented here. This page does not establish store compliance.</span></p>
+</main>
+<script nonce="{{ nonce }}">
+(() => {
+  'use strict';
+  const el = id => document.getElementById(id);
+  let csrf = document.querySelector('meta[name="csrf-token"]').content;
+  let token = null, stage = null, busy = false, epoch = 0;
+  const controllers = new Set();
+  const tell = message => { el('status').textContent = message; };
+  function clearSecrets() {
+    epoch += 1;
+    for (const controller of controllers) controller.abort();
+    controllers.clear();
+    busy = false; el('controls').disabled = false; el('deletion-form').removeAttribute('aria-busy');
+    token = null; stage = null; el('email').readOnly = false;
+    el('password').value = ''; el('code').value = ''; el('confirm').checked = false;
+    el('verification').hidden = true; el('deletion').hidden = true;
+  }
+  async function api(path, method, data = {}) {
+    const requestEpoch = epoch;
+    const controller = new AbortController();
+    controllers.add(controller);
+    const timeout = setTimeout(() => controller.abort(), 35000);
+    const headers = {'Content-Type': 'application/json', 'X-CSRFToken': csrf, 'X-Wainak-Deletion-Web': '1'};
+    if (token) headers['X-Session-Token'] = token;
+    try {
+      const response = await fetch(path, {method, headers, credentials: 'same-origin', cache: 'no-store',
+        redirect: 'error', signal: controller.signal, body: JSON.stringify(data)});
+      const body = await response.json();
+      if (requestEpoch !== epoch || controller.signal.aborted) throw new Error('Stale local response');
+      const refreshed = response.headers.get('X-CSRFToken');
+      if (refreshed) csrf = refreshed;
+      if (typeof body.meta?.session_token === 'string') token = body.meta.session_token;
+      return {status: response.status, body, epoch: requestEpoch};
+    } finally { clearTimeout(timeout); controllers.delete(controller); }
+  }
+  async function act(work) {
+    if (busy) return;
+    const actionEpoch = epoch;
+    busy = true; el('controls').disabled = true; el('deletion-form').setAttribute('aria-busy', 'true');
+    try { await work(); }
+    catch (_) { if (actionEpoch === epoch) { clearSecrets(); tell('تعذر التأكد من النتيجة. لا تكرر العملية تلقائيًا؛ سجّل الدخول للتحقق. / Result uncertain. Do not retry automatically; sign in to check.'); } }
+    finally { if (actionEpoch === epoch) { busy = false; el('controls').disabled = false; el('deletion-form').removeAttribute('aria-busy'); } }
+  }
+  function authState(result) {
+    if (result.epoch !== epoch) return;
+    if (result.status === 200 && result.body.meta?.is_authenticated === true && token) stage = 'verified';
+    else if (result.status === 401 && token && result.body.data?.flows?.some(flow => flow.id === 'verify_email' && flow.is_pending)) stage = 'pending';
+    else { clearSecrets(); tell('لم يثبت الوصول للحساب. تحقق من المدخلات أو أعد المحاولة لاحقًا. / Account access was not confirmed. Check inputs or try later.'); return; }
+    el('confirm').checked = false; el('email').readOnly = true;
+    if (typeof result.body.data?.user?.email === 'string') el('email').value = result.body.data.user.email;
+    el('verification').hidden = stage !== 'pending'; el('deletion').hidden = false;
+    tell('راجع تأكيد الحذف قبل المتابعة. / Review the deletion confirmation before continuing.');
+  }
+  el('deletion-form').addEventListener('submit', event => {
+    event.preventDefault();
+    if (!el('deletion-form').reportValidity()) return;
+    act(async () => { token = null; stage = null; el('confirm').checked = false;
+      el('deletion').hidden = true; el('verification').hidden = true; authState(await api('/_allauth/app/v1/auth/login', 'POST',
+      {email: el('email').value, password: el('password').value})); });
+  });
+  el('verify').addEventListener('click', () => act(async () => {
+    const result = await api('/_allauth/app/v1/auth/email/verify', 'POST', {key: el('code').value});
+    if (result.epoch !== epoch) return;
+    el('code').value = '';
+    if (result.status === 200) authState(result);
+    else tell('تعذر تأكيد الرمز أو انتهت الجلسة. / Code rejected or session expired.');
+  }));
+  el('resend').addEventListener('click', () => act(async () => {
+    const result = await api('/_allauth/app/v1/auth/email/verify/resend', 'POST');
+    if (result.epoch !== epoch) return;
+    tell(result.status === 200 ? 'أُنشئ رمز جديد في البريد الوهمي فقط. / New code generated in fake mail only.' : 'إعادة الرمز غير متاحة الآن. / Resend unavailable now.');
+  }));
+  el('delete').addEventListener('click', () => act(async () => {
+    if (!token || !stage || !el('confirm').checked || !el('password').value) {
+      tell('أدخل كلمة المرور وأكّد طلب الحذف. / Enter your password and confirm deletion.'); return;
+    }
+    if (stage === 'verified') {
+      const proof = await api('/identity/v1/reauthenticate', 'POST', {password: el('password').value});
+      if (proof.epoch !== epoch) return;
+      if (proof.status !== 200) { tell('تعذر تأكيد كلمة المرور. / Password could not be confirmed.'); return; }
+    }
+    const data = {confirmation: 'DELETE'};
+    if (stage === 'pending') data.password = el('password').value;
+    const result = await api(stage === 'pending' ? '/identity/v1/pending-account' : '/identity/v1/me', 'DELETE', data);
+    if (result.epoch !== epoch) return;
+    if (result.status === 200 && result.body.identity_erased === true) {
+      clearSecrets(); tell('حُذفت الهوية والبيانات الخاصة ضمن حدود الاختبار الموضحة أعلاه. / Identity and private data deleted within the stated fixture limits.');
+    } else { clearSecrets(); tell('لم يُؤكد الحذف. سجّل الدخول مجددًا للتحقق. / Deletion was not confirmed. Sign in again to check.'); }
+  }));
+  el('logout').addEventListener('click', () => act(async () => {
+    const logoutEpoch = epoch;
+    try {
+      const result = await api('/_allauth/app/v1/auth/session', 'DELETE');
+      if (result.epoch !== epoch) return;
+      tell(result.status === 401 ? 'أُغلقت الجلسة. / Signed out.' : 'تعذر تأكيد إبطال الخادم؛ مُسحت ذاكرة الصفحة. / Server revocation uncertain; page credentials cleared.');
+    } finally { if (logoutEpoch === epoch) clearSecrets(); }
+  }));
+  window.addEventListener('pagehide', clearSecrets);
+})();
+</script>
+</body>
+</html>

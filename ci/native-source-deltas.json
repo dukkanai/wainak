@@ -1,0 +1,34 @@
+{
+  "files": {
+    "archive/go.mod": {
+      "after_sha256": "68e37b3d448d929b2a6ac03a0d0364e851b1b9e1cf6cf67f1ab4e12b7a154823",
+      "before_sha256": "c3bd446633baa66cb706bc4206d47f98d8577711902fd589deabe60827dec765",
+      "reason": "Coherent upstream dependency preparation; additive authenticated checksums are NOT a go mod tidy result"
+    },
+    "archive/go.sum": {
+      "after_sha256": "ce89bc3d29b0b26309dfe62825689c4fa82314f29fecf4bc22088b63d084ec4f",
+      "before_sha256": "34888e0441f33af3f157560938b3ed164e13b70f112e59115d53d8d84f806ad7",
+      "reason": "Coherent upstream dependency preparation; additive authenticated checksums are NOT a go mod tidy result"
+    },
+    "archive/interop_test.go": {
+      "after_sha256": "80061c03c2bcc19d2f709a6ff131d162dc5573ab3e5ff331ff910d02d4304072",
+      "before_sha256": "739831ea30f84e2b3119f7a4314f0a3a3c073ae84e39e2ae63e7dafd77cd10d5",
+      "previous_preparation_sha256": "9f543799174f56dbf8e8bf140a24583449763394e6333ca0bbd4d54dea000c6a",
+      "reason": "Darwin/Linux inherited anonymous FD3 portability plus explicit owned CLI cwd/HOME/TMPDIR sandbox; unchanged 512MiB canary scan and crypto assertions; source-only harness change, not runtime acceptance"
+    },
+    "archivebridge/go.mod": {
+      "after_sha256": "8fe3d9077d27830843a138ad522156fa367a922039e61b50761275c858dedf3e",
+      "before_sha256": "d72492892242c09e058a9db79edf24a504c642e909c866d20b6389ba1a2070ca",
+      "reason": "Coherent upstream dependency preparation; additive authenticated checksums are NOT a go mod tidy result"
+    },
+    "archivebridge/go.sum": {
+      "after_sha256": "40b1ef66457e931191a49c57d4b0b272b4cb1fd632b06d390c74cac5436bb634",
+      "before_sha256": "0cd5a4ea7bd6848ddb2855e1bd666257bb281cc122c4f90047da02ff995360b3",
+      "reason": "Coherent upstream dependency preparation; additive authenticated checksums are NOT a go mod tidy result"
+    }
+  },
+  "go_require_roots_added": false,
+  "runtime_tests": "NOT_RUN",
+  "schema": 1,
+  "source_acquisition": "NOT_RUN"
+}

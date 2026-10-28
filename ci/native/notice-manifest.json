@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "source": "pinned upstream module ZIPs previously authenticated through the official Go module checksum database",
+  "licenses": [
+    {
+      "module": "golang.org/x/mobile@v0.0.0-20261011034528-197770444867",
+      "path": "notices/golang.org_x_mobile@v0.0.0-20261011034528-197770444867-LICENSE",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+      "bytes": 1453
+    },
+    {
+      "module": "golang.org/x/mod@v0.42.0",
+      "path": "notices/golang.org_x_mod@v0.42.0-LICENSE",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+      "bytes": 1453
+    },
+    {
+      "module": "golang.org/x/sync@v0.24.0",
+      "path": "notices/golang.org_x_sync@v0.24.0-LICENSE",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+      "bytes": 1453
+    },
+    {
+      "module": "golang.org/x/sys@v0.49.0",
+      "path": "notices/golang.org_x_sys@v0.49.0-LICENSE",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+      "bytes": 1453
+    },
+    {
+      "module": "golang.org/x/tools@v0.52.0",
+      "path": "notices/golang.org_x_tools@v0.52.0-LICENSE",
+      "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+      "bytes": 1453
+    }
+  ]
+}

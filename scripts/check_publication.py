@@ -10,8 +10,10 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PARTS = {'.runtime', 'backups', '.codex', '.playwright-mcp', 'secrets',
-                   'credentials', 'node_modules', '__pycache__', '.dart_tool'}
-FORBIDDEN_SUFFIXES = {'.pem', '.key', '.p12', '.pfx', '.dump', '.pyc', '.log'}
+                   'credentials', 'node_modules', '__pycache__', '.dart_tool',
+                   '.ci-work', '.gradle', '.venv', 'build'}
+FORBIDDEN_SUFFIXES = {'.pem', '.key', '.p12', '.pfx', '.dump', '.pyc', '.log',
+                      '.apk', '.aab', '.aar', '.ipa', '.xcarchive', '.xcframework'}
 PATTERNS = {
     'private key': re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
     'GitHub token': re.compile(rb'(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})'),
@@ -28,7 +30,8 @@ def main():
         metadata, name = entry.split('\t', 1)
         mode, oid, stage = metadata.split()
         path = Path(name)
-        if (set(path.parts) & FORBIDDEN_PARTS or path.suffix in FORBIDDEN_SUFFIXES
+        if (set(path.parts) & FORBIDDEN_PARTS
+                or any(Path(part).suffix.lower() in FORBIDDEN_SUFFIXES for part in path.parts)
                 or (path.name.startswith('.env') and path.name != '.env.example')
                 or name.startswith(('prototype/releases/', 'prototype/qa/results/'))):
             errors.append((name, 'excluded file is tracked'))

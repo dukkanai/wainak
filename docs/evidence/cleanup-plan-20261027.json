@@ -1,0 +1,320 @@
+{
+  "schema": 1,
+  "date": "2026-10-27",
+  "state": "filesystem_cleanup_complete",
+  "scope": "/home/chatbot/wainak-dev",
+  "preconditions": [
+    "Unified source passed required checks and is retained in Git.",
+    "Private Git bundle and selected source overlays/artifacts verified.",
+    "No active compiler/test owns a deletion target.",
+    "Paths are exact descendants of wainak-dev and not symlinks or mount roots."
+  ],
+  "preserve_tools_at_existing_paths": [
+    "/home/chatbot/wainak-dev/mobile-tools",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/go",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/gomodcache",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/bin",
+    "/home/chatbot/wainak-dev/auth-tools-phase2/venv",
+    "/home/chatbot/wainak-dev/backend-pg-tools-wfMbzK/venv",
+    "/home/chatbot/wainak-dev/node-tools-phase2-20261024/node-v24.19.0-linux-x64",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/sdk",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/jdk"
+  ],
+  "remove_worktrees_after_acceptance": [
+    {
+      "path": "/home/chatbot/wainak-dev/archive-bridge-phase6",
+      "commit": "5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/archive-phase5",
+      "commit": "8155772cf0a006078be433f45353c651d9ffe451",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/backend-auth-phase2",
+      "commit": "144937a34e88e3b558b0c9a007d36d529c5621a1",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/backend-matching-phase3",
+      "commit": "3bc638f8884cc9d8da586d649f96c34a53476e1b",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/backend-phase1",
+      "commit": "59a79ea75fe37daf36bf1f7203140dcad66e3c2f",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/build-review-stage1-20261026",
+      "commit": "9ee256dd9c5e857dc75c3971a564d800d1fd4fba",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/codemagic-ios-phase6",
+      "commit": "4b0bfafeebaceb7a892e03d39a56533c9eb7e0dc",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/identity-save-stage2-20261026",
+      "commit": "7b70dde710390baba8d0db78dc94150b483f127c",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/integration-matching-phase3",
+      "commit": "5f3433b23d8a29999c24943414ff1fdbcc40f46d",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/integration-phase2",
+      "commit": "b5f63ef0090be2513833a86e22c6c7032514c9f7",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/logical-budget-stage7-20261026",
+      "commit": "cf4a5e9c8872b79de568bbeae342b3c8dc27e9af",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/mobile-api-phase1",
+      "commit": "efd0421d559af6ee50ce04b887c7c40481d01aa0",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/mobile-auth-phase2",
+      "commit": "40c39c669e71c2050d4e791624468b11be94776b",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/mobile-local-cards-phase4",
+      "commit": "acbc72a78074bf3be3628dc8dff10a54c9dcecde",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/mobile-matching-phase3",
+      "commit": "a271d98e47c63931bd3d43cf2404e0ae0d67ca39",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/mobile-native-archive-phase6",
+      "commit": "eb8d521157597ac114ba905c699ad7ad68185b43",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/mobile-native-build-phase6",
+      "commit": "120a0c24970427438af7c693e772b95050b3fcfc",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/mobile-phase1",
+      "commit": "67434304e5c8a7134f3397fee5e8db332dfea87c",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/native-resource-stage5-20261026",
+      "commit": "7fcf56b741248e24472bcac8ff0947bbabd3576b",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/native-symbol-reader-stage4-20261026",
+      "commit": "eacbcf13c0061253bc9366d1b4b1221dfe591eae",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/prototype-containment-stage3-20261026",
+      "commit": "401e0c14ec19ed3f549b7678c038c35c58b40e59",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-archive-bridge-phase6",
+      "commit": "139cf7347d6e2b808c1a7455032a585eb221c1bf",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-archive-phase5",
+      "commit": "8f5ee50edf140e9defa3c64ee5f38ed1819626c0",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-auth-phase2",
+      "commit": "c0be17f1e8265389aaf1af3198f1bf1afbbfae5a",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-integration-b5f63ef",
+      "commit": "b5f63ef0090be2513833a86e22c6c7032514c9f7",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-integration-matching-5f3433b",
+      "commit": "5f3433b23d8a29999c24943414ff1fdbcc40f46d",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-local-cards-phase4",
+      "commit": "874db7c44af8b4147e560c56157d526282650c33",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-matching-phase3",
+      "commit": "fc582d94fea88774e8ed7f70399af5dab4de39bd",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-mobile-863b4d5",
+      "commit": "863b4d5c5df4d7be24b4b3a00e9ac5e6a8f83684",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-mobile-efd0421",
+      "commit": "efd0421d559af6ee50ce04b887c7c40481d01aa0",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-mobile-matching-68e06c8",
+      "commit": "68e06c8f256737c2dd093904fbb61631a9f46048",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-mobile-matching-a271d98",
+      "commit": "a271d98e47c63931bd3d43cf2404e0ae0d67ca39",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/qa-phase1",
+      "commit": "6ecb205821b4f96919a1c1cd94a1e2d862b0a7b2",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/simulator-unsigned-stage8-20261026",
+      "commit": "6ff0ed0421a8c1f0508a43e08fc6b2bdd3e800fc",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    },
+    {
+      "path": "/home/chatbot/wainak-dev/xcode-cache-stage6-20261026",
+      "commit": "1377a9a142abc1532199f76831e568c7a425d9b8",
+      "method": "git worktree remove after accepted integration and source-overlay preservation"
+    }
+  ],
+  "remove_experiments_after_evidence_preservation": [
+    "/home/chatbot/wainak-dev/compiler-memory-2560-20261024T1133",
+    "/home/chatbot/wainak-dev/integration-evidence-20261024",
+    "/home/chatbot/wainak-dev/integration-phase3-evidence-20261024",
+    "/home/chatbot/wainak-dev/mobile-auth-cold-90afbc1",
+    "/home/chatbot/wainak-dev/mobile-auth-cold-importfix",
+    "/home/chatbot/wainak-dev/mobile-auth-wasm-482f7de",
+    "/home/chatbot/wainak-dev/mobile-local-cards-cold-689a03f5bdfe",
+    "/home/chatbot/wainak-dev/mobile-local-cards-cold-acbc72a78074",
+    "/home/chatbot/wainak-dev/mobile-matching-cold-2bcea91bdb1c",
+    "/home/chatbot/wainak-dev/mobile-matching-cold-53c73627bf59",
+    "/home/chatbot/wainak-dev/phase3-backend-evidence",
+    "/home/chatbot/wainak-dev/phase3-integration-qa-evidence",
+    "/home/chatbot/wainak-dev/phase3-qa-evidence",
+    "/home/chatbot/wainak-dev/phase4-qa-evidence",
+    "/home/chatbot/wainak-dev/phase5-qa-evidence",
+    "/home/chatbot/wainak-dev/phase6-mobile-qa-evidence",
+    "/home/chatbot/wainak-dev/phase6-qa-evidence",
+    "/home/chatbot/wainak-dev/qa-archive-phase5-probe-old",
+    "/home/chatbot/wainak-dev/qa-mobile-auth-cold-482f7de",
+    "/home/chatbot/wainak-dev/qa-native-archive-cold-eb8d521",
+    "/home/chatbot/wainak-dev/qa-phase3-race-draft-20261024T1248",
+    "/home/chatbot/wainak-dev/qa-phase3-race-fixed-53c7362",
+    "/home/chatbot/wainak-dev/qa-phase4-core-20261024T1426"
+  ],
+  "remove_rebuildable_cache_after_acceptance": [
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/downloads",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/gradle-user-home-phase6",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/gradle-project-cache-phase6",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/gobind-197770444867",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/gomobile-build-197770444867",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/current-engine-prefetch-cf636b1",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/gocache",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/go1.27.3.linux-amd64.toolchain.zip",
+    "/home/chatbot/wainak-dev/node-tools-phase2-20261024/npm-cache",
+    "/home/chatbot/wainak-dev/node-tools-phase2-20261024/node-v24.19.0-linux-x64.tar.xz"
+  ],
+  "sudo_only_owned_legacy_trials": [
+    "/home/chatbot/wainak-dev/qa-runs/backend-pg-draft-20261024T0510",
+    "/home/chatbot/wainak-dev/qa-runs/backend-e73c9ab",
+    "/home/chatbot/wainak-dev/qa-runs/backend-642e8c5",
+    "/home/chatbot/wainak-dev/qa-runs/mobile-6743430"
+  ],
+  "do_not_touch": [
+    "/home/chatbot/wainak/.runtime",
+    "/home/chatbot/wainak/backups",
+    "Other projects, services, containers and host configuration"
+  ],
+  "private_artifact_root": "/home/chatbot/wainak-artifacts/cleanup-20261027",
+  "public_evidence_summary": "docs/evidence/legacy-verification-20261027.json",
+  "remove_retired_tool_builds_and_receipts_after_preservation": [
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/apk-builds",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/apk-flutter-cache-baseline.json",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/approval.json",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/bootstrap-manifest.json",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/build-aar-197770444867.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/build-aar-modfile-197770444867.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/classpath-report-owned-phase6.gradle",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/classpath-report-phase6.gradle",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/cleanup-approved-gradle-docs.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/current-engine-prefetch-cf636b1",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/downloads",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/eighth-symbol-format-repro-20261026T0838.json",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/fetch-public-go-advisories-20261025T0038.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/gobind-197770444867",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/gomobile-build-197770444867",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/gradle-cache",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/gradle-project-cache-phase6",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/gradle-user-home-phase6",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/home",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/identity-stage2-checks-20261026T0645",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/identity-stage2-widgets-20261026T0814",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/logs",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/metadata-mvs-20261025T0325",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/metadata-mvs-20261025T0346-aux",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/native-prep-probes-20261025T0341",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/objc-generation-20261025T0327",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/prefetch-current-flutter-engine.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/public-go-vulndb-20261025T0038",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/qa-aar-offline-20261025T0039",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/qa-aar-offline-20261025T0039.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/qa-aar-offline-20261025T0040",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/qa-aar-offline-20261025T0040.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/qa-aar-offline-20261025T0041",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/qa-aar-offline-20261025T0041.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/qa-maven-advisories-20261025T0111",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/run-classpath-report-owned-phase6.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/run-classpath-report-phase6.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/run-identity-stage2-widgets-20261026T0814.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/run-unsigned-apk-phase6.py",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/sdk-manager-home",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/tmp",
+    "/home/chatbot/wainak-dev/native-archive-tools-phase6-20261024/verify-aar-attempt2.py",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/age-buildinfo.txt",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/bootstrap-verifier.py",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/bridge-evidence-20261024T1740",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/go1.27.3.linux-amd64.toolchain.zip",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/gocache",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/gopath",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/govulncheck-buildinfo.txt",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/home",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/install-toolchain-command.txt",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/installation.json",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/security-evidence-20261024T1625",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/security-evidence-20261024T1626",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/security-evidence-20261024T1627",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/sumdb-proof-recheck-20261024T1612.json",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/tmp",
+    "/home/chatbot/wainak-dev/archive-tools-phase5-20261024/toolchain-provenance.json",
+    "/home/chatbot/wainak-dev/auth-tools-phase2/install.log",
+    "/home/chatbot/wainak-dev/auth-tools-phase2/requirements.lock",
+    "/home/chatbot/wainak-dev/auth-tools-phase2/resolution.json",
+    "/home/chatbot/wainak-dev/auth-tools-phase2/resolution.log",
+    "/home/chatbot/wainak-dev/node-tools-phase2-20261024/home",
+    "/home/chatbot/wainak-dev/node-tools-phase2-20261024/node-v24.19.0-linux-x64.tar.xz",
+    "/home/chatbot/wainak-dev/node-tools-phase2-20261024/npm-cache",
+    "/home/chatbot/wainak-dev/node-tools-phase2-20261024/provenance.json"
+  ],
+  "result": "cleanup-result-20261027.json",
+  "acceptance": "unification-ci-20261027.json"
+}

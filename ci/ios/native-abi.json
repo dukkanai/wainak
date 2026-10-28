@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "source_commit": "5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff",
+  "header_sha256": "2ba29fb669cfc99e867fc33168a31f40e14790626ccc429c3d641e516c313ba3",
+  "evidence": "Linux-host generation only; Apple import/link/runtime NOT RUN",
+  "declarations": [
+    "FOUNDATION_EXPORT BOOL ArchivebridgeCancel(int64_t handle, int64_t expectedEpoch, int64_t* _Nullable ret0_, NSError* _Nullable* _Nullable error);",
+    "FOUNDATION_EXPORT BOOL ArchivebridgeClose(int64_t handle, NSError* _Nullable* _Nullable error);",
+    "FOUNDATION_EXPORT BOOL ArchivebridgeEpoch(int64_t handle, int64_t* _Nullable ret0_, NSError* _Nullable* _Nullable error);",
+    "FOUNDATION_EXPORT NSData* _Nullable ArchivebridgeExportHistory(int64_t handle, int64_t epoch, NSData* _Nullable recordsJSON, NSError* _Nullable* _Nullable error);",
+    "FOUNDATION_EXPORT NSData* _Nullable ArchivebridgeHistorySnapshot(int64_t handle, int64_t epoch, NSError* _Nullable* _Nullable error);",
+    "FOUNDATION_EXPORT BOOL ArchivebridgeImportHistory(int64_t handle, int64_t epoch, NSData* _Nullable ciphertext, NSError* _Nullable* _Nullable error);",
+    "FOUNDATION_EXPORT BOOL ArchivebridgeNewSyntheticSession(int64_t* _Nullable ret0_, NSError* _Nullable* _Nullable error);"
+  ]
+}

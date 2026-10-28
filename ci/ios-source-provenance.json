@@ -1,0 +1,36 @@
+{
+  "files": {
+    "apps/mobile/ios/.gitignore": "8727480b58986f936cb58473c97ed798c368303730a25fd6794a1748824e10fc",
+    "apps/mobile/ios/Flutter/Debug.xcconfig": "6a8e2fc4ef126bd07b3791ebaa673b795d2a8c115b1602b96c7bd39917e13f68",
+    "apps/mobile/ios/Runner.xcodeproj/project.pbxproj": "0efb391114e5e18909b91e89b577ddd11370c91070e1c00757db854c37e9d133",
+    "apps/mobile/ios/Runner/AppDelegate.swift": "f55dfa9395039c582122f1260784ed7b53b2e8bffad13a925fb77faa96f833d6",
+    "apps/mobile/ios/Runner/ArchiveEngine.swift": "0849301f0d3b3315da311f78f301c844a9e98e85f36972ac1915fbdef217352b",
+    "apps/mobile/ios/Runner/ArchiveNativeBridge.h": "44c4438bd168ae5c6d1174b3e1eb1b3a5b282636ce88e3f373266256b188f86f",
+    "apps/mobile/ios/Runner/ArchiveNativeBridge.m": "aaf3225063d8ec94e9f36fea9f43bc98b38a2c4ab14ac39a84905644cad193dc",
+    "apps/mobile/ios/Runner/ArchiveProbeCoordinator.swift": "b470d4738b05b519059414a4e79ad1159d32ae4b91722850ba71e405d9b69319",
+    "apps/mobile/ios/Runner/GoArchiveEngine.swift": "8d1aecf0f4f0f3f55981da9880154effcbd6370c37bdc13c7b1fe6409c8aa1b1",
+    "apps/mobile/ios/Runner/NativeArchivePlugin.swift": "1e30aab2de92ebfde32ef2aecf1cb03ede5ef080631d274fc898152b4acc8d4c",
+    "apps/mobile/ios/Runner/Runner-Bridging-Header.h": "f9da16105a282e708ae2e7172a335d5831c0431895605ceb82c1a7079416407f",
+    "apps/mobile/ios/RunnerTests/NativeArchiveTests.swift": "70c7d44ed9412de8fdba24b18e00c1e8687e81433e633410797a4360d09d88fc",
+    "apps/mobile/lib/main.dart": "2ed2586c1c6737e1fcbbe98850155e99c4b72a9fcc66ae2cd4f6f0e7710f7f36",
+    "apps/mobile/test/native_archive_entry_test.dart": "07c14dc6b0736522e1107505c9c02ea6aaa6a66302dec5da43f970a6e2ca17f7",
+    "apps/mobile/test/native_archive_platform_test.dart": "a46439c18aee3ef8f2da7542f35150800121664f7e13cd7045ac77de78e7c514",
+    "docs/phase6-ios-scaffold.md": "58e1d4c743de5c763ec0648e0392ed83c6f59cc72f831fb1eaaca4c9b30d3939"
+  },
+  "header_sha256": "2ba29fb669cfc99e867fc33168a31f40e14790626ccc429c3d641e516c313ba3",
+  "runtime_tests": "NOT_RUN",
+  "schema": 1,
+  "scope": "16 source-only iOS/platform files; Swift/ObjC/XCTest NOT RUN",
+  "reviewed_changes": {
+    "apps/mobile/lib/main.dart": {
+      "before_sha256": "f986e44d6948e9c82462d7eab17770191c736a27863e54f4df5850983d1bda35",
+      "after_sha256": "2ed2586c1c6737e1fcbbe98850155e99c4b72a9fcc66ae2cd4f6f0e7710f7f36",
+      "reason": "Integrate the local_cards development entrypoint alongside the existing native_archive entrypoint; retain default-off and platform gates. This source change is covered by host entrypoint tests, not a new Xcode runtime result."
+    },
+    "docs/phase6-ios-scaffold.md": {
+      "before_sha256": "c58ed61874f08ad70792153b0002cb0d33d01504e3dd4f702b85956298a1806e",
+      "after_sha256": "58e1d4c743de5c763ec0648e0392ed83c6f59cc72f831fb1eaaca4c9b30d3939",
+      "reason": "Mark this phase-specific scaffold report as historical and point to current status; no native source or runtime assertion changed."
+    }
+  }
+}

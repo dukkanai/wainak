@@ -1,0 +1,10 @@
+{
+  "artifact_rebuilt": false,
+  "files": {
+    "apps/mobile/android/app/src/main/kotlin/invalid/example/wainak/wainak_mobile/NativeArchiveChannel.kt": {
+      "after_sha256": "b1caaee059093f99ccfdf73bf6c1c5621e3a625115b5a3bb96f23bd1c450c320",
+      "before_sha256": "5d3d5ce27a17a588860f26b7a055dee58031f69d05a69036d004ad1c64e58e6f"
+    }
+  },
+  "schema": 1
+}

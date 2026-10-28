@@ -1,0 +1,151 @@
+"""Reject false green test wrappers: missing execution, skips, failures and truncation."""
+from collections import Counter
+import json
+import os
+from pathlib import Path
+import tempfile
+import unittest
+from run_flutter_ci import validate_events, validate_matching_probe
+from run_go_checks import cache_inventory, validate_go_events
+from backend.integration.flutter_driver_diagnostics import PREFIX, project as project_driver
+
+
+def stream(events):
+    return '\n'.join(json.dumps(event) for event in events)
+
+
+class ResultControls(unittest.TestCase):
+    def test_matching_probe_requires_real_cases_and_one_successful_summary(self):
+        valid = '\n'.join(['PASS case'] * 4 + ['QA_MATCHING_RACES passed=4 failed=0'])
+        self.assertEqual(validate_matching_probe(valid, 0), {'passed': 4, 'failed': 0})
+        for output, code in [('', 0), ('QA_MATCHING_RACES passed=0 failed=0', 0),
+                             (valid, 1), (valid + '\nQA_MATCHING_RACES passed=4 failed=0', 0),
+                             (valid.replace('PASS case', 'FAIL case', 1), 0),
+                             (valid.replace('passed=4', 'passed=5'), 0)]:
+            with self.assertRaises(RuntimeError):
+                validate_matching_probe(output, code)
+
+    def diagnostic(self,stage,status='PASS',code='ok'):
+        return PREFIX+json.dumps({'schema':1,'stage':stage,'status':status,'code':code,'error_type':'none'})
+
+    def test_driver_requires_chain_and_harness_completion_and_zero_exit(self):
+        complete=self.diagnostic('complete')+'\n'+self.diagnostic('harness')
+        self.assertEqual(project_driver(complete,0)['status'],'PASS')
+        for output,code in [('',0),(self.diagnostic('complete'),0),(self.diagnostic('harness'),0),
+                            (complete,1),(complete+'\n'+self.diagnostic('harness'),0),
+                            (self.diagnostic('cleanup_flutter','FAILED','flutter_group_survived')+'\n'+complete,0)]:
+            self.assertEqual(project_driver(output,code)['status'],'FAILED')
+
+    def test_driver_diagnostics_never_project_raw_output_or_unknown_fields(self):
+        output='private-synthetic-value\n'+self.diagnostic('harness','FAILED','postgres_checks_failed')
+        result=project_driver(output,1)
+        self.assertNotIn('private-synthetic-value',json.dumps(result))
+        value=json.loads(self.diagnostic('harness')[len(PREFIX):]);value['raw']='private'
+        with self.assertRaises(RuntimeError):project_driver(PREFIX+json.dumps(value),1)
+        value.pop('raw');value['stage']='private-synthetic-value'
+        with self.assertRaises(RuntimeError):project_driver(PREFIX+json.dumps(value),1)
+        with self.assertRaises(RuntimeError):project_driver(PREFIX+'{',1)
+
+    def flutter(self, *, skip=False, hidden=False):
+        return [
+            {'type': 'suite', 'suite': {'id': 0, 'path': '/owned/opt_in_test.dart'}},
+            {'type': 'testStart', 'test': {'id': 1, 'suiteID': 0, 'name': 'synthetic'}},
+            {'type': 'testDone', 'testID': 1, 'skipped': skip, 'hidden': hidden, 'result': 'success'},
+            {'type': 'done', 'success': True},
+        ]
+
+    def go(self):
+        return [{'Action': 'start', 'Package': 'fixture'},
+                {'Action': 'run', 'Test': 'TestFixture'},
+                {'Action': 'pass', 'Test': 'TestFixture'}, {'Action': 'pass', 'Package': 'fixture'}]
+
+    def test_flutter_real_completion(self):
+        self.assertEqual(validate_events(stream(self.flutter()), 0)['passed'], 1)
+
+    def test_flutter_known_daemon_envelope_is_metadata_only(self):
+        envelope = [{'event': 'test.startedProcess', 'params': {'vmServiceUri': 'http://127.0.0.1:12345/'}}]
+        self.assertEqual(validate_events(stream([envelope, *self.flutter()]), 0)['passed'], 1)
+        envelope[0]['params']['vmServiceUri'] = None
+        self.assertEqual(validate_events(stream([envelope, *self.flutter()]), 0)['passed'], 1)
+        with self.assertRaises(RuntimeError):
+            validate_events(stream([envelope]), 0)
+        for event in [[{'event': 'unknown', 'params': {}}], [], 0, True, ['done']]:
+            with self.subTest(event=event), self.assertRaises(RuntimeError):
+                validate_events(stream([event, *self.flutter()]), 0)
+
+    def test_flutter_duplicate_start_or_suite_is_rejected(self):
+        for index in [0, 1]:
+            events = self.flutter()
+            with self.assertRaises(RuntimeError):
+                validate_events(stream([events[index], *events]), 0)
+
+    def test_flutter_failed_incomplete_skipped_or_hidden_is_not_acceptance(self):
+        bad = [self.flutter()[:-1], self.flutter(skip=True), self.flutter(hidden=True),
+               [{'type': 'done', 'success': True}], self.flutter() + [{'type': 'done', 'success': True}],
+               self.flutter()[:-2] + [{'type': 'done', 'success': True}]]
+        for events in bad:
+            with self.subTest(events=events), self.assertRaises(RuntimeError):
+                validate_events(stream(events), 0)
+        with self.assertRaises(RuntimeError):
+            validate_events(stream(self.flutter()), 1)
+
+    def test_flutter_explicit_skip_allowlist_still_requires_executed_test(self):
+        events = self.flutter(skip=True)[:-1]
+        events += [{'type': 'testStart', 'test': {'id': 2, 'suiteID': 0, 'name': 'executed'}},
+                   {'type': 'testDone', 'testID': 2, 'skipped': False, 'hidden': False, 'result': 'success'},
+                   {'type': 'done', 'success': True}]
+        self.assertEqual(validate_events(stream(events), 0, Counter({'opt_in_test.dart': 1}))['passed'], 1)
+        with self.assertRaises(RuntimeError):
+            validate_events(stream(events), 0, Counter({'another_test.dart': 1}))
+
+    def test_flutter_hidden_failure_is_failure(self):
+        events = self.flutter(); events[2].update(hidden=True, result='error')
+        with self.assertRaises(RuntimeError):
+            validate_events(stream(events), 0)
+
+    def test_go_requires_runtime_execution(self):
+        self.assertEqual(validate_go_events(stream(self.go()), 0)['passed'], 1)
+        with self.assertRaises(RuntimeError):
+            validate_go_events(stream([{'Action': 'pass'}]), 0)
+
+    def test_go_missing_start_or_terminal_or_duplicate_rejected(self):
+        for events in [self.go()[2:], self.go()[:-1], self.go() + [self.go()[-1]], self.go()[:2] + [self.go()[-1]]]:
+            with self.subTest(events=events), self.assertRaises(RuntimeError):
+                validate_go_events(stream(events), 0)
+
+    def test_go_fail_or_skip_or_nonzero_rejected(self):
+        for action in ['skip', 'fail']:
+            events = self.go(); events[2]['Action'] = action
+            with self.assertRaises(RuntimeError):
+                validate_go_events(stream(events), 0)
+        with self.assertRaises(RuntimeError):
+            validate_go_events(stream(self.go()), 1)
+
+    def test_go_malformed_stream_rejected(self):
+        with self.assertRaises(RuntimeError):
+            validate_go_events(stream(self.go()) + '\nnot-json', 0)
+
+    def test_go_cache_inventory_detects_runtime_changes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            env = {}
+            for name in ('GOCACHE', 'GOMODCACHE', 'GOTMPDIR'):
+                root = Path(temporary) / name
+                root.mkdir(mode=0o700)
+                env[name] = str(root)
+            path = Path(env['GOCACHE']) / 'fixture'
+            path.write_bytes(b'before')
+            before = cache_inventory(env)
+            path.write_bytes(b'after!')
+            self.assertNotEqual(before, cache_inventory(env))
+            path.unlink()
+            path.symlink_to('/dev/null')
+            with self.assertRaises(RuntimeError):
+                cache_inventory(env)
+            path.unlink()
+            os.mkfifo(path)
+            with self.assertRaises(RuntimeError):
+                cache_inventory(env)
+
+
+if __name__ == '__main__':
+    unittest.main()

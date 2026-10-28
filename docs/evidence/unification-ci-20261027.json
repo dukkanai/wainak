@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "status": "PASS",
+  "repository": "dukkanai/wainak",
+  "pull_request": 2,
+  "event": "pull_request",
+  "run_id": 40444381675,
+  "run_url": "https://github.com/dukkanai/wainak/actions/runs/40444381675",
+  "source_head": "4d0d75c823bdbab78817467237616efb4ebf77aa",
+  "base_sha": "9102af8606277c80412613e46dd7140d3b8fa663",
+  "tested_commit": "ad058f93f8b5bb83a856d50e31cbea6927fa30c1",
+  "tested_tree": "441f43ab4afa3db096e6945ef37bc4a7b724be56",
+  "checkout_commit_observed_in_job": 121992028878,
+  "check_suite_id": 109618228885,
+  "checks": [
+    {
+      "name": "Archive and bridge tests",
+      "id": 121992029171,
+      "app_id": 15368,
+      "head_sha": "4d0d75c823bdbab78817467237616efb4ebf77aa",
+      "conclusion": "success"
+    },
+    {
+      "name": "Operations unit tests",
+      "id": 121992029168,
+      "app_id": 15368,
+      "head_sha": "4d0d75c823bdbab78817467237616efb4ebf77aa",
+      "conclusion": "success"
+    },
+    {
+      "name": "Authenticated matching integration",
+      "id": 121992029158,
+      "app_id": 15368,
+      "head_sha": "4d0d75c823bdbab78817467237616efb4ebf77aa",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prototype browser tests",
+      "id": 121992029155,
+      "app_id": 15368,
+      "head_sha": "4d0d75c823bdbab78817467237616efb4ebf77aa",
+      "conclusion": "success"
+    },
+    {
+      "name": "Native build guard tests",
+      "id": 121992029130,
+      "app_id": 15368,
+      "head_sha": "4d0d75c823bdbab78817467237616efb4ebf77aa",
+      "conclusion": "success"
+    },
+    {
+      "name": "Flutter development tests",
+      "id": 121992029121,
+      "app_id": 15368,
+      "head_sha": "4d0d75c823bdbab78817467237616efb4ebf77aa",
+      "conclusion": "success"
+    },
+    {
+      "name": "Isolated database recovery",
+      "id": 121992029071,
+      "app_id": 15368,
+      "head_sha": "4d0d75c823bdbab78817467237616efb4ebf77aa",
+      "conclusion": "success"
+    },
+    {
+      "name": "Backend contracts and tests",
+      "id": 121992029023,
+      "app_id": 15368,
+      "head_sha": "4d0d75c823bdbab78817467237616efb4ebf77aa",
+      "conclusion": "success"
+    },
+    {
+      "name": "Source checks",
+      "id": 121992028878,
+      "app_id": 15368,
+      "head_sha": "4d0d75c823bdbab78817467237616efb4ebf77aa",
+      "conclusion": "success"
+    }
+  ],
+  "strict_required_checks": [
+    {
+      "context": "Source checks",
+      "app_id": 15368
+    },
+    {
+      "context": "Operations unit tests",
+      "app_id": 15368
+    },
+    {
+      "context": "Isolated database recovery",
+      "app_id": 15368
+    },
+    {
+      "context": "Prototype browser tests",
+      "app_id": 15368
+    },
+    {
+      "context": "Backend contracts and tests",
+      "app_id": 15368
+    },
+    {
+      "context": "Authenticated matching integration",
+      "app_id": 15368
+    },
+    {
+      "context": "Flutter development tests",
+      "app_id": 15368
+    },
+    {
+      "context": "Archive and bridge tests",
+      "app_id": 15368
+    },
+    {
+      "context": "Native build guard tests",
+      "app_id": 15368
+    }
+  ],
+  "run_updated_at": "2026-10-27T03:32:10Z"
+}
