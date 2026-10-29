@@ -8,5 +8,7 @@
   "old_method_sha256": "a410683587fbe042766ca4fe89e76f2959b58575b35edffd32a2728d3c1c9714",
   "new_method_sha256": "354dc061b2b0429638c1c5ab29fa610f67ac215edbd75f9776c1af8ef75ea43a",
   "term_timeout_seconds": 5,
-  "kill_timeout_seconds": 2
+  "kill_timeout_seconds": 2,
+  "tool_pubspec_lock_sha256": "6a98afb61c0cc72f31631ab444932f072fd275aa04d56cde2bf6831ba02fc8f8",
+  "tool_lock_archive_sha256": "6114edc2dae3636cfefb7e4456a4510399ee856e324149b34dbacb509e329d05"
 }

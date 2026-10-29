@@ -30,6 +30,16 @@ class GithubMacPolicy(unittest.TestCase):
         for host,machine,space in [('linux','arm64',10*g.GIB),('darwin','x86_64',10*g.GIB),('darwin','arm64',10*g.GIB-1)]:
             with self.assertRaises(p.PolicyError):g.preflight(env,host,machine,space)
 
+    def test_checkout_alias_is_resolved_and_other_target_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp).resolve();alias=root/'alias';alias.symlink_to(root,target_is_directory=True)
+            other=root/'other';other.mkdir();wrong=root/'wrong';wrong.symlink_to(other,target_is_directory=True)
+            with mock.patch.object(g,'ROOT',root):
+                for path in (root,alias):g.preflight({**self.env(root),'GITHUB_WORKSPACE':str(path)},'darwin','arm64',10*g.GIB)
+                for path in (other,wrong):
+                    with self.assertRaisesRegex(p.PolicyError,'github_checkout'):
+                        g.preflight({**self.env(root),'GITHUB_WORKSPACE':str(path)},'darwin','arm64',10*g.GIB)
+
     def test_fresh_work_rejects_existing_and_dangling_symbolic_directories(self):
         for kind in ('directory','dangling'):
             for name in ('work','build'):
@@ -70,6 +80,7 @@ class GithubMacPolicy(unittest.TestCase):
                 self.assertEqual(work_arg,work)
                 run('sdk_head',['git','rev-parse','HEAD'],cwd=base)
                 run('sdk_inventory',['git','ls-tree','-rz','HEAD','--',*g.sdk.SOURCE_PATHS],cwd=base)
+                run('sdk_dependencies',[base/'bin/cache/dart-sdk/bin/dart','pub','get','--enforce-lockfile','--no-precompile'],cwd=work/'analyzer_overlay/flutter_tools')
                 return overlay
             commands=[
                 ('source_commit',['git','rev-parse','HEAD']),('source_clean',['git','status','--porcelain']),
@@ -81,6 +92,7 @@ class GithubMacPolicy(unittest.TestCase):
                 ('flutter_version',['flutter','--version','--machine']),
                 ('sdk_head',['git','rev-parse','HEAD']),
                 ('sdk_inventory',['git','ls-tree','-rz','HEAD','--',*g.sdk.SOURCE_PATHS]),
+                ('sdk_dependencies',[base/'bin/cache/dart-sdk/bin/dart','pub','get','--enforce-lockfile','--no-precompile']),
                 ('pub_get',['flutter','pub','get','--enforce-lockfile']),('analyze',overlay.command()),
                 ('entry_test',['flutter','test','--no-pub','--concurrency=1',*p.DEFINES,'test/testflight_entrypoint_test.dart']),
                 ('compile_unsigned',['flutter','build','ios','--release','--no-pub','--no-codesign',*p.DEFINES]),
@@ -96,7 +108,7 @@ class GithubMacPolicy(unittest.TestCase):
                 self.assertTrue(kw['check']);self.assertIs(kw['group_observer'],g.groups.capture)
                 self.assertGreater(kw['seconds'],0);self.assertLessEqual(kw['seconds'],1200)
                 self.assertEqual(kw['cwd'],mobile if label in {'pub_get','analyze','entry_test','compile_unsigned'} else
-                    base if label in {'sdk_head','sdk_inventory'} else root)
+                    base if label in {'sdk_head','sdk_inventory'} else work/'analyzer_overlay/flutter_tools' if label=='sdk_dependencies' else root)
                 kw['diagnostic'].update(failure_kind='NONE',exit_code=0,output_bytes=0,cleanup_failed=False)
                 if fail==label:
                     kw['diagnostic'].update(failure_kind='NONZERO_EXIT',exit_code=9)
@@ -153,6 +165,7 @@ class GithubMacPolicy(unittest.TestCase):
 
     def test_initial_policy_reasons_are_finite_and_never_print_exception_messages(self):
         for error,expected in [(p.PolicyError('github_initial_disk'),'github_initial_disk'),
+            (p.PolicyError('sdk_tool_lock_hash'),'sdk_tool_lock_hash'),(p.PolicyError('sdk_generated_config_missing'),'sdk_generated_config_missing'),
             (p.PolicyError('CANARY'),'OTHER'),(RuntimeError('CANARY'),'OTHER')]:
             with mock.patch.object(g,'execute',side_effect=error),mock.patch('builtins.print') as printed:
                 self.assertEqual(g.main(),1)

@@ -19,7 +19,7 @@ from ci.testflight.check_sdk_dispose import check as dispose_check
 from scripts.ci_process import run_bounded
 
 LABELS=frozenset({'source_commit','source_clean','publication','preparation','regressions','xcode_version',
-    'extract_sdk','flutter_version','sdk_head','sdk_inventory','pub_get','analyze','entry_test',
+    'extract_sdk','flutter_version','sdk_head','sdk_inventory','sdk_dependencies','pub_get','analyze','entry_test',
     'compile_unsigned','verify_unsigned','source_unchanged','architecture'})
 GIB=1024**3
 SAFE_POLICY_REASONS=frozenset({'github_standard_arm_mac','github_manual_public_standard_only',
@@ -130,7 +130,7 @@ def execute():
     for field,key in [('frameworkVersion','version'),('frameworkRevision','framework_revision'),
                       ('engineRevision','engine_revision'),('dartSdkVersion','dart_version')]:
         p.require(version.get(field)==pins[key],'github_flutter_pin')
-    d.emit_host(ROOT,work,pins['version'],pins['dart_version'])
+    d.emit_host(ROOT,work,pins['version'],pins['dart_version'],checkout_variable='GITHUB_WORKSPACE',effective_env=env)
     overlay=sdk.prepare(work,run);print(json.dumps(overlay.report()),flush=True)
     print(json.dumps(dispose_check(overlay,work,env)),flush=True)
     run('pub_get',['flutter','pub','get','--enforce-lockfile'],cwd=mobile)
@@ -156,7 +156,7 @@ def main():
     except BaseException as error:
         reason=error.args[0] if isinstance(error,p.PolicyError) and error.args else None
         print(json.dumps({'status':'FAILED_CLOSED','artifact_eligible':False,'raw_output':'withheld',
-            'safe_reason':reason if type(reason) is str and reason in SAFE_POLICY_REASONS else 'OTHER',
+            'safe_reason':reason if type(reason) is str and reason in SAFE_POLICY_REASONS | sdk.SAFE_POLICY_REASONS else 'OTHER',
             'error_type':d.error_type(error)}),flush=True)
         return 1
     return 0

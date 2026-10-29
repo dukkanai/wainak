@@ -23,6 +23,7 @@ COMMAND_STAGES = {
     'xcode_version': 'preflight',
     'sdk_head': 'sdk_analyzer_overlay',
     'sdk_inventory': 'sdk_analyzer_overlay',
+    'sdk_dependencies': 'sdk_analyzer_overlay',
     'pub_get': 'flutter_host_checks',
     'analyze': 'flutter_host_checks',
     'entry_test': 'flutter_host_checks',
@@ -115,9 +116,11 @@ def numeric_version(value):
     return value if type(value) is str and re.fullmatch(r'[0-9]{1,3}(?:\.[0-9]{1,3}){1,3}', value) else 'UNKNOWN'
 
 
-def emit_host(root, work, flutter_version, dart_version):
+def emit_host(root, work, flutter_version, dart_version, *, checkout_variable="CM_BUILD_DIR", effective_env=None):
     # Probe an owned disposable directory after source checks. No paths, host
     # names, environment contents, provisioning data or tool output are logged.
+    if checkout_variable not in {"CM_BUILD_DIR", "GITHUB_WORKSPACE"}:raise ValueError("host_checkout_context")
+    effective_env = os.environ if effective_env is None else effective_env
     case_sensitive = None
     try:
         with tempfile.TemporaryDirectory(prefix='host-probe-', dir=work) as directory:
@@ -137,8 +140,8 @@ def emit_host(root, work, flutter_version, dart_version):
         'python': '.'.join(str(n) for n in sys.version_info[:3]),
         'macos': macos,
         'case_sensitive_volume': case_sensitive,
-        'checkout_resolves_to_root': Path(os.environ.get('CM_BUILD_DIR', '/nonexistent')).resolve() == root,
-        'pub_cache_explicit': 'PUB_CACHE' in os.environ,
+        'checkout_resolves_to_root': Path(os.environ.get(checkout_variable, '/nonexistent')).resolve() == root,
+        'pub_cache_explicit': 'PUB_CACHE' in effective_env,
         # These versions are emitted only after the driver's exact pin checks.
         'flutter': numeric_version(flutter_version),
         'dart': numeric_version(dart_version),

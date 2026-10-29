@@ -274,6 +274,21 @@ class SafeHostDiagnostics(unittest.TestCase):
             self.assertEqual(row['flutter'], '3.47.8')
             self.assertEqual(row['python'], '.'.join(str(n) for n in sys.version_info[:3]))
 
+    def test_github_host_uses_actual_checkout_context_and_child_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve();alias=root/'alias';alias.symlink_to(root,target_is_directory=True)
+            other=root/'other';other.mkdir()
+            for checkout,expected in ((root,True),(alias,True),(other,False)):
+                with mock.patch.dict(d.os.environ,{'GITHUB_WORKSPACE':str(checkout)},clear=True), \
+                     redirect_stdout(io.StringIO()) as output:
+                    d.emit_host(root,root,'3.47.8','3.13.7',checkout_variable='GITHUB_WORKSPACE',effective_env={'PUB_CACHE':CANARY})
+                row=json.loads(output.getvalue())
+                self.assertIs(row['checkout_resolves_to_root'],expected)
+                self.assertTrue(row['pub_cache_explicit']);self.assertNotIn(CANARY,output.getvalue())
+                self.assertNotIn(str(root),output.getvalue())
+            with self.assertRaisesRegex(ValueError,'host_checkout_context'):
+                d.emit_host(root,root,'3.47.8','3.13.7',checkout_variable=CANARY)
+
     def test_host_untrusted_version_architecture_and_probe_failure_are_bounded(self):
         with tempfile.TemporaryDirectory() as directory, \
              mock.patch.object(d.sys, 'platform', 'darwin'), \

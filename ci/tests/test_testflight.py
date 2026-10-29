@@ -288,6 +288,7 @@ class DriverGuards(unittest.TestCase):
                 self.assertEqual(work, root/'.ci-work/testflight')
                 run('sdk_head', ['git', 'rev-parse', 'HEAD'], cwd=sdk_base)
                 run('sdk_inventory', ['git', 'ls-tree', '-rz', 'HEAD', '--', *b.sdk.SOURCE_PATHS], cwd=sdk_base)
+                run('sdk_dependencies', [sdk_base/'bin/cache/dart-sdk/bin/dart', 'pub', 'get', '--enforce-lockfile', '--no-precompile'], cwd=work/'analyzer_overlay/flutter_tools')
                 return overlay
             commands = [
                 [b.sys.executable, root/'ci/check_preparation.py'],
@@ -295,6 +296,7 @@ class DriverGuards(unittest.TestCase):
                 ['flutter', '--version', '--machine'], ['xcodebuild', '-version'],
                 ['git', 'rev-parse', 'HEAD'],
                 ['git', 'ls-tree', '-rz', 'HEAD', '--', *b.sdk.SOURCE_PATHS],
+                [sdk_base/'bin/cache/dart-sdk/bin/dart', 'pub', 'get', '--enforce-lockfile', '--no-precompile'],
                 ['flutter', 'pub', 'get', '--enforce-lockfile'],
                 overlay.command(),
                 ['flutter', 'test', '--no-pub', '--concurrency=1', *p.DEFINES, 'test/testflight_entrypoint_test.dart'],
@@ -327,7 +329,7 @@ class DriverGuards(unittest.TestCase):
                 self.assertGreater(kwargs['seconds'], 0)
                 self.assertLessEqual(kwargs['seconds'], 1200 if label == 'build_ipa' else 300)
                 self.assertEqual(kwargs['cwd'], mobile if label in {
-                    'pub_get', 'analyze', 'entry_test', 'ios_config', 'build_ipa'} else sdk_base if label in {'sdk_head','sdk_inventory'} else root)
+                    'pub_get', 'analyze', 'entry_test', 'ios_config', 'build_ipa'} else sdk_base if label in {'sdk_head','sdk_inventory'} else root/'.ci-work/testflight/analyzer_overlay/flutter_tools' if label == 'sdk_dependencies' else root)
                 self.assertNotIn('CM_API_TOKEN', kwargs['env'])
                 expected_env = b.child_environment(env)
                 if label == "analyze":expected_env["FLUTTER_ROOT"] = str(sdk_base)
