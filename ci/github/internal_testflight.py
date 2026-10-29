@@ -97,6 +97,28 @@ def profile_check(profile, pins, number):
         hashlib.sha1(certs[0]).hexdigest().upper()==pins['certificate_sha1'],'signed_certificate')
 
 
+def decode_profile(run, label, path, keychain, pins):
+    p.require(label in {'profile_decode','read_profile'} and path.is_absolute(),'signed_cms_input')
+    data=regular(path,36*1024)
+    p.require(sha(data)==pins['profile_sha256'],'signed_profile_hash')
+    p.require(data.startswith(b'\x30'),'signed_cms_input')  # Pinned DER CMS, not PEM/base64 text.
+    p.require(keychain.is_absolute() and keychain==PRIVATE/'distribution.keychain-db' and
+              keychain.is_file() and not keychain.is_symlink() and not PRIVATE.is_symlink() and
+              keychain.parent.resolve()==PRIVATE.resolve(),'signed_cms_keychain')
+    print(json.dumps({'event':'GITHUB_CMS_INPUT','role':label,'absolute_path':True,
+        'regular_profile':True,'profile_bytes':len(data),'pinned_hash_match':True,
+        'format':'PINNED_DER','explicit_owned_keychain':True,'cwd':'CHECKOUT_ROOT'}),flush=True)
+    try:
+        # cms imports its embedded certificates. Supply the already unlocked
+        # owned keychain; do not depend on a default keychain in isolated HOME.
+        output=run(label,['/usr/bin/security','cms','-D','-k',keychain,'-i',path],cwd=ROOT)
+    except RuntimeError:
+        # Process exit/timeout/cleanup details remain in the bounded command event.
+        raise p.PolicyError('signed_cms_command_failed') from None
+    p.require(sha(regular(path,36*1024))==pins['profile_sha256'],'signed_profile_hash')
+    return xml_plist(output)
+
+
 def unpack_signed(ipa, destination):
     # A Mac volume can merge names that Linux treats as different. Reject even
     # implicit parent aliases before the existing bounded ZIP extractor writes.
@@ -166,16 +188,17 @@ def compile_internal(pins, number, ctx, secret_source):
         raw=decode(secret_source[q.SIGNING_SECRETS[2]],36*1024)
         p.require(sha(raw)==pins['profile_sha256'],'signed_profile_hash')
         profile_path=PRIVATE/'profile.mobileprovision';new_file(profile_path,raw)
-        profile=xml_plist(run('profile_decode',['/usr/bin/security','cms','-D','-i',profile_path]))
-        profile_check(profile,pins,number)
-        p12=PRIVATE/'distribution.p12';new_file(p12,decode(secret_source[q.SIGNING_SECRETS[0]],36*1024))
-        password=secret_source[q.SIGNING_SECRETS[1]]
-        p.require(type(password) is str and len(password)<=1024 and '\0' not in password,'signed_secret_bound')
         prior=shlex.split(run('keychain_list',['/usr/bin/security','list-keychains','-d','user']))
         p.require(len(prior)<=32 and all(x.startswith('/') and '\n' not in x and '\0' not in x for x in prior),'signed_path')
         new_file(PRIVATE/'search-list.json',json.dumps(prior).encode())
         run('keychain_create',['/usr/bin/security','create-keychain','-p',key_password,keychain])
         run('keychain_unlock',['/usr/bin/security','unlock-keychain','-p',key_password,keychain])
+        profile=decode_profile(run,'profile_decode',profile_path,keychain,pins)
+        profile_check(profile,pins,number)
+        # P12 is not read/imported until the profile has passed validation.
+        p12=PRIVATE/'distribution.p12';new_file(p12,decode(secret_source[q.SIGNING_SECRETS[0]],36*1024))
+        password=secret_source[q.SIGNING_SECRETS[1]]
+        p.require(type(password) is str and len(password)<=1024 and '\0' not in password,'signed_secret_bound')
         run('keychain_import',['/usr/bin/security','import',p12,'-k',keychain,'-P',password,'-T','/usr/bin/codesign','-T','/usr/bin/security'])
         run('keychain_access',['/usr/bin/security','set-key-partition-list','-S','apple-tool:,apple:,codesign:','-s','-k',key_password,keychain])
         run('keychain_select',['/usr/bin/security','list-keychains','-d','user','-s',keychain,*prior])
@@ -211,7 +234,7 @@ def compile_internal(pins, number, ctx, secret_source):
         entitlements=xml_plist(run('read_entitlements',['/usr/bin/codesign','-d','--entitlements',':-',app]))
         embedded=regular(app/'embedded.mobileprovision',256*1024)
         p.require(sha(embedded)==pins['profile_sha256'],'signed_profile_hash')
-        embedded_profile=xml_plist(run('read_profile',['/usr/bin/security','cms','-D','-i',app/'embedded.mobileprovision']))
+        embedded_profile=decode_profile(run,'read_profile',app/'embedded.mobileprovision',keychain,pins)
         profile_check(embedded_profile,pins,number)
         info=plistlib.loads(regular(app/'Info.plist'))
         p.validate_profile(embedded_profile,entitlements,info,number)

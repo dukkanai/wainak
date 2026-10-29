@@ -34,7 +34,8 @@ REASONS = frozenset({'signed_disabled','signed_pin_schema','signed_pin_value','s
     'signed_secret_encoding','signed_secret_bound','signed_existing_path','signed_path','signed_export',
     'signed_source_drift','signed_receipt','signed_ipa_hash','signed_identity_count','signed_settings',
     'signed_cleanup','signed_upload_ambiguous','signed_no_ipa','signed_debug_logging','signed_p8_shape',
-    'signed_pin_mismatch','signed_active_workflow'})
+    'signed_pin_mismatch','signed_active_workflow','signed_cms_input','signed_cms_keychain',
+    'signed_cms_command_failed'})
 # Fixed codes from the reused signing/ZIP policy, never exception text from tools.
 REASONS |= frozenset({'build_number','app_identity','app_platform','profile_team','not_app_store_profile',
     'profile_expiry_missing','profile_expired','application_identifier','entitlement_team','debug_entitlement',

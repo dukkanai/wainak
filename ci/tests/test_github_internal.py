@@ -17,7 +17,7 @@ from ci.github import internal_policy as q, internal_testflight as s, mac_unsign
 from ci.testflight import policy as p
 
 CERT=b'synthetic-public-certificate-not-a-key'
-PROFILE_BYTES=b'synthetic-provisioning-envelope'
+PROFILE_BYTES=b'\x30synthetic-provisioning-envelope'
 PINS={'enabled':True,'certificate_sha256':hashlib.sha256(CERT).hexdigest(),
       'certificate_sha1':hashlib.sha1(CERT).hexdigest().upper(),
       'profile_sha256':hashlib.sha256(PROFILE_BYTES).hexdigest(),
@@ -238,6 +238,97 @@ class Policy(unittest.TestCase):
                 self.assertFalse((root/'inspect').exists())
 
 
+class CMSInput(unittest.TestCase):
+    def setUp(self):
+        temporary=tempfile.TemporaryDirectory(prefix='cms paths with spaces ')
+        self.addCleanup(temporary.cleanup)
+        self.root=Path(temporary.name).resolve();self.work=self.root/'.ci-github'
+        self.private=self.work/'signing';self.private.mkdir(parents=True)
+        patch=mock.patch.multiple(s,ROOT=self.root,WORK=self.work,PRIVATE=self.private)
+        patch.start();self.addCleanup(patch.stop)
+        self.path=self.private/'profile.mobileprovision';self.path.write_bytes(PROFILE_BYTES)
+        self.keychain=self.private/'distribution.keychain-db';self.keychain.write_bytes(b'synthetic-keychain')
+        self.run=mock.Mock(return_value=plistlib.dumps(PROFILE).decode())
+
+    def decode(self,**overrides):
+        return s.decode_profile(self.run,overrides.get('label','profile_decode'),
+            overrides.get('path',self.path),overrides.get('keychain',self.keychain),overrides.get('pins',PINS))
+
+    def test_absolute_paths_spaces_explicit_keychain_and_cwd(self):
+        # No real security process: argv is checked exactly, with no shell or
+        # option that disables CMS signature/trust processing.
+        with mock.patch('builtins.print') as printed:
+            for label in ('profile_decode','read_profile'):
+                self.assertEqual(self.decode(label=label),PROFILE)
+                self.run.assert_called_with(label,['/usr/bin/security','cms','-D','-k',self.keychain,'-i',self.path],cwd=self.root)
+                row=json.loads(printed.call_args.args[0])
+                self.assertEqual(row,{'event':'GITHUB_CMS_INPUT','role':label,'absolute_path':True,
+                    'regular_profile':True,'profile_bytes':len(PROFILE_BYTES),'pinned_hash_match':True,
+                    'format':'PINNED_DER','explicit_owned_keychain':True,'cwd':'CHECKOUT_ROOT'})
+            self.assertNotIn(str(self.root),str(printed.call_args_list))
+
+    def test_relative_outside_directory_and_symlink_profiles_rejected_before_command(self):
+        outside=self.root/'outside';outside.write_bytes(PROFILE_BYTES)
+        link=self.private/'link';link.symlink_to(self.path)
+        parent=self.work/'alias';parent.symlink_to(self.private,target_is_directory=True)
+        for path,reason in [(Path('profile.mobileprovision'),'signed_cms_input'),
+                            (outside,'signed_path'),(self.private,'signed_path'),
+                            (link,'signed_path'),(parent/self.path.name,'signed_path')]:
+            with self.subTest(path=path.name),self.assertRaisesRegex(p.PolicyError,reason):self.decode(path=path)
+        self.run.assert_not_called()
+
+    def test_keychain_missing_wrong_location_directory_or_symlink_rejected(self):
+        other=self.private/'other.keychain-db';other.write_bytes(b'synthetic')
+        for keychain in (Path(self.keychain.name),other,self.private):
+            with self.subTest(path=keychain.name),self.assertRaisesRegex(p.PolicyError,'signed_cms_keychain'):
+                self.decode(keychain=keychain)
+        self.keychain.unlink()
+        with self.assertRaisesRegex(p.PolicyError,'signed_cms_keychain'):self.decode()
+        self.keychain.symlink_to(other)
+        with self.assertRaisesRegex(p.PolicyError,'signed_cms_keychain'):self.decode()
+        self.run.assert_not_called()
+
+    def test_input_hash_and_format_rejected_before_command(self):
+        self.path.write_bytes(b'changed')
+        with self.assertRaisesRegex(p.PolicyError,'signed_profile_hash'):self.decode()
+        # Even a pinned text envelope is not accepted as the reviewed DER input.
+        with self.assertRaisesRegex(p.PolicyError,'signed_cms_input'):
+            self.decode(pins={**PINS,'profile_sha256':s.sha(b'changed')})
+        with self.assertRaisesRegex(p.PolicyError,'signed_cms_input'):self.decode(label='unexpected')
+        self.run.assert_not_called()
+
+    def test_post_command_hash_drift_and_symlink_rejected(self):
+        for mutation in ('bytes','symlink'):
+            with self.subTest(mutation=mutation),mock.patch('builtins.print'):
+                def mutate(*args,**kwargs):
+                    if mutation=='bytes':self.path.write_bytes(b'changed')
+                    else:
+                        other=self.private/'replacement';other.write_bytes(PROFILE_BYTES)
+                        self.path.unlink();self.path.symlink_to(other)
+                    return plistlib.dumps(PROFILE).decode()
+                self.run.side_effect=mutate
+                with self.assertRaisesRegex(p.PolicyError,'signed_profile_hash' if mutation=='bytes' else 'signed_path'):
+                    self.decode()
+                self.path.unlink();self.path.write_bytes(PROFILE_BYTES)
+
+    def test_failed_cms_has_safe_reason_no_fallback_and_no_output_leak(self):
+        for error in (RuntimeError('CANARY_CMS_TRUST_FAILURE'),RuntimeError('CANARY_TIMEOUT_OR_CLEANUP')):
+            self.run.reset_mock();self.run.side_effect=error
+            with mock.patch('builtins.print') as printed,self.assertRaisesRegex(p.PolicyError,'^signed_cms_command_failed$') as caught:
+                self.decode()
+            self.assertEqual(self.run.call_count,1)
+            self.assertNotIn('CANARY',str(printed.call_args_list)+str(caught.exception))
+            self.assertIn(str(caught.exception),q.REASONS)
+        self.run.side_effect=p.PolicyError('sdk_base_changed')
+        with mock.patch('builtins.print'),self.assertRaisesRegex(p.PolicyError,'sdk_base_changed'):self.decode()
+
+    def test_successful_exit_without_plist_still_rejected(self):
+        self.run.return_value='CANARY_INVALID_OUTPUT'
+        with mock.patch('builtins.print') as printed,self.assertRaisesRegex(p.PolicyError,'missing_plist_output'):
+            self.decode()
+        self.assertNotIn('CANARY',str(printed.call_args_list))
+
+
 class Lifecycle(unittest.TestCase):
     def exercise(self, failure=None, mutation=None, uploading=False):
         with tempfile.TemporaryDirectory() as tmp:
@@ -246,8 +337,8 @@ class Lifecycle(unittest.TestCase):
             mobile=root/'apps/mobile';mobile.mkdir(parents=True)
             overlay=mock.Mock();ctx={'env':{'PATH':'/safe/path','HOME':str(work/'home')},'deadline':9999999999,
                                     'overlay':overlay,'mobile':mobile}
-            calls=[];failed=False
-            commands=['profile_decode','keychain_list','keychain_create','keychain_unlock','keychain_import','keychain_access',
+            calls=[];failed=False;unlocked=False
+            commands=['keychain_list','keychain_create','keychain_unlock','profile_decode','keychain_import','keychain_access',
                 'keychain_select','signing_identity','ios_config','build_settings','build_ipa','verify_signature','read_entitlements',
                 'read_profile','extract_certificate','architecture','source_clean','keychain_restore','keychain_delete']
             outputs={'profile_decode':plistlib.dumps(PROFILE).decode(),'keychain_list':'"/original/login.keychain-db"\n',
@@ -260,7 +351,7 @@ class Lifecycle(unittest.TestCase):
             if mutation=='settings':outputs['build_settings']=json.dumps([{'target':'Runner','buildSettings':{}}])
             keychain=private/'distribution.keychain-db';app=work/'signed-inspect/Payload/Runner.app'
             expected_commands={
-                'profile_decode':['/usr/bin/security','cms','-D','-i',private/'profile.mobileprovision'],
+                'profile_decode':['/usr/bin/security','cms','-D','-k',keychain,'-i',private/'profile.mobileprovision'],
                 'keychain_list':['/usr/bin/security','list-keychains','-d','user'],
                 'keychain_create':['/usr/bin/security','create-keychain','-p','synthetic-password',keychain],
                 'keychain_unlock':['/usr/bin/security','unlock-keychain','-p','synthetic-password',keychain],
@@ -275,7 +366,7 @@ class Lifecycle(unittest.TestCase):
                 'build_ipa':['flutter','build','ipa','--release','--no-pub','--build-number','17','--export-options-plist',private/'export.plist',*p.DEFINES],
                 'verify_signature':['/usr/bin/codesign','--verify','--deep','--strict',app],
                 'read_entitlements':['/usr/bin/codesign','-d','--entitlements',':-',app],
-                'read_profile':['/usr/bin/security','cms','-D','-i',app/'embedded.mobileprovision'],
+                'read_profile':['/usr/bin/security','cms','-D','-k',keychain,'-i',app/'embedded.mobileprovision'],
                 'extract_certificate':['/usr/bin/codesign','-d','--extract-certificates',private/'leaf',app],
                 'architecture':['/usr/bin/lipo','-archs',app/'Runner'],
                 'source_clean':['git','status','--porcelain'],
@@ -285,7 +376,7 @@ class Lifecycle(unittest.TestCase):
             }
             self.assertEqual(set(expected_commands),s.LABELS)
             def run(label,argv,**kwargs):
-                nonlocal failed
+                nonlocal failed,unlocked
                 self.assertIn(label,s.LABELS,'unexpected command')
                 self.assertEqual(argv,expected_commands[label],'unexpected argv')
                 if label not in {'keychain_restore','keychain_delete'}:
@@ -294,6 +385,12 @@ class Lifecycle(unittest.TestCase):
                 calls.append(label)
                 if failure==label:failed=True;raise RuntimeError('CANARY_SECRET_OUTPUT')
                 if label=='keychain_create':(private/'distribution.keychain-db').write_bytes(b'synthetic-keychain')
+                if label=='keychain_unlock':
+                    self.assertTrue(keychain.is_file());unlocked=True
+                if label in {'profile_decode','read_profile'}:
+                    self.assertTrue(unlocked,'CMS requires an unlocked owned keychain')
+                    self.assertTrue(keychain.is_file());self.assertEqual(kwargs['cwd'],root)
+                    self.assertTrue(argv[-1].is_absolute());self.assertTrue(argv[4].is_absolute())
                 if label=='keychain_delete':(private/'distribution.keychain-db').unlink()
                 if label=='keychain_import':
                     self.assertNotIn('-A',argv);self.assertIn('/usr/bin/codesign',argv)
@@ -314,8 +411,11 @@ class Lifecycle(unittest.TestCase):
                     self.assertNotIn('CANARY',str(argv));self.assertEqual(kwargs['cwd'],private)
                     self.assertTrue((private/'private_keys'/('AuthKey_'+PINS['asc_key_id']+'.p8')).is_file())
                 return outputs.get(label,'')
-            fake_secrets={q.SIGNING_SECRETS[0]:base64.b64encode(b'synthetic-p12').decode(),
-                          q.SIGNING_SECRETS[1]:'CANARY_PASSWORD',q.SIGNING_SECRETS[2]:base64.b64encode(PROFILE_BYTES).decode()}
+            secret_reads=[]
+            class SyntheticSecrets(dict):
+                def __getitem__(self,key):secret_reads.append(key);return super().__getitem__(key)
+            fake_secrets=SyntheticSecrets({q.SIGNING_SECRETS[0]:base64.b64encode(b'synthetic-p12').decode(),
+                          q.SIGNING_SECRETS[1]:'CANARY_PASSWORD',q.SIGNING_SECRETS[2]:base64.b64encode(PROFILE_BYTES).decode()})
             with mock.patch.multiple(s,ROOT=root,WORK=work,PRIVATE=private,IPA=ipa,RECEIPT=receipt), \
                  mock.patch.object(s,'runner',return_value=run),mock.patch.object(s,'cleanup_runner',return_value=run), \
                  mock.patch.object(s.secrets,'token_hex',return_value='synthetic-password'), \
@@ -324,6 +424,9 @@ class Lifecycle(unittest.TestCase):
                     if failure or mutation:
                         with self.assertRaises((RuntimeError,p.PolicyError)):s.compile_internal(PINS,'17',ctx,fake_secrets)
                         self.assertFalse(receipt.exists())
+                        if failure in {'keychain_list','keychain_create','keychain_unlock','profile_decode'} or mutation=='profile':
+                            self.assertNotIn(q.SIGNING_SECRETS[0],secret_reads)
+                            self.assertNotIn(q.SIGNING_SECRETS[1],secret_reads)
                     else:
                         s.compile_internal(PINS,'17',ctx,fake_secrets)
                         self.assertEqual(calls,commands);self.assertTrue(ipa.exists())
