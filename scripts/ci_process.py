@@ -9,7 +9,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from ci.ios.diagnostics import cleanup_process  # Reuse the reviewed group cleanup.
+from ci.ios.diagnostics import cleanup_process, project_cleanup_errors, safe_error
 
 
 def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024,
@@ -29,6 +29,7 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
     kind = 'NONE'
     code = None
     cleanup_failed = False
+    cleanup_errors = []
     process = selector = primary = None
     output = bytearray()
     previous = signal.getsignal(signal.SIGTERM)
@@ -82,6 +83,7 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
             # group cleanup. Always reap the direct child, not just probe a PID.
             if primary is not None and process is not None and cleanup_grace:
                 try:
+                    process.poll()
                     os.killpg(process.pid, signal.SIGTERM)
                     end=time.monotonic()+cleanup_grace
                     while time.monotonic() < end:
@@ -92,19 +94,24 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
                             break
                         time.sleep(.05)
                     process.wait(timeout=max(.01,end-time.monotonic()))
-                except BaseException:
+                except ProcessLookupError:
+                    pass  # Owned group is already absent.
+                except BaseException as error:
                     # Never let signal/probe/reap failure bypass final group cleanup
                     # or replace the original timeout/cancellation failure.
-                    pass
+                    cleanup_errors.append({'operation': 'grace_cleanup', **safe_error(error)})
             try:
                 failures = cleanup_process(process, selector)
-            except BaseException:
+            except BaseException as error:
+                cleanup_errors.append({'operation': 'cleanup_process', **safe_error(error)})
                 cleanup_failed = True
                 if primary is None:
                     kind = 'CLEANUP'
-                raise
-            cleanup_failed = bool(failures)
-            if failures and primary is None:
+                    raise
+                failures = []
+            cleanup_errors.extend(failures)
+            cleanup_failed = bool(cleanup_errors)
+            if cleanup_failed and primary is None:
                 kind = 'CLEANUP'
                 raise RuntimeError('Host CI owned process cleanup could not be verified')
         finally:
@@ -115,3 +122,4 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
                     diagnostic.clear()
                     diagnostic.update(failure_kind=kind, exit_code=code,
                                       output_bytes=len(output), cleanup_failed=cleanup_failed)
+                    diagnostic.update(project_cleanup_errors(cleanup_errors))

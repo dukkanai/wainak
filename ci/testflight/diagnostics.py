@@ -12,6 +12,7 @@ import tempfile
 import time
 
 from ci.testflight import policy as p
+from ci.ios.diagnostics import project_cleanup_errors
 
 COMMAND_STAGES = {
     'source_preparation': 'preflight',
@@ -79,6 +80,9 @@ def emit_command(label, outcome, started, detail):
         'failure_kind': kind,
         'output_bytes': integer(detail.get('output_bytes'), 0, 16 * 1024 * 1024),
         'cleanup_failed': detail.get('cleanup_failed') is True,
+        **project_cleanup_errors(detail.get('cleanup_errors', [])),
+        'cleanup_errors_truncated': detail.get('cleanup_errors_truncated') is True or
+            (type(detail.get('cleanup_errors')) is list and len(detail['cleanup_errors']) > 16),
     }), flush=True)
 
 

@@ -46,6 +46,29 @@ def emit(event, **fields):
     print('WAINEK_CI_DIAGNOSTIC ' + json.dumps({'event': event, **fields}, sort_keys=True), flush=True)
 
 
+CLEANUP_OPERATIONS = frozenset({'poll_direct_child', 'signal_term', 'signal_kill',
+    'probe_after_term', 'probe_after_kill', 'reap_direct_child', 'verify_group_gone',
+    'close_selector', 'close_stdout', 'cleanup_process', 'grace_cleanup'})
+CLEANUP_TYPES = frozenset(ERROR_TYPES) | {'UnverifiedProcessGroup', 'Exception', 'RuntimeError'}
+
+
+def project_cleanup_errors(errors):
+    """Bounded public projection, including hostile or malformed caller data."""
+    if type(errors) is not list:
+        errors = [{'operation': 'cleanup_process', 'type': 'Exception'}]
+    rows = []
+    for error in errors[:16]:
+        error = error if type(error) is dict else {}
+        operation, kind = error.get('operation'), error.get('type')
+        row = {'operation': operation if type(operation) is str and operation in CLEANUP_OPERATIONS else 'other',
+               'type': kind if type(kind) is str and kind in CLEANUP_TYPES else 'Exception'}
+        number = error.get('errno')
+        if type(number) is int and number in errno.errorcode:
+            row['errno'] = number
+        rows.append(row)
+    return {'cleanup_errors': rows, 'cleanup_errors_truncated': len(errors) > 16}
+
+
 def cleanup_process(process, selector):
     """Best-effort owned-group cleanup; uncertainty is returned as failure, never waived.
 
@@ -58,8 +81,19 @@ def cleanup_process(process, selector):
     def record(operation, error):
         failures.append({'operation': operation, **safe_error(error)})
 
+    def reap_ready_child():
+        # Reap a terminated direct child without waiting. On Darwin, a group
+        # containing only unreaped zombies can report EPERM; on Linux it can
+        # remain discoverable indefinitely until waitpid/poll collects it.
+        # Reaping the leader is never evidence that its descendants are gone.
+        try:
+            process.poll()
+        except BaseException as error:
+            record('poll_direct_child', error)
+
     def probe(operation):
         nonlocal group_gone
+        reap_ready_child()
         try:
             os.killpg(process.pid, 0)
             return True
@@ -72,6 +106,7 @@ def cleanup_process(process, selector):
 
     if process is not None:
         for sig, delay, label in ((signal.SIGTERM, 15, 'term'), (signal.SIGKILL, 2, 'kill')):
+            reap_ready_child()
             try:
                 os.killpg(process.pid, sig)
             except ProcessLookupError:
