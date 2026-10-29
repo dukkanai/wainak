@@ -10,10 +10,12 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from ci.ios.diagnostics import cleanup_process, project_cleanup_errors, safe_error
+from scripts import security_diagnostics as security
 
 
 def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024,
-                check=False, cleanup_grace=0, diagnostic=None, group_observer=None):
+                check=False, cleanup_grace=0, diagnostic=None, group_observer=None,
+                output_profile=None):
     """Capture bounded merged output; never print command arguments or child output.
 
     POSIX host tools must keep children in the inherited group. Nested fixture
@@ -26,6 +28,8 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
     # exception objects or captured output; existing exception contracts remain.
     if diagnostic is not None and type(diagnostic) is not dict:
         raise TypeError('Diagnostic destination must be a plain dictionary')
+    if output_profile is not None and (type(output_profile) is not str or output_profile!=security.PROFILE):
+        raise ValueError('Unknown output diagnostic profile')
     kind = 'NONE'
     code = None
     cleanup_failed = False
@@ -147,3 +151,9 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
                     diagnostic.update(project_cleanup_errors(cleanup_errors))
                     if group_observer is not None:
                         diagnostic.update(group_before_cleanup=group_before, group_after_cleanup=group_after)
+                    if output_profile is not None:
+                        classified='NOT_APPLICABLE'
+                        if kind=='NONZERO_EXIT' and code:
+                            try:classified=security.project(security.classify(output))
+                            except Exception:classified='CLASSIFIER_FAILED'
+                        diagnostic['security_error']=classified

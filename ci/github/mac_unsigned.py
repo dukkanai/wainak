@@ -64,7 +64,7 @@ def download(spec, target, guard):
 
 
 def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
-                allowed_labels=LABELS,safe_reasons=SAFE_POLICY_REASONS):
+                allowed_labels=LABELS,safe_reasons=SAFE_POLICY_REASONS,output_profile=None):
     p.require(label in allowed_labels,'github_command_identity')
     detail={};started=time.monotonic();outcome='FAILED';phase='pre_verification';command_outcome='NOT_RUN';reason='NONE'
     print(json.dumps({'event':'GITHUB_MAC_COMMAND','command':label,'outcome':'START'}),flush=True)
@@ -73,13 +73,22 @@ def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
         if overlay:overlay.verify()
         phase='command';command_outcome='FAILED'
         result=run_bounded(command,cwd=cwd,env=env,seconds=min(seconds,max(.01,deadline-time.monotonic())),
-            check=True,diagnostic=detail,group_observer=groups.capture)
+            check=True,diagnostic=detail,group_observer=groups.capture,
+            **({'output_profile':output_profile} if output_profile is not None else {}))
         command_outcome='PASS';phase='post_verification'
         guard()
         if overlay:overlay.verify()
         outcome='PASS';phase='complete'
         return result.stdout
     except BaseException as error:
+        if (output_profile is not None and phase=='command' and
+                detail.get('failure_kind')=='NONZERO_EXIT' and isinstance(error,RuntimeError)):
+            from scripts import security_diagnostics as security
+            classified=security.project(detail.get('security_error'))
+            candidate='security_'+classified.lower()
+            if candidate in security.REASONS and candidate in safe_reasons:
+                reason=candidate
+                raise p.PolicyError(reason) from None
         value=error.args[0] if isinstance(error,p.PolicyError) and error.args else None
         reason=value if type(value) is str and value in safe_reasons | sdk.SAFE_POLICY_REASONS else 'OTHER'
         raise
@@ -97,6 +106,9 @@ def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
              'group_before_cleanup':groups.project(detail.get('group_before_cleanup')),
              'group_after_cleanup':groups.project(detail.get('group_after_cleanup')),
              **d.project_cleanup_errors(detail.get('cleanup_errors',[]))}
+        if output_profile is not None:
+            from scripts import security_diagnostics as security
+            row['security_error']=security.project(detail.get('security_error','NOT_APPLICABLE'))
         print(json.dumps(row),flush=True)
 
 

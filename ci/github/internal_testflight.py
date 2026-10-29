@@ -21,6 +21,7 @@ sys.path.insert(0,str(ROOT))
 from ci.github import internal_policy as q, mac_unsigned as g
 from ci.testflight import policy as p, diagnostics as d
 from ci.testflight.build import safe_unpack, xml_plist, child_environment
+from scripts import security_diagnostics as security
 
 LABELS=frozenset({'keychain_list','keychain_create','keychain_unlock','keychain_import','keychain_access',
     'keychain_select','keychain_restore','keychain_delete','signing_identity','profile_decode','ios_config',
@@ -69,7 +70,9 @@ def runner(env, deadline, overlay=None):
     def run(label, command, cwd=ROOT, seconds=300):
         return g.run_checked(label,command,cwd=cwd,env=env,deadline=deadline,
             guard=lambda:g.resource_guard(WORK,ROOT/'apps/mobile',deadline),overlay=overlay,seconds=seconds,
-            allowed_labels=LABELS,safe_reasons=g.SAFE_POLICY_REASONS|q.REASONS)
+            allowed_labels=LABELS,safe_reasons=g.SAFE_POLICY_REASONS|q.REASONS,
+            **({'output_profile':security.PROFILE} if label=='keychain_import' and
+               list(command[:2])==['/usr/bin/security','import'] else {}))
     return run
 
 
