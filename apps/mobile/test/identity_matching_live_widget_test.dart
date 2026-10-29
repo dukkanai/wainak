@@ -3,10 +3,10 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/identity/app.dart';
-import 'package:wainak_mobile/src/identity/client.dart';
-import 'package:wainak_mobile/src/api/transport.dart';
-import 'package:wainak_mobile/src/api/transport_io.dart';
+import 'package:wainek_mobile/src/identity/app.dart';
+import 'package:wainek_mobile/src/identity/client.dart';
+import 'package:wainek_mobile/src/api/transport.dart';
+import 'package:wainek_mobile/src/api/transport_io.dart';
 import '../tool/identity_fixture_bridge.dart';
 
 class MatchingLoopbackBinding extends AutomatedTestWidgetsFlutterBinding {
@@ -301,7 +301,7 @@ void main() {
         }
       }
     },
-    skip: Platform.environment['WAINAK_RUN_MATCHING_WIDGET'] != '1',
+    skip: Platform.environment['WAINEK_RUN_MATCHING_WIDGET'] != '1',
     timeout: const Timeout(Duration(minutes: 7)),
   );
 }

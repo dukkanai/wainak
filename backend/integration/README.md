@@ -34,8 +34,8 @@ Python connects using a Unix socket inside a newly created mode-0700 temporary r
 
 ## Isolation and cleanup
 
-The harness generates a random `wainak-pgtest-<12 hex>` container and named volume,
-and database `wainak_test_<12 hex>`. It refuses an existing generated name. Both Docker
+The harness generates a random `wainek-pgtest-<12 hex>` container and named volume,
+and database `wainek_test_<12 hex>`. It refuses an existing generated name. Both Docker
 resources carry the exact unique ownership label, checked before cleanup. The secret
 is generated for this synthetic test, written mode 0600 only inside its private temp
 root, and never placed in argv, repository files or printed output. No persistent
@@ -49,7 +49,7 @@ ownership check fails, do not claim success or delete an unrelated resource; ins
 the exact failed artifact with the owner connector and report the blocker.
 
 No input argument/environment DSN is accepted. The adapter and initial migration
-also independently reject database names outside `wainak_test_[0-9a-f]{12}`. The
+also independently reject database names outside `wainek_test_[0-9a-f]{12}`. The
 migration requires an explicit opt-in and a new empty database; it refuses an existing
 user schema instead of overwriting or silently upgrading it. Schema markers further
 restrict the adapter to `synthetic_development_only` version 1. This defense-in-depth
@@ -104,7 +104,7 @@ in **23.583 seconds**; container, volume and secret/socket temp directory cleanu
 verified. This precommit run is implementation evidence; the final commit's repeated
 and independent test results must be used for acceptance.
 
-Not tested/implemented here: migration of the existing Wainak DB, multi-host failover,
+Not tested/implemented here: migration of the existing Wainek DB, multi-host failover,
 load capacity, production credentials/roles/RLS, real auth/email/session expiry,
 encrypted backups, production retention/deletion, payments, chat cryptography, mobile
 network integration, or store acceptance. No such capability is implied by a passing

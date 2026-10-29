@@ -2,15 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/api/client.dart';
-import 'package:wainak_mobile/src/api/http_repository.dart';
-import 'package:wainak_mobile/src/api/transport_io.dart';
-import 'package:wainak_mobile/src/repository.dart';
+import 'package:wainek_mobile/src/api/client.dart';
+import 'package:wainek_mobile/src/api/http_repository.dart';
+import 'package:wainek_mobile/src/api/transport_io.dart';
+import 'package:wainek_mobile/src/repository.dart';
 
 void main() {
-  final backendRoot = Platform.environment['WAINAK_BACKEND_ROOT'];
-  final externalUrl = Platform.environment['WAINAK_TEST_BASE_URL'];
-  final controlPath = Platform.environment['WAINAK_TEST_CONTROL_DIR'];
+  final backendRoot = Platform.environment['WAINEK_BACKEND_ROOT'];
+  final externalUrl = Platform.environment['WAINEK_TEST_BASE_URL'];
+  final controlPath = Platform.environment['WAINEK_TEST_CONTROL_DIR'];
   Future<void> restartCheckpoint(String phase) async {
     if (controlPath == null) return;
     final directory = Directory(controlPath);
@@ -87,7 +87,7 @@ void main() {
             '-c',
             r'''
 from wsgiref.simple_server import make_server,WSGIRequestHandler
-from wainak.api import DevelopmentApplication
+from wainek.api import DevelopmentApplication
 class Quiet(WSGIRequestHandler):
  def log_message(self,*args): pass
 app=DevelopmentApplication(enable_development=True)
@@ -100,7 +100,7 @@ with make_server('127.0.0.1',0,app,handler_class=Quiet) as server:
         );
         errSub = server.stderr.transform(utf8.decoder).listen((_) {});
       }
-      WainakApiClient? peer;
+      WainekApiClient? peer;
       HttpJourneyRepository? repo;
       try {
         final Uri uri;
@@ -114,7 +114,7 @@ with make_server('127.0.0.1',0,app,handler_class=Quiet) as server:
               .timeout(const Duration(seconds: 10));
           uri = Uri.parse('http://127.0.0.1:${int.parse(line)}');
         }
-        peer = WainakApiClient(baseUri: uri, transport: NativeApiTransport());
+        peer = WainekApiClient(baseUri: uri, transport: NativeApiTransport());
         final peerAccount = await peer.register(
           email:
               'peer_${DateTime.now().microsecondsSinceEpoch}@example.invalid',
@@ -139,7 +139,7 @@ with make_server('127.0.0.1',0,app,handler_class=Quiet) as server:
           'marital_statuses': ['single'],
         });
         repo = HttpJourneyRepository(
-          WainakApiClient(baseUri: uri, transport: NativeApiTransport()),
+          WainekApiClient(baseUri: uri, transport: NativeApiTransport()),
         );
         await repo.register(
           age: 29,
@@ -228,7 +228,7 @@ with make_server('127.0.0.1',0,app,handler_class=Quiet) as server:
       }
     },
     skip: backendRoot == null && externalUrl == null
-        ? 'Set WAINAK_BACKEND_ROOT to an authorized local backend checkout; no server starts by default.'
+        ? 'Set WAINEK_BACKEND_ROOT to an authorized local backend checkout; no server starts by default.'
         : false,
     timeout: const Timeout(Duration(seconds: 240)),
   );

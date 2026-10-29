@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:wainak_mobile/src/identity/client.dart';
-import 'package:wainak_mobile/src/identity/profile_save.dart';
+import 'package:wainek_mobile/src/identity/client.dart';
+import 'package:wainek_mobile/src/identity/profile_save.dart';
 import '../test/support/identity_fixture.dart';
 
 void check(bool value, String label) {

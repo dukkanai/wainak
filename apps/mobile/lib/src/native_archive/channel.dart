@@ -10,7 +10,7 @@ final class MethodChannelArchiveProbe implements ArchiveProbePort {
   MethodChannelArchiveProbe({
     MethodChannel? channel,
     this.timeout = const Duration(seconds: 35),
-  }) : _channel = channel ?? const MethodChannel('wainak/native_archive_v1') {
+  }) : _channel = channel ?? const MethodChannel('wainek/native_archive_v1') {
     if (timeout <= Duration.zero || timeout > const Duration(seconds: 35)) {
       throw ArgumentError('archive_timeout');
     }

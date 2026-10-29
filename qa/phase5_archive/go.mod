@@ -1,10 +1,10 @@
-module wainak.local/archiveqa
+module wainek.local/archiveqa
 
 go 1.27.3
 
 require (
 	filippo.io/age v1.3.2
-	wainak.local/historyarchive v0.0.0
+	wainek.local/historyarchive v0.0.0
 )
 
 require (
@@ -13,4 +13,4 @@ require (
 	golang.org/x/sys v0.49.0 // indirect
 )
 
-replace wainak.local/historyarchive => ../../archive
+replace wainek.local/historyarchive => ../../archive

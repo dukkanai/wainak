@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/native_archive/app.dart';
-import 'package:wainak_mobile/src/native_archive/channel.dart';
-import 'package:wainak_mobile/src/native_archive/controller.dart';
+import 'package:wainek_mobile/src/native_archive/app.dart';
+import 'package:wainek_mobile/src/native_archive/channel.dart';
+import 'package:wainek_mobile/src/native_archive/controller.dart';
 
 final class CapacityFixture implements ArchiveProbePort {
   @override
@@ -18,7 +18,7 @@ final class CapacityFixture implements ArchiveProbePort {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const channel = MethodChannel('wainak/native_archive_v1');
+  const channel = MethodChannel('wainek/native_archive_v1');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));

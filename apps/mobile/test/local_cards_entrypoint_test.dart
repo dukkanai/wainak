@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
-import 'package:wainak_mobile/main.dart' as entry;
-import 'package:wainak_mobile/src/local_cards/app.dart';
+import 'package:wainek_mobile/main.dart' as entry;
+import 'package:wainek_mobile/src/local_cards/app.dart';
 
 void main() {
   const enabled =
-      bool.fromEnvironment('WAINAK_DEV_MODE') &&
-      String.fromEnvironment('WAINAK_REPOSITORY') == 'local_cards';
+      bool.fromEnvironment('WAINEK_DEV_MODE') &&
+      String.fromEnvironment('WAINEK_REPOSITORY') == 'local_cards';
   testWidgets(
     'explicit development entry opens isolated local cards without API configuration',
     (t) async {

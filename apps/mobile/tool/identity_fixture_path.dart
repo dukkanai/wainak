@@ -27,7 +27,7 @@ Future<FixtureScriptSelection> resolveFixtureScript({
     throw const FixtureScriptFailure('invalid_verifier_timeout');
   final path =
       explicit ??
-      (environment ?? Platform.environment)['WAINAK_IDENTITY_FIXTURE_SCRIPT'];
+      (environment ?? Platform.environment)['WAINEK_IDENTITY_FIXTURE_SCRIPT'];
   if (path == null || path.isEmpty)
     throw const FixtureScriptFailure('explicit_fixture_script_required');
   if (path.length > 4096 ||

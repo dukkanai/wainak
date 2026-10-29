@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/app.dart';
-import 'package:wainak_mobile/src/repository.dart';
-import 'package:wainak_mobile/src/api/client.dart';
-import 'package:wainak_mobile/src/api/transport.dart';
+import 'package:wainek_mobile/src/app.dart';
+import 'package:wainek_mobile/src/repository.dart';
+import 'package:wainek_mobile/src/api/client.dart';
+import 'package:wainek_mobile/src/api/transport.dart';
 
 Future<void> tapKey(WidgetTester t, String key) async {
   final target = find.byKey(Key(key));
@@ -22,7 +22,7 @@ Future<void> tapText(WidgetTester t, String text) async {
   await t.pumpAndSettle();
 }
 Future<void> candidate(WidgetTester t, DevJourneyRepository r) async {
-  await t.pumpWidget(WainakApp(repository: r));
+  await t.pumpWidget(WainekApp(repository: r));
   for (final key in ['adult', 'muslim', 'terms', 'privacy', 'register', 'save-profile']) {
     await tapKey(t, key);
   }
@@ -53,7 +53,7 @@ ApiResponse registration(String token) => ApiResponse(201, jsonEncode({
   'mode':'synthetic_development_only', 'token_type':'Bearer', 'access_token':token,
   'account': {'id':'usr_0123456789abcdef0123456789abcdef'}
 }));
-Future<Map<String,dynamic>> register(WainakApiClient api) => api.register(
+Future<Map<String,dynamic>> register(WainekApiClient api) => api.register(
   email:'qa@example.invalid', birthDate:'1996-01-01',
   isMuslim:true, acceptedTerms:true, acknowledgedPrivacy:true,
 );
@@ -61,7 +61,7 @@ Future<Map<String,dynamic>> register(WainakApiClient api) => api.register(
 void main() {
   testWidgets('QA: a declared minor cannot reach a profile despite checking all consents', (t) async {
     final r = DevJourneyRepository();
-    await t.pumpWidget(WainakApp(repository:r));
+    await t.pumpWidget(WainekApp(repository:r));
     await tapKey(t, 'age');
     await tapText(t, '17 سنة');
     for (final key in ['adult','muslim','terms','privacy','register']) {
@@ -172,7 +172,7 @@ void main() {
 
   test('QA: out of order registration cannot overwrite the newest session',() async {
     final transport=DeferredTransport();
-    final api=WainakApiClient(baseUri:Uri.parse('http://127.0.0.1:8089'),transport:transport);
+    final api=WainekApiClient(baseUri:Uri.parse('http://127.0.0.1:8089'),transport:transport);
     final old=register(api);
     final oldExpected=expectLater(old,throwsA(isA<ApiFailure>().having((e)=>e.code,'code','stale_response')));
     final current=register(api);
@@ -189,7 +189,7 @@ void main() {
 
   test('QA: successful stale read cannot survive account deletion',() async {
     final transport=DeferredTransport();
-    final api=WainakApiClient(baseUri:Uri.parse('http://127.0.0.1:8089'),transport:transport);
+    final api=WainekApiClient(baseUri:Uri.parse('http://127.0.0.1:8089'),transport:transport);
     final first=register(api);
     transport.replies[0].complete(registration('synthetic-current'));
     await first;

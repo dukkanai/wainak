@@ -154,13 +154,13 @@ def normal_journey(client):
 
 
 def artifact_inventory():
-    label = "com.wainak.disposable-postgres-test"
+    label = "com.wainek.disposable-postgres-test"
     def listed(arguments):
         result = subprocess.run(arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
         require(result.returncode == 0, "Cannot verify owned fixture resource inventory")
         return tuple(sorted(result.stdout.decode("ascii").split()))
     directories = tuple(sorted(entry.name for entry in os.scandir("/tmp")
-        if entry.name.startswith("wainak-postgres-test-") and entry.is_dir(follow_symlinks=False)
+        if entry.name.startswith("wainek-postgres-test-") and entry.is_dir(follow_symlinks=False)
         and entry.stat(follow_symlinks=False).st_uid == os.getuid()))
     return (listed(["docker", "ps", "-aq", "--filter", "label=" + label]),
             listed(["docker", "volume", "ls", "-q", "--filter", "label=" + label]), directories)

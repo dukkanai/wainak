@@ -1,5 +1,5 @@
-name: wainak_mobile
-description: Development-only accessible Arabic Wainak journey. Not a production app.
+name: wainek_mobile
+description: Development-only accessible Arabic Wainek journey. Not a production app.
 publish_to: none
 version: 0.1.0+1
 environment:

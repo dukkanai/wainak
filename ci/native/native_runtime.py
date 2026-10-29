@@ -25,7 +25,7 @@ import time
 import urllib.request
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from build_guards import tree_size, wait_until
-from check_static import InvalidRecipe, require, read_regular, read_json, sha, module_id, validate_source_inventory
+from check_static import source_matches, InvalidRecipe, require, read_regular, read_json, sha, module_id, validate_source_inventory
 from host_diagnostics import declared_tests, project_go_events, safe_last_command, HOST_COMMANDS, classify_tool_output, classify_gate_error, graph_failure_reason, safe_primary
 from artifact_diagnostics import strict_symbols_present, symbol_summary, load_summary, reason as artifact_reason
 from artifact_static import static_arm64_container, validate_modulemap, validate_apple_load_commands
@@ -168,7 +168,7 @@ class Runtime:
             elapsed=time.monotonic()-started
             projection=None; proof_failed=False
             if go_json:
-                package='wainak.local/archivebridge' if name.startswith('archivebridge-') else 'wainak.local/historyarchive'
+                package='wainek.local/archivebridge' if name.startswith('archivebridge-') else 'wainek.local/historyarchive'
                 expected={name.removeprefix('fuzz-')} if name.startswith('fuzz-') else self.test_names[package]
                 projection,has_failure,proof_ok=project_go_events(bytes(data),self.test_names[package],package,expected)
                 proof_failed=not proof_ok
@@ -294,7 +294,7 @@ def validate_graph_controls(controls, local, generated_main=None):
         # Upstream parseModuleVersions preserves the original versionless main
         # module as a control-only local replacement. It is NOT a dependency.
         expected=local.get(identity)
-        if identity=='wainak.local/cibinding' and generated_main is not None:
+        if identity=='wainek.local/cibinding' and generated_main is not None:
             expected=generated_main
         require(expected is not None and new.get('Path')==str(expected),'unapproved replacement')
 
@@ -322,7 +322,7 @@ def inspect_graph(runtime, go, cwd, env, name, allowed, local, generated_main=No
     for row in rows:
         require(not row.get('Error'),'unresolved graph metadata')
         if row.get('Main'): continue
-        require(row.get('Path')!='wainak.local/cibinding','owned main module selected as dependency')
+        require(row.get('Path')!='wainek.local/cibinding','owned main module selected as dependency')
         key=(row['Path'],row.get('Version'))
         if row['Path'] in local:
             require(row.get('Replace',{}).get('Dir')==str(local[row['Path']]),'local source replacement drift')
@@ -423,17 +423,17 @@ def runtime_test_env(env, root, age):
     return {'PATH':'/nonexistent','LC_ALL':'C','HOME':str(root/'home'),'TMPDIR':str(root/'tmp'),
             'GOENV':'off','GOTOOLCHAIN':'local','GOWORK':'off','GOTELEMETRY':'off',
             'GOPROXY':'off','GOSUMDB':'off','GOMAXPROCS':'2','GOMEMLIMIT':'1073741824',
-            'WAINAK_ARCHIVE_INTEROP':'1','WAINAK_AGE_CLI':str(age),
-            'WAINAK_AGE_CLI_SHA256':digest_file(age),'WAINAK_ARCHIVE_SCAN_ROOT':str(root)}
+            'WAINEK_ARCHIVE_INTEROP':'1','WAINEK_AGE_CLI':str(age),
+            'WAINEK_AGE_CLI_SHA256':digest_file(age),'WAINEK_ARCHIVE_SCAN_ROOT':str(root)}
 
 def test_host_policy(runtime, go, tools_module, env, lock):
     runtime.stage='new-policy-host-tests'
     age=runtime.work/'bin/age'
     runtime.run([go,'build','-trimpath','-o',age,'filippo.io/age/cmd/age'],tools_module,dict(env,CGO_ENABLED='0'),'age-cli-build')
     source=runtime.work/'host-tests'; source.mkdir()
-    local={'wainak.local/historyarchive':source/'archive/module'}
+    local={'wainek.local/historyarchive':source/'archive/module'}
     results=[]
-    for name,module in [('archive','wainak.local/historyarchive'),('archivebridge','wainak.local/archivebridge')]:
+    for name,module in [('archive','wainek.local/historyarchive'),('archivebridge','wainek.local/archivebridge')]:
         root=source/name; root.mkdir(mode=0o700)
         for folder in ('home','tmp'): (root/folder).mkdir(mode=0o700)
         target=root/'module';make_module(target,module,lock,None if name=='archive' else local)
@@ -441,7 +441,7 @@ def test_host_policy(runtime, go, tools_module, env, lock):
         for relative, expected in sorted(lock['source_hashes'].items()):
             if relative.split('/')[0] != name: continue
             data=read_regular(runtime.repo/relative)
-            require(hashlib.sha256(data).hexdigest()==expected,'reviewed Go source/test bytes changed')
+            require(source_matches(runtime.repo,relative,expected),'reviewed Go source/test bytes changed')
             destination=target/Path(relative).name
             destination.write_bytes(data)
             require(digest_file(destination)==expected,'copied Go source bytes changed')
@@ -634,7 +634,7 @@ def build_ios(repo, directory, lock, work, output):
         shutil.copyfile(work/'toolchain/go/LICENSE',work/'licenses/GO-TOOLCHAIN-LICENSE.txt')
         version=runtime.run([go,'version'],repo,env,'go-version').decode().strip()
         require(version=='go version go1.27.3 darwin/arm64','bootstrapped Go identity mismatch')
-        tools_module=work/'tools-module'; make_module(tools_module,'wainak.local/citools',lock)
+        tools_module=work/'tools-module'; make_module(tools_module,'wainek.local/citools',lock)
         runtime.stage='authenticated-public-module-acquisition'
         acquired=acquire_modules(runtime,go,tools_module,env,lock)
         allowed={(r['path'],r['version']) for r in all_rows(lock) if not r.get('metadata_only')}
@@ -650,11 +650,11 @@ def build_ios(repo, directory, lock, work, output):
         runtime.stage='unmodified-upstream-apple-bind'
         validate_source_inventory(repo,lock['source_hashes'])
         require(initial=={name:sha(repo/name) for name in initial},'repository Go source changed')
-        local={'wainak.local/archivebridge':repo/'archivebridge','wainak.local/historyarchive':repo/'archive'}
-        binding=work/'binding'; make_module(binding,'wainak.local/cibinding',lock,local)
+        local={'wainek.local/archivebridge':repo/'archivebridge','wainek.local/historyarchive':repo/'archive'}
+        binding=work/'binding'; make_module(binding,'wainek.local/cibinding',lock,local)
         input_graph=inspect_graph(runtime,go,binding,env,'binding-input',allowed,local)
         runtime.run([work/'bin/gomobile','bind','-v','-x','-work','-target=ios/arm64,iossimulator/arm64',
-                     '-iosversion=15.0','-o',output,'wainak.local/archivebridge'],binding,env,'apple-bind')
+                     '-iosversion=15.0','-o',output,'wainek.local/archivebridge'],binding,env,'apple-bind')
         generated=[]
         target_packages=[]
         for mod in sorted((work/'tmp').rglob('go.mod')):

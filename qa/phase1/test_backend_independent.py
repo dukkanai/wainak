@@ -9,8 +9,8 @@ import json
 import threading
 import unittest
 from datetime import date
-from wainak.api import DevelopmentApplication
-from wainak.domain import DevelopmentService, DomainError, POLICY_VERSION
+from wainek.api import DevelopmentApplication
+from wainek.domain import DevelopmentService, DomainError, POLICY_VERSION
 
 
 class IndependentBackendReview(unittest.TestCase):

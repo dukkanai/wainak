@@ -104,9 +104,9 @@ communication permissions still fail closed from current eligibility. Missing/st
 ## Local web deletion exception
 
 GET `/account-deletion` renders the unpublished Arabic/English fixture page.
-`X-Wainak-Deletion-Web:1` selects only login, email verify/resend, sign-out,
+`X-Wainek-Deletion-Web:1` selects only login, email verify/resend, sign-out,
 reauthenticate and the two deletion routes. Every mutation requires matching
-Origin, the HttpOnly/SameSiteStrict `wainak_deletion_csrf` cookie and a valid
+Origin, the HttpOnly/SameSiteStrict `wainek_deletion_csrf` cookie and a valid
 `X-CSRFToken`; other cookies and routes are refused. The initial masked token is
 in `meta[name=csrf-token]`. Read refreshed `X-CSRFToken` response headers after
 login/verification rotates the secret. This marker is not authentication.

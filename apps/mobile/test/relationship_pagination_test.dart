@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/api/client.dart';
-import 'package:wainak_mobile/src/api/http_repository.dart';
-import 'package:wainak_mobile/src/api/relationship_page.dart';
-import 'package:wainak_mobile/src/api/transport.dart';
-import 'package:wainak_mobile/src/identity/client.dart';
-import 'package:wainak_mobile/src/identity/matching_repository.dart';
-import 'package:wainak_mobile/src/repository.dart';
+import 'package:wainek_mobile/src/api/client.dart';
+import 'package:wainek_mobile/src/api/http_repository.dart';
+import 'package:wainek_mobile/src/api/relationship_page.dart';
+import 'package:wainek_mobile/src/api/transport.dart';
+import 'package:wainek_mobile/src/identity/client.dart';
+import 'package:wainek_mobile/src/identity/matching_repository.dart';
+import 'package:wainek_mobile/src/repository.dart';
 import 'api_client_test.dart' as legacy;
 import 'connected_widget_test.dart' show FixtureApi, meId;
 import 'identity_matching_widget_test.dart' show openMatch, tapMatch;
@@ -83,7 +83,7 @@ class LegacyPages extends FixtureApi {
   }
 }
 
-class ReplacingSessionClient extends WainakApiClient {
+class ReplacingSessionClient extends WainekApiClient {
   ReplacingSessionClient(legacy.RecordingTransport transport)
     : super(baseUri: Uri.parse('http://127.0.0.1:8089'), transport: transport);
   bool replaceAfterPage = false;
@@ -319,7 +319,7 @@ void main() {
     'legacy repository finds incoming request after 100 outgoing rows',
     () async {
       final f = LegacyPages();
-      final api = WainakApiClient(
+      final api = WainekApiClient(
         baseUri: Uri.parse('http://127.0.0.1:8089'),
         transport: f,
       );
@@ -351,7 +351,7 @@ void main() {
     'legacy complete-list cap rejects rather than returning truncated rows',
     () async {
       final t = legacy.RecordingTransport();
-      final api = WainakApiClient(
+      final api = WainekApiClient(
         baseUri: Uri.parse('http://127.0.0.1:8089'),
         transport: t,
       );
@@ -420,7 +420,7 @@ void main() {
 
   test('legacy page failures and cap preserve previous candidate', () async {
     final fixture = LegacyPages()..includeIncoming = false;
-    final api = WainakApiClient(
+    final api = WainekApiClient(
       baseUri: Uri.parse('http://127.0.0.1:8089'),
       transport: fixture,
     );
@@ -444,7 +444,7 @@ void main() {
     'legacy card response after block cannot restore candidate or cards',
     () async {
       final fixture = HeldCards();
-      final api = WainakApiClient(
+      final api = WainekApiClient(
         baseUri: Uri.parse('http://127.0.0.1:8089'),
         transport: fixture,
       );

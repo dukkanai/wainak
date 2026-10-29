@@ -81,7 +81,7 @@ class BudgetSelectionTests(unittest.TestCase):
             self.reject_cli(['--build-unsigned', *tail])
 
     def test_environment_does_not_select_cap(self):
-        with patch.dict(os.environ, {'WAINAK_LOGICAL_BUDGET': '42949672960',
+        with patch.dict(os.environ, {'WAINEK_LOGICAL_BUDGET': '42949672960',
                                      'MAX_BYTES': '42949672960',
                                      'LLVM_CAS_MAX_MAPPING_SIZE': '104857600'}):
             self.assertEqual(b.select_workspace_budget(), 8 * GIB)
@@ -211,10 +211,11 @@ class ExperimentalWorkflowTests(unittest.TestCase):
     def setUp(self):
         self.config = prep.read_json(prep.ROOT / 'codemagic.yaml')
 
-    def test_exact_two_manually_started_workflows(self):
-        self.assertEqual(set(self.config['workflows']), {'ios-unsigned-archive', EXPERIMENT})
+    def test_two_unsigned_workflows_and_separate_internal_workflow(self):
+        self.assertEqual(set(self.config['workflows']), {'ios-unsigned-archive', EXPERIMENT, 'ios-testflight'})
         prep.validate_workflow(self.config)
-        for workflow in self.config['workflows'].values():
+        for key in ('ios-unsigned-archive', EXPERIMENT):
+            workflow = self.config['workflows'][key]
             self.assertEqual(workflow['instance_type'], 'mac_mini_m2')
             self.assertEqual(workflow['max_build_duration'], 45)
             self.assertEqual(workflow['environment'], {'xcode': '26.4.1', 'flutter': '3.47.8'})

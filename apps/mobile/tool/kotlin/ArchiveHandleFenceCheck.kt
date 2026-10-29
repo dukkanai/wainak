@@ -1,4 +1,4 @@
-package invalid.example.wainak.wainak_mobile
+package com.nextaura.wainek
 
 /** Standalone pure-Kotlin checks, NOT RUN. No Android/JNI/runtime claim.
  * Uses check(), not JVM assertions; requires only Kotlin stdlib and the source.

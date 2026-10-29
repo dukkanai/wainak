@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
-const html = readFileSync(new URL('../wainak_identity/templates/wainak_identity/account_deletion.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../wainek_identity/templates/wainek_identity/account_deletion.html', import.meta.url), 'utf8');
 const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)[1];
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const settle = async () => { for (let i = 0; i < 6; i++) await tick(); };

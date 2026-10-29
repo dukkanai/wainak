@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/api/client.dart';
-import 'package:wainak_mobile/src/api/http_repository.dart';
-import 'package:wainak_mobile/src/api/transport.dart';
-import 'package:wainak_mobile/src/connected_app.dart';
+import 'package:wainek_mobile/src/api/client.dart';
+import 'package:wainek_mobile/src/api/http_repository.dart';
+import 'package:wainek_mobile/src/api/transport.dart';
+import 'package:wainek_mobile/src/connected_app.dart';
 
 const meId = 'usr_11111111111111111111111111111111';
 const peerId = 'usr_22222222222222222222222222222222';
@@ -190,10 +190,10 @@ Future<void> choose(WidgetTester t, String text) async {
 }
 
 HttpJourneyRepository repository(FixtureApi f) => HttpJourneyRepository(
-  WainakApiClient(baseUri: Uri.parse('http://127.0.0.1:8089'), transport: f),
+  WainekApiClient(baseUri: Uri.parse('http://127.0.0.1:8089'), transport: f),
 );
 Future<void> onboard(WidgetTester t, FixtureApi f) async {
-  await t.pumpWidget(ConnectedWainakApp(repository: repository(f)));
+  await t.pumpWidget(ConnectedWainekApp(repository: repository(f)));
   for (final key in [
     'api-adult',
     'api-muslim',
@@ -323,7 +323,7 @@ void main() {
     'busy registration suppresses repeat and disposed UI ignores late HTTP success',
     (t) async {
       final f = FixtureApi()..holdRegistration = true;
-      await t.pumpWidget(ConnectedWainakApp(repository: repository(f)));
+      await t.pumpWidget(ConnectedWainekApp(repository: repository(f)));
       for (final key in [
         'api-adult',
         'api-muslim',

@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/main.dart' as application;
-import 'package:wainak_mobile/src/native_archive/app.dart';
+import 'package:wainek_mobile/main.dart' as application;
+import 'package:wainek_mobile/src/native_archive/app.dart';
 
 void main() {
-  const dev = bool.fromEnvironment('WAINAK_DEV_MODE');
+  const dev = bool.fromEnvironment('WAINEK_DEV_MODE');
   const mode = String.fromEnvironment(
-    'WAINAK_REPOSITORY',
+    'WAINEK_REPOSITORY',
     defaultValue: 'fake',
   );
   testWidgets(
@@ -83,7 +83,7 @@ void main() {
     try {
       application.main();
       await tester.pumpAndSettle();
-      const iosPreview = bool.fromEnvironment('WAINAK_IOS_ARCHIVE_PREVIEW');
+      const iosPreview = bool.fromEnvironment('WAINEK_IOS_ARCHIVE_PREVIEW');
       if (dev && iosPreview) {
         expect(find.byType(NativeArchiveApp), findsOneWidget);
       } else {

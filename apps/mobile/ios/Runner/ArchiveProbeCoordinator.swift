@@ -122,8 +122,8 @@ final class ArchiveProbeCoordinator {
   private static let maximumLifetimeHandles = 64
 
   init(engine: ArchiveEngine, allowed: Bool,
-       worker: ArchiveExecutor = BoundedArchiveExecutor(label: "wainak.archive.worker"),
-       control: ArchiveExecutor = BoundedArchiveExecutor(label: "wainak.archive.control"),
+       worker: ArchiveExecutor = BoundedArchiveExecutor(label: "wainek.archive.worker"),
+       control: ArchiveExecutor = BoundedArchiveExecutor(label: "wainek.archive.control"),
        deliver: @escaping (@escaping () -> Void) -> Void = { operation in
          if Thread.isMainThread { operation() } else { DispatchQueue.main.async(execute: operation) }
        },

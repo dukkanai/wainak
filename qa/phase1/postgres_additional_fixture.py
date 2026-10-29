@@ -43,10 +43,10 @@ def load_module(name, path):
 
 def extra_factory(qa):
     def extra(connect, restart, temporary):
-        from wainak.domain import DevelopmentService
-        from wainak.api import DevelopmentApplication
-        from wainak.postgres import PostgresRepository
-        from wainak.migrations import require_disposable_database
+        from wainek.domain import DevelopmentService
+        from wainek.api import DevelopmentApplication
+        from wainek.postgres import PostgresRepository
+        from wainek.migrations import require_disposable_database
         if not callable(connect):
             raise RuntimeError("Only the harness-owned disposable connection factory is accepted")
         class DurableIndependentQA(qa.IndependentBackendReview):

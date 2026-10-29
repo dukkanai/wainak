@@ -24,8 +24,8 @@ class _LocalCardsAppState extends State<LocalCardsApp> {
     locale: const Locale('ar'),
     supportedLocales: const [Locale('ar')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
-    theme: WainakTokens.theme(Brightness.light),
-    darkTheme: WainakTokens.theme(Brightness.dark),
+    theme: WainekTokens.theme(Brightness.light),
+    darkTheme: WainekTokens.theme(Brightness.dark),
     navigatorObservers: [observer],
     home: _LocalCardsHome(
       observer: observer,

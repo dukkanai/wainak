@@ -16,7 +16,7 @@ import (
 	"unicode/utf8"
 
 	"filippo.io/age"
-	history "wainak.local/historyarchive"
+	history "wainek.local/historyarchive"
 )
 
 const Profile = "wainak-synthetic-history-bridge-v1"

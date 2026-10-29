@@ -8,7 +8,7 @@ real SMTP adapter or existing-database DSN flag. The integrated native mobile
 auth UI is now in `../apps/mobile`; it remains a synthetic development UI, not
 a production account service. See `../docs/phase2-integration.md` for exact-source
 integration gates and local-only main authorization.
-`wainak_identity.bootstrap.configure` accepts the owned disposable harness's
+`wainek_identity.bootstrap.configure` accepts the owned disposable harness's
 private Python connection factory. The account namespace is `@example.invalid`.
 
 ## Reproducible development checks

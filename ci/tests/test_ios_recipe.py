@@ -42,7 +42,7 @@ class IOSRecipeChecks(unittest.TestCase):
         slices = v.framework_slices(self.root)
         self.assertEqual(set(slices), {'device', 'simulator'})
         config = v.xcconfig(slices)
-        self.assertIn('WAINAK_ARCHIVE_BRIDGE=1', config)
+        self.assertIn('WAINEK_ARCHIVE_BRIDGE=1', config)
         self.assertNotIn('Embed', config)
         self.assertIn('CODE_SIGNING_ALLOWED = NO', config)
 
@@ -112,7 +112,7 @@ class IOSRecipeChecks(unittest.TestCase):
             v.xcconfig({'device': Path('/a/$(UNTRUSTED)'), 'simulator': Path('/b')})
 
     def settings(self):
-        return [{'target': 'Runner', 'buildSettings': {'CODE_SIGNING_ALLOWED': 'NO', 'CODE_SIGNING_REQUIRED': 'NO', 'CODE_SIGN_IDENTITY': '', 'DEVELOPMENT_TEAM': '', 'CONFIGURATION': 'Debug', 'PLATFORM_NAME': 'iphoneos', 'IPHONEOS_DEPLOYMENT_TARGET': '15.0', 'ARCHS': 'arm64', 'SWIFT_ACTIVE_COMPILATION_CONDITIONS': 'DEBUG WAINAK_ARCHIVE_BRIDGE', 'GCC_PREPROCESSOR_DEFINITIONS': 'WAINAK_ARCHIVE_BRIDGE=1', 'OTHER_LDFLAGS': '-framework Archivebridge'}}]
+        return [{'target': 'Runner', 'buildSettings': {'CODE_SIGNING_ALLOWED': 'NO', 'CODE_SIGNING_REQUIRED': 'NO', 'CODE_SIGN_IDENTITY': '', 'DEVELOPMENT_TEAM': '', 'CONFIGURATION': 'Debug', 'PLATFORM_NAME': 'iphoneos', 'IPHONEOS_DEPLOYMENT_TARGET': '15.0', 'ARCHS': 'arm64', 'SWIFT_ACTIVE_COMPILATION_CONDITIONS': 'DEBUG WAINEK_ARCHIVE_BRIDGE', 'GCC_PREPROCESSOR_DEFINITIONS': 'WAINEK_ARCHIVE_BRIDGE=1', 'OTHER_LDFLAGS': '-framework Archivebridge'}}]
 
     def test_effective_unsigned_settings(self):
         v.unsigned_settings(self.settings(), 'iphoneos')

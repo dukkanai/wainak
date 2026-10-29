@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/native_archive/channel.dart';
-import 'package:wainak_mobile/src/native_archive/controller.dart';
+import 'package:wainek_mobile/src/native_archive/channel.dart';
+import 'package:wainek_mobile/src/native_archive/controller.dart';
 
 class ProbeFixture implements ArchiveProbePort {
   Completer<ArchiveLease>? opening;
@@ -136,7 +136,7 @@ void main() {
     c.dispose();
   });
 
-  const channel = MethodChannel('wainak/native_archive_v1');
+  const channel = MethodChannel('wainek/native_archive_v1');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));

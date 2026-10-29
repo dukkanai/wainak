@@ -1,18 +1,18 @@
-# تطبيق وينك للهاتف
+# تطبيق wainek للهاتف
 
 تطبيق Flutter عربي مع اتجاه RTL وخط محلي. تجمع النسخة الحالية أساس الحسابات والمطابقة وإصلاح الحفظ الجزئي، ومعاينة البطاقات المحلية، وتجربة جسر الأرشيف الأصلي. هذه شرائح تطوير مستقلة؛ لم تُفعّل المراسلة أو الدفع أو خدمة حسابات عامة، ولا تعني نتيجة الاختبارات قبولًا للمتاجر.
 
-نسخة Flutter المثبتة للتحقق وCI هي `3.47.8`، وبداخلها Dart `3.13.7`. تبقى معرفات التطبيقات `invalid.example.wainak` مؤقتة. يستخدم التطبيق `lib/main.dart` نقطة دخول واحدة تختار الوضع صراحة.
+نسخة Flutter المثبتة للتحقق وCI هي `3.47.8`، وبداخلها Dart `3.13.7`. أصبحت هوية Android وiOS المعتمدة `com.nextaura.wainek`، واسم العرض `wainek`. إعداد TestFlight الداخلي موضح في [دليل التوقيع والتوزيع](../../docs/ios-testflight.md). يستخدم التطبيق `lib/main.dart` نقطة دخول واحدة تختار الوضع صراحة.
 
 ## أوضاع التشغيل
 
-دون `WAINAK_DEV_MODE=true` تظهر شاشة عربية معطلة ولا تنشأ جلسة أو قناة بيانات. مع تفعيل التطوير، يحدد `WAINAK_REPOSITORY` أحد الأوضاع التالية:
+دون `WAINEK_DEV_MODE=true` تظهر شاشة عربية معطلة ولا تنشأ جلسة أو قناة بيانات. مع تفعيل التطوير، يحدد `WAINEK_REPOSITORY` أحد الأوضاع التالية:
 
 - `fake`: رحلة اصطناعية محلية في الذاكرة، وهو الافتراضي عند تفعيل التطوير دون اختيار وضع. القبول والتفعيل وحالة الرد هنا محاكاة، ولا يصل شيء إلى خادم أو شريك.
 - `api`: الرحلة القديمة المتصلة بخادم التطوير عبر HTTP أصلي. تتضمن قواعد الطلب والقبول والتفعيل التجريبي ومكتبة البطاقات؛ لا تنقل إجابات الحوار. تتطلب عنوان loopback صريحًا، ولا تعمل على الويب.
 - `identity`: رحلة الحسابات والمطابقة عبر Django/allauth. تتضمن التسجيل بالبريد الاصطناعي والتحقق والدخول والخروج والحذف والملف والتفضيلات والطلبات والحظر. قبول الطلب يتوقف قبل تفعيل المحادثة أو الدفع. الجلسات في الذاكرة؛ ليست مصادقة إنتاجية. التفاصيل في [دليل الهوية](IDENTITY.md) و[المطابقة](PHASE3_MATCHING.md).
 - `local_cards`: أربع بطاقات عربية مستقلة بإجابات جاهزة ومعاينة محلية واضحة، دون اتصال أو تاريخ إجابات أو ارتباط بحساب. يرفض وضع release ويمسح الاختيار عند حدود الإخفاء والخروج. التفاصيل في [دليل البطاقات](LOCAL_CARDS.md).
-- `native_archive`: تجربة محدودة لجسر الأرشيف باستخدام سجلين اصطناعيين. Android يتطلب محركًا أصليًا مبنيًا ومتحققًا منه؛ iOS يتطلب أيضًا `WAINAK_IOS_ARCHIVE_PREVIEW=true`. يرفض الويب وrelease والمنصات غير المدعومة، ويعرض فشلًا صريحًا عند غياب المحرك بدل محاكاة نجاح. هذه ليست مراسلة مشفرة أو نسخًا احتياطيًا لمحادثات حقيقية. التفاصيل في [دليل تجربة الأرشيف الأصلي](../../docs/phase6-mobile-native-archive.md).
+- `native_archive`: تجربة محدودة لجسر الأرشيف باستخدام سجلين اصطناعيين. Android يتطلب محركًا أصليًا مبنيًا ومتحققًا منه؛ iOS يتطلب أيضًا `WAINEK_IOS_ARCHIVE_PREVIEW=true`. يرفض الويب وrelease والمنصات غير المدعومة، ويعرض فشلًا صريحًا عند غياب المحرك بدل محاكاة نجاح. هذه ليست مراسلة مشفرة أو نسخًا احتياطيًا لمحادثات حقيقية. التفاصيل في [دليل تجربة الأرشيف الأصلي](../../docs/phase6-mobile-native-archive.md).
 
 الأوضاع لا تتحول إلى بعضها تلقائيًا عند الفشل. تحفظ تجربة البطاقات مستقلة عن الحسابات، ولا يمنح فتحها استحقاقًا أو موافقة شريك. الخادم يقرر أهلية الإجراءات؛ حواجز الواجهة لا تحل محل صلاحياته.
 
@@ -31,13 +31,13 @@ flutter pub get
 معاينة البطاقات المحلية:
 
 ```bash
-flutter run --dart-define=WAINAK_DEV_MODE=true --dart-define=WAINAK_REPOSITORY=local_cards
+flutter run --dart-define=WAINEK_DEV_MODE=true --dart-define=WAINEK_REPOSITORY=local_cards
 ```
 
 واجهة الحسابات مع خادم تطوير شُغّل بشكل منفصل:
 
 ```bash
-flutter run --dart-define=WAINAK_DEV_MODE=true --dart-define=WAINAK_REPOSITORY=identity --dart-define=WAINAK_API_BASE_URL=http://127.0.0.1:8089
+flutter run --dart-define=WAINEK_DEV_MODE=true --dart-define=WAINEK_REPOSITORY=identity --dart-define=WAINEK_API_BASE_URL=http://127.0.0.1:8089
 ```
 
 لا يبدأ التطبيق خادمًا. عنوان loopback على هاتف أو محاكي يشير إلى ذلك الجهاز، وليس إلى حاسوب المطور. المثال لا يفتح منافذ ولا يضبط تحويل اتصال، ولا يجيز استعمال عنوان إنتاج أو بيانات حقيقية. الهوية تقبل بيانات `@example.invalid` ضمن بيئة الاختبار فقط.
@@ -59,19 +59,19 @@ flutter test --no-pub --concurrency=1 --reporter=expanded
 فحص دخول معاينة البطاقات:
 
 ```bash
-flutter test --no-pub --concurrency=1 --dart-define=WAINAK_DEV_MODE=true --dart-define=WAINAK_REPOSITORY=local_cards test/local_cards_entrypoint_test.dart
+flutter test --no-pub --concurrency=1 --dart-define=WAINEK_DEV_MODE=true --dart-define=WAINEK_REPOSITORY=local_cards test/local_cards_entrypoint_test.dart
 ```
 
 فحص دخول جسر Android وفشل المحرك الغائب في بيئة widgets:
 
 ```bash
-flutter test --no-pub --concurrency=1 --dart-define=WAINAK_DEV_MODE=true --dart-define=WAINAK_REPOSITORY=native_archive test/native_archive_entry_test.dart
+flutter test --no-pub --concurrency=1 --dart-define=WAINEK_DEV_MODE=true --dart-define=WAINEK_REPOSITORY=native_archive test/native_archive_entry_test.dart
 ```
 
 فحص اختيار معاينة iOS وفشل المحرك الغائب:
 
 ```bash
-flutter test --no-pub --concurrency=1 --dart-define=WAINAK_DEV_MODE=true --dart-define=WAINAK_REPOSITORY=native_archive --dart-define=WAINAK_IOS_ARCHIVE_PREVIEW=true test/native_archive_platform_test.dart
+flutter test --no-pub --concurrency=1 --dart-define=WAINEK_DEV_MODE=true --dart-define=WAINEK_REPOSITORY=native_archive --dart-define=WAINEK_IOS_ARCHIVE_PREVIEW=true test/native_archive_platform_test.dart
 ```
 
 هذه فحوص Flutter على المضيف؛ لا تشغّل Android أو iOS ولا تعد اختبارًا لمحرك الأرشيف الأصلي.
@@ -82,20 +82,20 @@ flutter test --no-pub --concurrency=1 --dart-define=WAINAK_DEV_MODE=true --dart-
 
 حدد هذه المتغيرات الثلاثة من بيئة أدواتك؛ لا توجد مسارات افتراضية لمضيف المطور:
 
-- `WAINAK_IDENTITY_FIXTURE_SCRIPT`: المسار المطلق والنهائي إلى `backend/integration/serve_identity_fixture.py` في نسخة المصدر المراد اختبارها. يجب أن يكون ملفًا عاديًا مملوكًا للمشغل وغير قابل لكتابة المجموعة أو الآخرين.
-- `WAINAK_IDENTITY_FIXTURE_PYTHON`: المسار المطلق إلى Python في بيئة تحتوي اعتماديات الحسابات وPostgreSQL المقفلة. يسمح برابط مفسر venv مع الاحتفاظ بمساره كي لا يفقد بيئته.
-- `WAINAK_IDENTITY_FIXTURE_HOME`: دليل مؤقت مخصص للاختبار، موجود بصلاحيات `0700` وبمسار نهائي دون روابط. لا تستخدم مجلد المستخدم الحقيقي. تمرر هذه القيمة إلى `HOME` للعملية الفرعية فقط؛ لا يُغير الاختبار بيئة المضيف.
+- `WAINEK_IDENTITY_FIXTURE_SCRIPT`: المسار المطلق والنهائي إلى `backend/integration/serve_identity_fixture.py` في نسخة المصدر المراد اختبارها. يجب أن يكون ملفًا عاديًا مملوكًا للمشغل وغير قابل لكتابة المجموعة أو الآخرين.
+- `WAINEK_IDENTITY_FIXTURE_PYTHON`: المسار المطلق إلى Python في بيئة تحتوي اعتماديات الحسابات وPostgreSQL المقفلة. يسمح برابط مفسر venv مع الاحتفاظ بمساره كي لا يفقد بيئته.
+- `WAINEK_IDENTITY_FIXTURE_HOME`: دليل مؤقت مخصص للاختبار، موجود بصلاحيات `0700` وبمسار نهائي دون روابط. لا تستخدم مجلد المستخدم الحقيقي. تمرر هذه القيمة إلى `HOME` للعملية الفرعية فقط؛ لا يُغير الاختبار بيئة المضيف.
 
 لا ترث العملية الفرعية البيئة العامة. تمرر فقط دليلها المخصص ومسار أدوات النظام واللغة وضوابط Python، وتمنع `PYTHONPATH` وموقع حزم المستخدم وسائر متغيرات الاعتماد أو الأسرار. الاختيار الصريح للأدوات لا يجعل مفسرًا أو نسخة مصدر غير موثوقين آمنين.
 
 بعد تجهيز هذه المتغيرات واعتماديات الخادم، يشغل كل اختبار على حدة:
 
 ```bash
-WAINAK_RUN_IDENTITY_WIDGET=1 flutter test --no-pub --concurrency=1 test/identity_live_widget_test.dart
+WAINEK_RUN_IDENTITY_WIDGET=1 flutter test --no-pub --concurrency=1 test/identity_live_widget_test.dart
 ```
 
 ```bash
-WAINAK_RUN_MATCHING_WIDGET=1 flutter test --no-pub --concurrency=1 test/identity_matching_live_widget_test.dart
+WAINEK_RUN_MATCHING_WIDGET=1 flutter test --no-pub --concurrency=1 test/identity_matching_live_widget_test.dart
 ```
 
 يجب التحقق من إنهاء الخدمة والقاعدة المؤقتتين، لا من نجاح الواجهة وحده. اقرأ [بروتوكول fixture](../../backend/integration/IDENTITY_PIPE.md) و[دليل التكامل](../../backend/integration/README.md) لتجهيز البيئة. اختبارات المسار القديم مع PostgreSQL لها أداة منفصلة [FLUTTER_CHAIN.md](../../backend/integration/FLUTTER_CHAIN.md).

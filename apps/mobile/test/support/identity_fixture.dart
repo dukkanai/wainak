@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:wainak_mobile/src/api/transport.dart';
+import 'package:wainek_mobile/src/api/transport.dart';
 
 /// Synthetic contract fixture, not Django or evidence of real email delivery.
 class IdentityFixture implements ApiTransport {

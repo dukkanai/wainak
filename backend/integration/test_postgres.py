@@ -10,10 +10,10 @@ from datetime import date
 
 import psycopg
 
-from wainak.domain import DevelopmentService, DomainError, POLICY_VERSION
-from wainak.api import DevelopmentApplication
-from wainak.migrations import RepositoryConfigurationError, apply_initial_migration
-from wainak.postgres import PostgresRepository
+from wainek.domain import DevelopmentService, DomainError, POLICY_VERSION
+from wainek.api import DevelopmentApplication
+from wainek.migrations import RepositoryConfigurationError, apply_initial_migration
+from wainek.postgres import PostgresRepository
 
 CONNECT = None
 CONNECT_WRONG_DATABASE = None

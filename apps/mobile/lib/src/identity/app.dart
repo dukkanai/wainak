@@ -29,9 +29,9 @@ class _IdentityAppState extends State<IdentityApp> {
     supportedLocales: const [Locale('ar')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     debugShowCheckedModeBanner: false,
-    title: 'وينك · اختبار الهوية',
-    theme: WainakTokens.theme(Brightness.light),
-    darkTheme: WainakTokens.theme(Brightness.dark),
+    title: 'wainek · اختبار الهوية',
+    theme: WainekTokens.theme(Brightness.light),
+    darkTheme: WainekTokens.theme(Brightness.dark),
     themeMode: mode,
     home: IdentityJourney(
       client: widget.client,
@@ -305,7 +305,7 @@ class _IdentityJourneyState extends State<IdentityJourney> {
         64,
         MediaQuery.textScalerOf(context).scale(24) + 24,
       ),
-      title: const Text('وينك'),
+      title: const Text('wainek'),
       actions: [
         IconButton(
           tooltip: 'تبديل الوضع الفاتح والداكن',

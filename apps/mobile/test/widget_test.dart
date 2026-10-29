@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/main.dart';
-import 'package:wainak_mobile/src/app.dart';
-import 'package:wainak_mobile/src/repository.dart';
-import 'package:wainak_mobile/src/theme.dart';
+import 'package:wainek_mobile/main.dart';
+import 'package:wainek_mobile/src/app.dart';
+import 'package:wainek_mobile/src/repository.dart';
+import 'package:wainek_mobile/src/theme.dart';
 
 Future<void> tap(WidgetTester t, String key) async {
   final finder = find.byKey(Key(key));
@@ -22,7 +22,7 @@ Future<void> choose(WidgetTester t, String text) async {
 }
 
 Future<void> toCandidate(WidgetTester t, DevJourneyRepository r) async {
-  await t.pumpWidget(WainakApp(repository: r));
+  await t.pumpWidget(WainekApp(repository: r));
   for (final key in [
     'adult',
     'muslim',
@@ -46,7 +46,7 @@ void main() {
     expect(find.textContaining('الخدمات الفعلية غير متصلة'), findsOneWidget);
   });
   testWidgets('RTL and required eligibility failures are readable', (t) async {
-    await t.pumpWidget(WainakApp(repository: DevJourneyRepository()));
+    await t.pumpWidget(WainekApp(repository: DevJourneyRepository()));
     expect(
       Directionality.of(t.element(find.byKey(const Key('register')))),
       TextDirection.rtl,
@@ -138,7 +138,7 @@ void main() {
   testWidgets('48 targets and labeled tap actions on eligibility', (t) async {
     final handle = t.ensureSemantics();
     try {
-      await t.pumpWidget(WainakApp(repository: DevJourneyRepository()));
+      await t.pumpWidget(WainekApp(repository: DevJourneyRepository()));
       await t.pumpAndSettle();
       await t.ensureVisible(find.byKey(const Key('register')));
       await t.pumpAndSettle();
@@ -155,7 +155,7 @@ void main() {
   test(
     'design tokens keep helper text at 16 and contrast above required thresholds',
     () {
-      final theme = WainakTokens.theme(Brightness.light);
+      final theme = WainekTokens.theme(Brightness.light);
       expect(theme.textTheme.bodySmall!.fontSize, 16);
       double contrast(Color a, Color b) {
         final x = a.computeLuminance(), y = b.computeLuminance();
@@ -163,16 +163,16 @@ void main() {
       }
 
       expect(
-        contrast(WainakTokens.ink, WainakTokens.background),
+        contrast(WainekTokens.ink, WainekTokens.background),
         greaterThan(4.5),
       );
       expect(
-        contrast(WainakTokens.muted, WainakTokens.background),
+        contrast(WainekTokens.muted, WainekTokens.background),
         greaterThan(4.5),
       );
-      expect(contrast(Colors.white, WainakTokens.primary), greaterThan(4.5));
-      expect(contrast(WainakTokens.outline, Colors.white), greaterThan(3));
-      final dark = WainakTokens.theme(Brightness.dark).colorScheme;
+      expect(contrast(Colors.white, WainekTokens.primary), greaterThan(4.5));
+      expect(contrast(WainekTokens.outline, Colors.white), greaterThan(3));
+      final dark = WainekTokens.theme(Brightness.dark).colorScheme;
       expect(contrast(dark.primary, dark.onPrimary), greaterThan(4.5));
       expect(contrast(dark.onSurfaceVariant, dark.surface), greaterThan(4.5));
     },

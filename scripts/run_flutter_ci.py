@@ -98,7 +98,7 @@ def run_gate(flutter, label, args, env, skips=None):
     result = run_bounded([flutter, 'test', '--no-pub', '--concurrency=1', '--machine', *args],
                          cwd=MOBILE, env=env, seconds=600,
                          cleanup_grace=120 if any(env.get(flag) == '1' for flag in
-                            ('WAINAK_RUN_IDENTITY_WIDGET', 'WAINAK_RUN_MATCHING_WIDGET')) else 0)
+                            ('WAINEK_RUN_IDENTITY_WIDGET', 'WAINEK_RUN_MATCHING_WIDGET')) else 0)
     try:
         summary = validate_events(result.stdout, result.returncode, skips)
     except Exception:
@@ -118,16 +118,16 @@ def main():
     python = args.identity_python.absolute()
     if not flutter.is_file() or not python.is_file():
         raise SystemExit('Explicit Flutter and identity Python are required')
-    with tempfile.TemporaryDirectory(prefix='wainak-identity-home-', dir=tools) as fixture_home:
+    with tempfile.TemporaryDirectory(prefix='wainek-identity-home-', dir=tools) as fixture_home:
         run_checks(tools, flutter, python, Path(fixture_home).resolve(strict=True))
 
 
 def run_checks(tools, flutter, python, fixture_home):
     env = dict(os.environ, PUB_CACHE=str(tools / 'pub-cache'), CI='true', FLUTTER_SUPPRESS_ANALYTICS='true',
-               WAINAK_IDENTITY_FIXTURE_PYTHON=str(python), WAINAK_IDENTITY_FIXTURE_HOME=str(fixture_home),
-               WAINAK_IDENTITY_FIXTURE_SCRIPT=str(ROOT / 'backend/integration/serve_identity_fixture.py'))
-    for key in ('WAINAK_RUN_IDENTITY_WIDGET', 'WAINAK_RUN_MATCHING_WIDGET', 'WAINAK_BACKEND_ROOT',
-                'WAINAK_TEST_BASE_URL', 'WAINAK_TEST_CONTROL_DIR'):
+               WAINEK_IDENTITY_FIXTURE_PYTHON=str(python), WAINEK_IDENTITY_FIXTURE_HOME=str(fixture_home),
+               WAINEK_IDENTITY_FIXTURE_SCRIPT=str(ROOT / 'backend/integration/serve_identity_fixture.py'))
+    for key in ('WAINEK_RUN_IDENTITY_WIDGET', 'WAINEK_RUN_MATCHING_WIDGET', 'WAINEK_BACKEND_ROOT',
+                'WAINEK_TEST_BASE_URL', 'WAINEK_TEST_CONTROL_DIR'):
         env.pop(key, None)
     run_bounded([flutter, 'pub', 'get', '--enforce-lockfile'], cwd=MOBILE, env=env, check=True)
     run_bounded([flutter, 'analyze', '--no-pub'], cwd=MOBILE, env=env, check=True, seconds=180)
@@ -136,16 +136,18 @@ def run_checks(tools, flutter, python, fixture_home):
                         cwd=ROOT, env=env, seconds=90)
     print(json.dumps({'gate': 'independent matching race probe', 'status': 'PASS',
                       **validate_matching_probe(probe.stdout, probe.returncode)}), flush=True)
-    run_gate(flutter, 'local cards entrypoint', ['--dart-define=WAINAK_DEV_MODE=true',
-        '--dart-define=WAINAK_REPOSITORY=local_cards', 'test/local_cards_entrypoint_test.dart'], env)
-    run_gate(flutter, 'native archive entrypoint', ['--dart-define=WAINAK_DEV_MODE=true',
-        '--dart-define=WAINAK_REPOSITORY=native_archive', 'test/native_archive_entry_test.dart'], env)
-    run_gate(flutter, 'iOS platform host fixture', ['--dart-define=WAINAK_DEV_MODE=true',
-        '--dart-define=WAINAK_REPOSITORY=native_archive', '--dart-define=WAINAK_IOS_ARCHIVE_PREVIEW=true',
+    run_gate(flutter, 'internal TestFlight fake entrypoint', ['--dart-define=WAINEK_DEV_MODE=true',
+        '--dart-define=WAINEK_REPOSITORY=fake', 'test/testflight_entrypoint_test.dart'], env)
+    run_gate(flutter, 'local cards entrypoint', ['--dart-define=WAINEK_DEV_MODE=true',
+        '--dart-define=WAINEK_REPOSITORY=local_cards', 'test/local_cards_entrypoint_test.dart'], env)
+    run_gate(flutter, 'native archive entrypoint', ['--dart-define=WAINEK_DEV_MODE=true',
+        '--dart-define=WAINEK_REPOSITORY=native_archive', 'test/native_archive_entry_test.dart'], env)
+    run_gate(flutter, 'iOS platform host fixture', ['--dart-define=WAINEK_DEV_MODE=true',
+        '--dart-define=WAINEK_REPOSITORY=native_archive', '--dart-define=WAINEK_IOS_ARCHIVE_PREVIEW=true',
         'test/native_archive_platform_test.dart'], env)
     for label, test, flag in (
-        ('identity HTTP PostgreSQL widgets', 'identity_live_widget_test.dart', 'WAINAK_RUN_IDENTITY_WIDGET'),
-        ('matching HTTP PostgreSQL widgets', 'identity_matching_live_widget_test.dart', 'WAINAK_RUN_MATCHING_WIDGET'),
+        ('identity HTTP PostgreSQL widgets', 'identity_live_widget_test.dart', 'WAINEK_RUN_IDENTITY_WIDGET'),
+        ('matching HTTP PostgreSQL widgets', 'identity_matching_live_widget_test.dart', 'WAINEK_RUN_MATCHING_WIDGET'),
     ):
         run_gate(flutter, label, ['test/' + test], dict(env, **{flag: '1'}))
     result = run_bounded([python, 'backend/integration/run_flutter_postgres.py', '--run-flutter-postgres',

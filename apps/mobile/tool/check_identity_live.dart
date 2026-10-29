@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'package:wainak_mobile/src/identity/client.dart';
-import 'package:wainak_mobile/src/api/transport_io.dart';
+import 'package:wainek_mobile/src/identity/client.dart';
+import 'package:wainek_mobile/src/api/transport_io.dart';
 import 'identity_fixture_bridge.dart';
 
 void check(bool value, String name) {

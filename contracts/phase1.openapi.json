@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Wainak phase-one synthetic development contract",
+    "title": "Wainek phase-one synthetic development contract",
     "version": "0.1.0-dev",
     "description": "NOT PRODUCTION. Loopback only; default volatile memory, optional marked disposable PostgreSQL repository; synthetic @example.invalid accounts; no real email, authentication, payments, chat transport, medical data, moderation team, evidence upload, or production deletion pipeline. Current permissions override stale UI state. Unknown fields are rejected. JSON body limit: 16384 bytes. The only query parameter is the exact cursor on GET /v1/relationships; other queries and browser Origin headers are rejected."
   },

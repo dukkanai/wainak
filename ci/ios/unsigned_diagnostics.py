@@ -5,7 +5,7 @@ import re
 import stat
 import struct
 
-PREFIX = 'WAINAK_UNSIGNED_DIAGNOSTIC '
+PREFIX = 'WAINEK_UNSIGNED_DIAGNOSTIC '
 CATEGORIES = {'bundle_metadata', 'invalid_arguments', 'signature_present',
               'unexpected_codesign_output', 'codesign_timeout', 'codesign_tool_error',
               'codesign_output_bound'}

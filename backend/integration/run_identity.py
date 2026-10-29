@@ -16,7 +16,7 @@ def main(extra_test_factory=None, argv=None):
         parser.error("Explicit --run-disposable-identity is required")
 
     def extra(connect, restart, temporary):
-        from wainak_identity.bootstrap import configure, ephemeral_keys
+        from wainek_identity.bootstrap import configure, ephemeral_keys
         keys = ephemeral_keys()  # Generated only in harness memory; never a file/env/argv/log.
         configure(connect, keys=keys)
         # Django schema setup is lazy, AFTER the unchanged 14 phase1 PG tests.

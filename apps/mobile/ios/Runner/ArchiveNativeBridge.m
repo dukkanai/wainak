@@ -1,43 +1,43 @@
 #import "ArchiveNativeBridge.h"
 
-#if defined(WAINAK_ARCHIVE_BRIDGE) && WAINAK_ARCHIVE_BRIDGE
+#if defined(WAINEK_ARCHIVE_BRIDGE) && WAINEK_ARCHIVE_BRIDGE
 // Exact generated prototypes: header SHA256 2ba29fb669cfc99e867fc33168a31f40e14790626ccc429c3d641e516c313ba3.
 // Framework/module packaging is source-verified, not Apple-compiled evidence.
 #import <Archivebridge/Archivebridge.h>
 #import <CoreFoundation/CoreFoundation.h>
 
-static BOOL WainakBool(id value, BOOL expected) {
+static BOOL WainekBool(id value, BOOL expected) {
   return [value isKindOfClass:[NSNumber class]] &&
     CFGetTypeID((__bridge CFTypeRef)value) == CFBooleanGetTypeID() &&
     [(NSNumber *)value boolValue] == expected;
 }
 
-static BOOL WainakKeys(NSDictionary *value, NSArray<NSString *> *keys) {
+static BOOL WainekKeys(NSDictionary *value, NSArray<NSString *> *keys) {
   return value.count == keys.count &&
     [[NSSet setWithArray:value.allKeys] isEqualToSet:[NSSet setWithArray:keys]];
 }
 
-static BOOL WainakCloseChecked(int64_t session) {
+static BOOL WainekCloseChecked(int64_t session) {
   if (session <= 0) return NO;
   NSError *error = nil;
   BOOL closed = ArchivebridgeClose(session, &error);
   return closed && error == nil;
 }
 
-int64_t WainakArchiveOpen(void) {
+int64_t WainekArchiveOpen(void) {
   @autoreleasepool {
     int64_t session = 0;
     NSError *error = nil;
     BOOL opened = ArchivebridgeNewSyntheticSession(&session, &error);
     if (!opened || error != nil || session <= 0) {
-      if (session > 0 && !WainakCloseChecked(session)) return -1;
+      if (session > 0 && !WainekCloseChecked(session)) return -1;
       return 0;
     }
     return session;
   }
 }
 
-int32_t WainakArchiveRoundTrip(int64_t session) {
+int32_t WainekArchiveRoundTrip(int64_t session) {
   @autoreleasepool {
     if (session <= 0) return 0;
     NSError *error = nil;
@@ -64,9 +64,9 @@ int32_t WainakArchiveRoundTrip(int64_t session) {
     id decoded = [NSJSONSerialization JSONObjectWithData:history options:0 error:&error];
     if (error != nil || ![decoded isKindOfClass:[NSDictionary class]]) return 0;
     NSDictionary *root = decoded;
-    if (!WainakKeys(root, @[@"profile", @"synthetic", @"records"]) ||
+    if (!WainekKeys(root, @[@"profile", @"synthetic", @"records"]) ||
         ![root[@"profile"] isEqual:@"wainak-synthetic-history-bridge-v1"] ||
-        !WainakBool(root[@"synthetic"], YES) ||
+        !WainekBool(root[@"synthetic"], YES) ||
         ![root[@"records"] isKindOfClass:[NSArray class]]) return 0;
     NSArray *rows = root[@"records"];
     if (rows.count != 2) return 0;
@@ -78,7 +78,7 @@ int32_t WainakArchiveRoundTrip(int64_t session) {
     for (id raw in rows) {
       if (![raw isKindOfClass:[NSDictionary class]]) return 0;
       NSDictionary *row = raw;
-      if (!WainakKeys(row, @[@"event_id", @"occurred_at", @"card_id", @"response_id", @"imported", @"authenticated_author"]) ||
+      if (!WainekKeys(row, @[@"event_id", @"occurred_at", @"card_id", @"response_id", @"imported", @"authenticated_author"]) ||
           ![row[@"event_id"] isKindOfClass:[NSString class]]) return 0;
       NSString *event = row[@"event_id"];
       NSArray *pair = expected[event];
@@ -86,15 +86,15 @@ int32_t WainakArchiveRoundTrip(int64_t session) {
           ![row[@"occurred_at"] isEqual:pair[0]] ||
           ![row[@"card_id"] isEqual:@"sample_card"] ||
           ![row[@"response_id"] isEqual:pair[1]] ||
-          !WainakBool(row[@"imported"], YES) ||
-          !WainakBool(row[@"authenticated_author"], NO)) return 0;
+          !WainekBool(row[@"imported"], YES) ||
+          !WainekBool(row[@"authenticated_author"], NO)) return 0;
       [seen addObject:event];
     }
     return 2;
   }
 }
 
-BOOL WainakArchiveClose(int64_t session) {
-  @autoreleasepool { return WainakCloseChecked(session); }
+BOOL WainekArchiveClose(int64_t session) {
+  @autoreleasepool { return WainekCloseChecked(session); }
 }
 #endif

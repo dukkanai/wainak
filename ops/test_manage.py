@@ -14,7 +14,7 @@ import manage
 
 class ManageTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix='wainak-manage-test-')
+        self.temp = tempfile.TemporaryDirectory(prefix='wainek-manage-test-')
         self.root = Path(self.temp.name)
         self.runtime = self.root / '.runtime'
         self.backups = self.root / 'backups'

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/identity/app.dart';
-import 'package:wainak_mobile/src/identity/client.dart';
+import 'package:wainek_mobile/src/identity/app.dart';
+import 'package:wainek_mobile/src/identity/client.dart';
 import '../tool/check_identity_matching.dart' as checks;
 import 'support/matching_fixture.dart';
 

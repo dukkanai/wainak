@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/api/client.dart';
-import 'package:wainak_mobile/src/api/http_repository.dart';
-import 'package:wainak_mobile/src/api/transport_io.dart';
-import 'package:wainak_mobile/src/connected_app.dart';
-import 'package:wainak_mobile/src/repository.dart';
+import 'package:wainek_mobile/src/api/client.dart';
+import 'package:wainek_mobile/src/api/http_repository.dart';
+import 'package:wainek_mobile/src/api/transport_io.dart';
+import 'package:wainek_mobile/src/connected_app.dart';
+import 'package:wainek_mobile/src/repository.dart';
 
 // Deliberate opt-in for this independently reviewed loopback-only test.
 class LiveLoopbackBinding extends AutomatedTestWidgetsFlutterBinding {
@@ -80,8 +80,8 @@ Future<void> checkpoint(String directory, String phase) async {
 
 void main() {
   LiveLoopbackBinding();
-  final url = Platform.environment['WAINAK_TEST_BASE_URL'];
-  final controls = Platform.environment['WAINAK_TEST_CONTROL_DIR'];
+  final url = Platform.environment['WAINEK_TEST_BASE_URL'];
+  final controls = Platform.environment['WAINEK_TEST_CONTROL_DIR'];
   testWidgets(
     'QA live widgets -> native HTTP -> PostgreSQL: consent, two actors, restart, block/report/delete',
     (tester) async {
@@ -92,12 +92,12 @@ void main() {
       expect(uri.userInfo.isEmpty && !uri.hasQuery && !uri.hasFragment, isTrue);
       expect(uri.path.isEmpty || uri.path == '/', isTrue);
       expect(Directory(controls!).isAbsolute, isTrue);
-      final peer = WainakApiClient(
+      final peer = WainekApiClient(
         baseUri: uri,
         transport: NativeApiTransport(),
       );
       final repo = HttpJourneyRepository(
-        WainakApiClient(baseUri: uri, transport: NativeApiTransport()),
+        WainekApiClient(baseUri: uri, transport: NativeApiTransport()),
       );
       String? peerId;
       try {
@@ -129,7 +129,7 @@ void main() {
             'marital_statuses': ['single'],
           });
         });
-        await tester.pumpWidget(ConnectedWainakApp(repository: repo));
+        await tester.pumpWidget(ConnectedWainekApp(repository: repo));
         expect(
           Directionality.of(tester.element(find.byType(Scaffold))),
           TextDirection.rtl,

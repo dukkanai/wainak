@@ -16,12 +16,12 @@ from django.db import connection, connections, transaction
 from django.test import Client, override_settings
 from django.utils import timezone
 from allauth.account.models import EmailAddress
-from wainak.domain import POLICY_VERSION
-from wainak_identity.mailbox import OUTBOX
-from wainak_identity.models import User, DigestSession, RateBucket, MutationReceipt, DeletionReceipt
-from wainak_identity.repository import service
-from wainak_identity.sessions import SessionStore, digest_token, email_fingerprint
-from wainak_identity import rate_limits
+from wainek.domain import POLICY_VERSION
+from wainek_identity.mailbox import OUTBOX
+from wainek_identity.models import User, DigestSession, RateBucket, MutationReceipt, DeletionReceipt
+from wainek_identity.repository import service
+from wainek_identity.sessions import SessionStore, digest_token, email_fingerprint
+from wainek_identity import rate_limits
 
 AUTH = "/_allauth/app/v1/"
 RESTART_DATABASE = None
@@ -114,7 +114,7 @@ class IndependentIdentityTests(unittest.TestCase):
 
     def test_verify_code_is_session_bound_and_expired_code_cannot_authenticate(self):
         # Controlled, distinct synthetic codes make cross-session binding deterministic.
-        with mock.patch("wainak_identity.adapters.AccountAdapter.generate_email_verification_code",
+        with mock.patch("wainek_identity.adapters.AccountAdapter.generate_email_verification_code",
                         side_effect=["111111", "222222"]):
             a, ca = self.signup("qa_a@example.invalid")
             b, cb = self.signup("qa_b@example.invalid")
@@ -213,7 +213,7 @@ class IndependentIdentityTests(unittest.TestCase):
         now = timezone.now()
         absolute = now + timedelta(seconds=100)
         DigestSession.objects.filter(session_key=digest_token(token)).update(
-            created_at=absolute - timedelta(seconds=settings.WAINAK_SESSION_ABSOLUTE_SECONDS),
+            created_at=absolute - timedelta(seconds=settings.WAINEK_SESSION_ABSOLUTE_SECONDS),
             last_seen_at=now - timedelta(seconds=1700), expire_date=now + timedelta(seconds=50))
         with mock.patch("django.utils.timezone.now", return_value=now):
             self.expect_status(self.call("GET", "/v1/relationships", token=token), 200)
@@ -227,7 +227,7 @@ class IndependentIdentityTests(unittest.TestCase):
         other, _ = self.account("qa_idle@example.invalid")
         idle_now = timezone.now()
         DigestSession.objects.filter(session_key=digest_token(other)).update(
-            last_seen_at=idle_now - timedelta(seconds=settings.WAINAK_SESSION_IDLE_SECONDS),
+            last_seen_at=idle_now - timedelta(seconds=settings.WAINEK_SESSION_IDLE_SECONDS),
             expire_date=idle_now + timedelta(seconds=100))
         with mock.patch("django.utils.timezone.now", return_value=idle_now):
             self.expect_status(self.call("GET", "/identity/v1/me", token=other), 401)
@@ -240,7 +240,7 @@ class IndependentIdentityTests(unittest.TestCase):
         self.expect_status(self.call("GET", "/identity/v1/me", token=b), 401)
         self.expect_status(self.call("GET", "/identity/v1/me", token=a), 200)
         self.expect_status(self.call("GET", "/identity/v1/me", token=digest_token(a)), 401)
-        with override_settings(WAINAK_SESSION_ENCRYPTION_KEY=Fernet.generate_key()):
+        with override_settings(WAINEK_SESSION_ENCRYPTION_KEY=Fernet.generate_key()):
             self.expect_status(self.call("GET", "/identity/v1/me", token=a), 401)
 
     def test_async_session_cycle_flush_and_manager_guards_do_not_store_raw_secrets(self):
@@ -379,7 +379,7 @@ class IndependentIdentityTests(unittest.TestCase):
             a, HTTP_IDEMPOTENCY_KEY="qa_consent_relationship"), 201)
         # Stored consent version is DB-constrained. Simulate a future code policy
         # instead of bypassing that constraint to manufacture an impossible row.
-        with mock.patch("wainak_identity.repository.POLICY_VERSION", "future-policy-fixture"):
+        with mock.patch("wainek_identity.repository.POLICY_VERSION", "future-policy-fixture"):
             self.expect_status(self.call("GET", "/v1/candidates", token=a), 403)
             self.expect_status(self.call("PUT", "/v1/me/preferences", {
                 "min_age": 18, "max_age": 60, "countries": [], "marital_statuses": ["single"]}, a), 403)

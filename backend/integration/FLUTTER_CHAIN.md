@@ -2,7 +2,7 @@
 
 This additive acceptance harness uses the existing disposable PostgreSQL safeguards.
 It does not publish an application, enable real accounts, or connect to the existing
-Wainak database. Execute only as the project owner, with one Flutter build at a time.
+Wainek database. Execute only as the project owner, with one Flutter build at a time.
 
 ```sh
 /path/to/owned/psycopg-venv/bin/python \
@@ -32,8 +32,8 @@ flutter test --no-pub --concurrency=1 --reporter=expanded \
   test/native_backend_integration_test.dart
 ```
 
-It receives only the loopback `WAINAK_TEST_BASE_URL` and private
-`WAINAK_TEST_CONTROL_DIR` in addition to the constrained SDK environment. A client
+It receives only the loopback `WAINEK_TEST_BASE_URL` and private
+`WAINEK_TEST_CONTROL_DIR` in addition to the constrained SDK environment. A client
 may retain its own synthetic API session token in memory, as a real client must;
 no token is put in a control file, command argument or persistent fixture.
 

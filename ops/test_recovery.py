@@ -14,10 +14,13 @@ import manage
 def main():
     os.umask(0o077)
     source = manage.ROOT / 'compose.yaml'
-    with tempfile.TemporaryDirectory(prefix='wainak-recovery-test-') as directory:
+    with tempfile.TemporaryDirectory(prefix='wainek-recovery-test-') as directory:
         root = Path(directory)
-        project = 'wainak-test-' + secrets.token_hex(4)
-        (root / 'compose.yaml').write_text(source.read_text().replace('name: wainak\n', f'name: {project}\n', 1))
+        project = 'wainek-test-' + secrets.token_hex(4)
+        original = source.read_text()
+        if original.count('name: wainak\n') != 1:
+            raise RuntimeError('Disposable project boundary cannot be established')
+        (root / 'compose.yaml').write_text(original.replace('name: wainak\n', f'name: {project}\n', 1))
         manage.ROOT = root
         manage.RUNTIME = root / '.runtime'
         manage.BACKUPS = root / 'backups'

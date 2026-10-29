@@ -7,11 +7,11 @@ import assert from 'node:assert/strict';
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const target = process.env.WAINAK_PREVIEW_URL || pathToFileURL(path.join(root, 'dist/index.html')).href;
+const target = process.env.WAINEK_PREVIEW_URL || pathToFileURL(path.join(root, 'dist/index.html')).href;
 const output = path.join(root, 'qa/results');
 await mkdir(output, { recursive: true });
 const result = { target, date: new Date().toISOString(), checks: [], accessibility: [], failures: [], network: [], consoleErrors: [] };
-const browser = await chromium.launch({ executablePath: process.env.WAINAK_CHROME || '/usr/bin/google-chrome', headless: true });
+const browser = await chromium.launch({ executablePath: process.env.WAINEK_CHROME || '/usr/bin/google-chrome', headless: true });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'ar', reducedMotion: 'reduce' });
 const page = await context.newPage();
 page.setDefaultTimeout(7000);

@@ -4,24 +4,24 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'repository.dart';
 import 'theme.dart';
 
-class WainakApp extends StatefulWidget {
-  const WainakApp({super.key, required this.repository});
+class WainekApp extends StatefulWidget {
+  const WainekApp({super.key, required this.repository});
   final JourneyRepository repository;
   @override
-  State<WainakApp> createState() => _WainakAppState();
+  State<WainekApp> createState() => _WainekAppState();
 }
 
-class _WainakAppState extends State<WainakApp> {
+class _WainekAppState extends State<WainekApp> {
   ThemeMode mode = ThemeMode.system;
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'وينك · تطوير',
+    title: 'wainek',
     debugShowCheckedModeBanner: false,
     locale: const Locale('ar'),
     supportedLocales: const [Locale('ar')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
-    theme: WainakTokens.theme(Brightness.light),
-    darkTheme: WainakTokens.theme(Brightness.dark),
+    theme: WainekTokens.theme(Brightness.light),
+    darkTheme: WainekTokens.theme(Brightness.dark),
     themeMode: mode,
     home: Journey(
       repository: widget.repository,
@@ -139,7 +139,7 @@ class _JourneyState extends State<Journey> {
             64,
             MediaQuery.textScalerOf(context).scale(24) + 24,
           ),
-          title: const Text('وينك'),
+          title: const Text('wainek'),
           leading: page != JourneyPage.eligibility
               ? IconButton(
                   key: const Key('back'),
@@ -235,7 +235,7 @@ class _JourneyState extends State<Journey> {
 
   List<Widget> eligibility() => [
     const Text(
-      'وينك للمسلمين البالغين الباحثين عن زواج جاد. العمر والإقرارات هنا محاكاة، وليست إثبات هوية أو تحققًا إنتاجيًا.',
+      'wainek للمسلمين البالغين الباحثين عن زواج جاد. العمر والإقرارات هنا محاكاة، وليست إثبات هوية أو تحققًا إنتاجيًا.',
     ),
     const SizedBox(height: 20),
     if (repo.registered) ...[

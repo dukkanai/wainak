@@ -29,7 +29,7 @@ class PackagingTests(unittest.TestCase):
         (self.dist/'index.html').write_text('<!doctype html><html><head><link rel="stylesheet" href="styles.css"></head><body><a href="assets/font-OFL.txt">License</a><script src="app.js"></script></body></html>')
         (self.dist/'styles.css').write_text('@font-face {font-family: public; src:url("assets/font.woff2");}')
         (self.dist/'app.js').write_text('window.syntheticOnly = true;')
-        (self.prototype/'README.md').write_text('Use releases/wainak-preview.html')
+        (self.prototype/'README.md').write_text('Use releases/wainek-preview.html')
         self.enterContext(patch.object(p,'ROOT',self.prototype))
         self.enterContext(patch.object(p,'DIST',self.dist))
         self.enterContext(patch.object(p,'RELEASES',self.releases))
@@ -37,21 +37,21 @@ class PackagingTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):p.main()
     def rejected(self):
         with self.assertRaises((ValueError,OSError)):self.package()
-        if (self.releases/'wainak-preview.html').exists():
-            self.assertNotIn(MARKER,(self.releases/'wainak-preview.html').read_text())
+        if (self.releases/'wainek-preview.html').exists():
+            self.assertNotIn(MARKER,(self.releases/'wainek-preview.html').read_text())
     def test_normal_offline_html_zip_notices_and_manifest(self):
         self.package()
-        html=(self.releases/'wainak-preview.html').read_text()
+        html=(self.releases/'wainek-preview.html').read_text()
         self.assertIn('PUBLIC FONT LICENSE',html)
         self.assertIn(base64.b64encode(b'PUBLIC FONT LICENSE').decode(),html)
         self.assertIn('window.syntheticOnly = true;',html)
         self.assertIn(base64.b64encode(b'PUBLICFONT').decode(),html)
         self.assertNotIn('src="app.js"',html)
-        with zipfile.ZipFile(self.releases/'wainak-prototype.zip') as z:
+        with zipfile.ZipFile(self.releases/'wainek-prototype.zip') as z:
             for relative in p.source_files(self.dist):
-                self.assertEqual(z.read('wainak-prototype/'+relative),p.local_asset(relative))
-            self.assertEqual(z.read('wainak-preview.html').decode(),html)
-            self.assertIn(b'Use wainak-preview.html',z.read('README.md'))
+                self.assertEqual(z.read('wainek-prototype/'+relative),p.local_asset(relative))
+            self.assertEqual(z.read('wainek-preview.html').decode(),html)
+            self.assertIn(b'Use wainek-preview.html',z.read('README.md'))
         manifest=json.loads((self.releases/'manifest.json').read_text())
         for name,row in manifest.items():
             data=(self.releases/name).read_bytes()
@@ -133,7 +133,7 @@ class PackagingTests(unittest.TestCase):
             with self.assertRaises(ValueError):p.inline_css('a{src:url('+url+')}')
     def test_missing_readme_remains_optional(self):
         (self.prototype/'README.md').unlink();self.package()
-        with zipfile.ZipFile(self.releases/'wainak-prototype.zip') as z:
+        with zipfile.ZipFile(self.releases/'wainek-prototype.zip') as z:
             self.assertNotIn('README.md',z.namelist())
     def test_release_directory_link_is_rejected(self):
         self.releases.symlink_to(self.external,target_is_directory=True)
@@ -141,20 +141,20 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(sorted(path.name for path in self.external.iterdir()),['font-OFL.txt'])
 
     def output_names(self):
-        return ('wainak-preview.html','wainak-prototype.zip','manifest.json')
+        return ('wainek-preview.html','wainek-prototype.zip','manifest.json')
     def assert_no_staging_files(self):
-        self.assertEqual(list(self.releases.glob('.wainak-package-*')),[])
+        self.assertEqual(list(self.releases.glob('.wainek-package-*')),[])
     def test_safe_existing_outputs_can_be_refreshed_without_truncation(self):
         self.package()
         unrelated=self.releases/'keep.txt';unrelated.write_text('KEEP')
-        old=(self.releases/'wainak-preview.html').read_bytes()
-        old_fd=os.open(self.releases/'wainak-preview.html',os.O_RDONLY)
+        old=(self.releases/'wainek-preview.html').read_bytes()
+        old_fd=os.open(self.releases/'wainek-preview.html',os.O_RDONLY)
         try:
             (self.dist/'app.js').write_text('window.syntheticOnly = "updated";')
             self.package()
             self.assertEqual(os.read(old_fd,len(old)+1),old)
         finally:os.close(old_fd)
-        self.assertIn('"updated"',(self.releases/'wainak-preview.html').read_text())
+        self.assertIn('"updated"',(self.releases/'wainek-preview.html').read_text())
         self.assertEqual(unrelated.read_text(),'KEEP')
         manifest=json.loads((self.releases/'manifest.json').read_text())
         for name,row in manifest.items():
@@ -198,7 +198,7 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(list(self.releases.iterdir()),[])
     def test_existing_leaf_changed_during_staging_is_rejected(self):
         self.package()
-        leaf=self.releases/'wainak-preview.html'
+        leaf=self.releases/'wainek-preview.html'
         original=p.os.fsync;changed=False
         def mutate(fd):
             nonlocal changed
@@ -230,18 +230,18 @@ class PackagingTests(unittest.TestCase):
         self.assertTrue(swapped)
         self.assertEqual(sorted(x.name for x in self.external.iterdir()),['font-OFL.txt'])
         self.assertEqual((self.external/'font-OFL.txt').read_text(),MARKER)
-        self.assertEqual(list(moved.glob('.wainak-package-*')),[])
+        self.assertEqual(list(moved.glob('.wainek-package-*')),[])
     def test_leaf_link_swap_at_replace_does_not_follow_external_target(self):
         original=p.os.replace;swapped=False
         def replace(source,destination,*args,**kwargs):
             nonlocal swapped
-            if destination=='wainak-preview.html' and not swapped:
+            if destination=='wainek-preview.html' and not swapped:
                 swapped=True;(self.releases/destination).symlink_to(self.external/'font-OFL.txt')
             return original(source,destination,*args,**kwargs)
         with patch.object(p.os,'replace',side_effect=replace):self.package()
         self.assertTrue(swapped)
         self.assertEqual((self.external/'font-OFL.txt').read_text(),MARKER)
-        self.assertFalse((self.releases/'wainak-preview.html').is_symlink())
+        self.assertFalse((self.releases/'wainek-preview.html').is_symlink())
         self.assert_no_staging_files()
     def test_replaced_staging_name_is_not_published_or_removed_as_owned(self):
         original=p.os.fsync;changed=False;replaced=None
@@ -249,27 +249,27 @@ class PackagingTests(unittest.TestCase):
             nonlocal changed,replaced
             if not changed:
                 changed=True
-                replaced=next(self.releases.glob('.wainak-package-*'))
+                replaced=next(self.releases.glob('.wainek-package-*'))
                 replaced.unlink();replaced.symlink_to(self.external/'font-OFL.txt')
             return original(fd)
         with patch.object(p.os,'fsync',side_effect=mutate):
             with self.assertRaises(ValueError):self.package()
         self.assertTrue(replaced.is_symlink())
         self.assertEqual((self.external/'font-OFL.txt').read_text(),MARKER)
-        self.assertEqual(list(self.releases.glob('.wainak-package-*')),[replaced])
-        self.assertFalse((self.releases/'wainak-preview.html').exists())
+        self.assertEqual(list(self.releases.glob('.wainek-package-*')),[replaced])
+        self.assertFalse((self.releases/'wainek-preview.html').exists())
     def test_partial_publication_failure_does_not_publish_new_manifest(self):
         self.package()
         old_manifest=(self.releases/'manifest.json').read_bytes()
         (self.dist/'app.js').write_text('window.changed = true;')
         original=p.os.replace
         def fail_second(source,destination,*args,**kwargs):
-            if destination=='wainak-prototype.zip':raise OSError('injected second replace failure')
+            if destination=='wainek-prototype.zip':raise OSError('injected second replace failure')
             return original(source,destination,*args,**kwargs)
         with patch.object(p.os,'replace',side_effect=fail_second):
             with self.assertRaises(OSError):self.package()
         self.assertEqual((self.releases/'manifest.json').read_bytes(),old_manifest)
-        self.assertIn('window.changed = true;',(self.releases/'wainak-preview.html').read_text())
+        self.assertIn('window.changed = true;',(self.releases/'wainek-preview.html').read_text())
         self.assert_no_staging_files()
 
 if __name__=='__main__':unittest.main()

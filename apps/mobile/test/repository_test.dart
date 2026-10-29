@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/repository.dart';
+import 'package:wainek_mobile/src/repository.dart';
 
 void register(DevJourneyRepository r) =>
     r.register(age: 29, adult: true, muslim: true, terms: true, privacy: true);

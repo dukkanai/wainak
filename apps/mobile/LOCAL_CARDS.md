@@ -6,7 +6,7 @@ Base: local main `5f3433b23d8a29999c24943414ff1fdbcc40f46d`. Isolated developmen
 
 ## Agreed boundary before implementation
 
-This is a standalone default-off development mode, `WAINAK_DEV_MODE=true` and `WAINAK_REPOSITORY=local_cards`. Release mode is rejected. It is not opened from an authenticated relationship and receives no account, relationship, entitlement, API or persistence dependency. Existing fake/API/identity modes remain separate and unchanged. A local preview does not earn activation or simulate a partner's acceptance.
+This is a standalone default-off development mode, `WAINEK_DEV_MODE=true` and `WAINEK_REPOSITORY=local_cards`. Release mode is rejected. It is not opened from an authenticated relationship and receives no account, relationship, entitlement, API or persistence dependency. Existing fake/API/identity modes remain separate and unchanged. A local preview does not earn activation or simulate a partner's acceptance.
 
 The sample contains four newly drafted Arabic-fusha cards and predefined responses, including deferral. These are illustrative editorial samples, not reviewed final product content or a compatibility/psychological assessment. They do not implement the planned library of thousands of cards or dialect variants in `docs/content.md`. The sample limits (1–12 cards, 2–5 responses per card, ar only) are validation bounds for this slice, not permanent product decisions. Unsupported locales fail closed; future dialect catalogues require explicit reviewed copy and versioning, not silent fallback or remote loading. Card IDs and response IDs have separate namespaces; card IDs are unique, and response IDs are globally unique across cards. Version format is checked; no remote version loader exists.
 
@@ -40,6 +40,6 @@ All existing live tests remain opt-in; do not start their backend fixtures as pa
 
 Explicit entrypoint check (no API base URL, no backend fixture):
 
-    flutter test --no-pub --concurrency=1 --dart-define=WAINAK_DEV_MODE=true --dart-define=WAINAK_REPOSITORY=local_cards test/local_cards_entrypoint_test.dart
+    flutter test --no-pub --concurrency=1 --dart-define=WAINEK_DEV_MODE=true --dart-define=WAINEK_REPOSITORY=local_cards test/local_cards_entrypoint_test.dart
 
 At the first core handoff, developer15 checks and analyzer passed; independent22 controller checks passed on catalog4db0a07b/controller407c19b4. These are source-hash-scoped results, not widget or actual release-build evidence. The default suite skips the explicit-entrypoint check unless its compile flags are enabled.

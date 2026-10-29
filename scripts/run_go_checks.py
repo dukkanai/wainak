@@ -79,7 +79,7 @@ def validate_go_events(output, code):
 def make_cli_module(path, lock):
     path.mkdir(mode=0o700)
     required = ''.join('\t' + row['path'] + ' ' + row['version'] + '\n' for row in lock['input_modules'])
-    (path / 'go.mod').write_text('module wainak.local/ciagetool\n\ngo 1.27.3\n\nrequire (\n' + required + ')\n')
+    (path / 'go.mod').write_text('module wainek.local/ciagetool\n\ngo 1.27.3\n\nrequire (\n' + required + ')\n')
     sums = []
     for row in lock['input_modules'] + lock['auxiliary_modules']:
         sums.append(row['path'] + ' ' + row['version'] + '/go.mod ' + row['go_mod_sum'])
@@ -112,7 +112,7 @@ def main():
     version = run([go, 'version'], ROOT, env).stdout.strip()
     if ' go1.27.3 ' not in version:
         raise SystemExit('Go must match the reviewed 1.27.3 module toolchain')
-    with tempfile.TemporaryDirectory(prefix='wainak-go-ci-') as temporary:
+    with tempfile.TemporaryDirectory(prefix='wainek-go-ci-') as temporary:
         work = Path(temporary)
         for name in ('GOCACHE', 'GOMODCACHE', 'GOTMPDIR'):
             cache = work / name.lower()
@@ -159,8 +159,8 @@ def main():
                 'HOME': str(runtime / 'home'), 'TMPDIR': str(runtime / 'tmp'),
                 'GOENV': 'off', 'GOTOOLCHAIN': 'local', 'GOTELEMETRY': 'off', 'GOWORK': 'off',
                 'GOPROXY': 'off', 'GOSUMDB': 'off', 'GOMAXPROCS': '2', 'GOMEMLIMIT': '1GiB',
-                'WAINAK_ARCHIVE_INTEROP': '1', 'WAINAK_AGE_CLI': str(age),
-                'WAINAK_AGE_CLI_SHA256': age_hash, 'WAINAK_ARCHIVE_SCAN_ROOT': str(runtime)}
+                'WAINEK_ARCHIVE_INTEROP': '1', 'WAINEK_AGE_CLI': str(age),
+                'WAINEK_AGE_CLI_SHA256': age_hash, 'WAINEK_ARCHIVE_SCAN_ROOT': str(runtime)}
             args = [go, 'tool', 'test2json', '-t', '-p', label, binary,
                     '-test.v=test2json', '-test.count=1', '-test.timeout=120s']
             if pattern:

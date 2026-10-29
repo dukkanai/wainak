@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:wainak_mobile/src/api/transport.dart';
+import 'package:wainek_mobile/src/api/transport.dart';
 import 'identity_fixture.dart';
 
 class MatchingFixture extends IdentityFixture {

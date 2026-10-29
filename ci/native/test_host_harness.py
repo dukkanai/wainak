@@ -68,15 +68,15 @@ class ProjectionTests(unittest.TestCase):
     def test_output_paths_and_subtests_not_exposed(self):
         events=[{'Action':'output','Test':'TestKnown/private','Output':'PRIVATE_KEY_CANARY'},
                 {'Action':'fail','Test':'TestKnown/private'}, {'Action':'fail','Test':'Unknown_PRIVATE'}]
-        for event in events:event['Package']='wainak.local/historyarchive'
-        result,failed,valid=d.project_go_events(b''.join(json.dumps(e).encode()+b'\n' for e in events),{'TestKnown'},'wainak.local/historyarchive')
+        for event in events:event['Package']='wainek.local/historyarchive'
+        result,failed,valid=d.project_go_events(b''.join(json.dumps(e).encode()+b'\n' for e in events),{'TestKnown'},'wainek.local/historyarchive')
         self.assertTrue(failed);self.assertEqual(result['failed_tests'],['TestKnown'])
         self.assertNotIn('private',json.dumps(result));self.assertNotIn('PRIVATE',json.dumps(result))
     def test_malformed_incomplete_and_depth_are_value_free(self):
-        result,_,_=d.project_go_events(b'['*10000+b'0'+b']'*10000,{'TestKnown'},'wainak.local/historyarchive')
+        result,_,_=d.project_go_events(b'['*10000+b'0'+b']'*10000,{'TestKnown'},'wainek.local/historyarchive')
         self.assertEqual(set(result['failure_categories']),{'MALFORMED_TEST_JSON','INCOMPLETE_TEST_JSON'})
     def test_terminal_pass_is_required_and_fail_event_contradiction_rejected(self):
-        pkg='wainak.local/historyarchive'
+        pkg='wainek.local/historyarchive'
         for events,valid in [([{'Action':'pass','Package':pkg}],False),
                             ([{'Action':'run','Package':pkg,'Test':'TestKnown'}, {'Action':'pass','Package':pkg,'Test':'TestKnown'}, {'Action':'pass','Package':pkg}],True),
                             ([{'Action':'run','Package':pkg,'Test':'TestKnown'}],False),
@@ -85,10 +85,10 @@ class ProjectionTests(unittest.TestCase):
             result,_,ok=d.project_go_events(b''.join(json.dumps(e).encode()+b'\n' for e in events),{'TestKnown'},pkg)
             self.assertEqual(ok,valid)
     def test_json_event_count_depth_encoding_and_duplicate_bound(self):
-        pkg='wainak.local/historyarchive'
+        pkg='wainek.local/historyarchive'
         for raw in [b'{}\n'*10001, b'['*33+b'0'+b']'*33+b'\n',
-                    '{"Action":"pass","Package":"wainak.local/historyarchive"}'.encode('utf-16')+b'\n',
-                    b'{"Action":"pass","Action":"pass","Package":"wainak.local/historyarchive"}\n']:
+                    '{"Action":"pass","Package":"wainek.local/historyarchive"}'.encode('utf-16')+b'\n',
+                    b'{"Action":"pass","Action":"pass","Package":"wainek.local/historyarchive"}\n']:
             result,_,ok=d.project_go_events(raw,{'TestKnown'},pkg)
             self.assertFalse(ok);self.assertIn('MALFORMED_TEST_JSON',result['failure_categories'])
     def test_unknown_command_not_public(self):
@@ -104,11 +104,11 @@ class ProjectionTests(unittest.TestCase):
                 p=root/relative;p.write_text('func TestPublic(t *testing.T) {}\n// func TestFake(t) {}\n')
                 hashes[relative]=hashlib.sha256(p.read_bytes()).hexdigest()
             (root/'archive/private_test.go').write_text('func TestPrivate(t *testing.T) {}\n')
-            self.assertEqual(d.declared_tests(root,hashes)['wainak.local/historyarchive'],{'TestPublic'})
+            self.assertEqual(d.declared_tests(root,hashes)['wainek.local/historyarchive'],{'TestPublic'})
             hashes['archive/archive_test.go']='0'*64
             with self.assertRaises(ValueError):d.declared_tests(root,hashes)
     def test_unbounded_or_nonstring_test_field_rejected(self):
-        pkg='wainak.local/historyarchive'
+        pkg='wainek.local/historyarchive'
         for test in ([],{},1,'T'*513):
             raw=json.dumps({'Action':'fail','Package':pkg,'Test':test}).encode()+b'\n'
             result,_,ok=d.project_go_events(raw,{'TestKnown'},pkg)
@@ -119,7 +119,7 @@ class RuntimeTests(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
         (self.root/'logs').mkdir()
         self.rt=r.Runtime.__new__(r.Runtime);self.rt.work=self.root;self.rt.sequence=0
-        self.rt.guard=Mock();self.rt.test_names={'wainak.local/historyarchive':frozenset({'TestKnown'})};self.rt.last_command=None;self.rt.commands=[]
+        self.rt.guard=Mock();self.rt.test_names={'wainek.local/historyarchive':frozenset({'TestKnown'})};self.rt.last_command=None;self.rt.commands=[]
         self.rt.lock={'limits':{'process_seconds':1200,'process_output_bytes':1024}}
         self.proc=Mock();self.proc.returncode=0;self.proc.poll.return_value=0;self.proc.wait.return_value=0
         self.selector=Mock();self.selector.get_map.return_value={}
@@ -230,7 +230,7 @@ class HostBoundaryTests(unittest.TestCase):
             for args,cwd,child,name,kwargs in calls:
                 if name.endswith('-tests'):
                     self.assertEqual(child['HOME'],str(cwd.parent/'home'));self.assertEqual(child['TMPDIR'],str(cwd.parent/'tmp'))
-                    self.assertEqual(child['WAINAK_ARCHIVE_SCAN_ROOT'],str(cwd.parent))
+                    self.assertEqual(child['WAINEK_ARCHIVE_SCAN_ROOT'],str(cwd.parent))
                     self.assertEqual(cwd.name,'module')
                     for key in env:self.assertNotIn(key,child)
                     self.assertTrue(kwargs['go_json']);self.assertFalse(kwargs['public_output'])
@@ -256,7 +256,7 @@ class HostBoundaryTests(unittest.TestCase):
                     if name=='age-cli-build':(work/'bin/age').write_bytes(b'public-cli')
                     if name.endswith('-test-compile'):Path(args[args.index('-o')+1]).write_bytes(b'public-test')
                     if name in ('archive-tests','archivebridge-tests'):
-                        module=name.removesuffix('-tests');cwd=Path(cwd);root=Path(env['WAINAK_ARCHIVE_SCAN_ROOT'])
+                        module=name.removesuffix('-tests');cwd=Path(cwd);root=Path(env['WAINEK_ARCHIVE_SCAN_ROOT'])
                         assert cwd==root/'module' and cwd.is_relative_to(root)
                         assert Path(env['HOME'])==root/'home' and Path(env['TMPDIR'])==root/'tmp'
                         for relative,data in sources[module].items():

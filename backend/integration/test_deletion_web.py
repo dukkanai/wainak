@@ -12,9 +12,9 @@ from django.utils import timezone
 from allauth.account.models import EmailAddress
 import identity_integration as baseline
 from identity_integration import AUTH
-from wainak_identity.deletion import expire_orphaned_staged_accounts
-from wainak_identity.models import User, DigestSession, DeletionReceipt, RateBucket
-from wainak_identity.sessions import digest_token
+from wainek_identity.deletion import expire_orphaned_staged_accounts
+from wainek_identity.models import User, DigestSession, DeletionReceipt, RateBucket
+from wainek_identity.sessions import digest_token
 
 
 class DeletionWebTests(unittest.TestCase):
@@ -61,7 +61,7 @@ class DeletionWebTests(unittest.TestCase):
 
     def test_duplicate_pending_signup_cannot_delete_the_original_account(self):
         original, _ = self.signup()
-        from wainak.domain import POLICY_VERSION
+        from wainek.domain import POLICY_VERSION
         status, body = self.call("POST", AUTH+"auth/signup", {
             "email": "alpha@example.invalid", "password": self.password, "birth_date": "1995-01-01",
             "is_muslim": True, "terms_version": POLICY_VERSION, "privacy_version": POLICY_VERSION})
@@ -124,12 +124,12 @@ class DeletionWebTests(unittest.TestCase):
         User.objects.exclude(email="young@example.invalid").update(date_joined=now-timedelta(hours=24))
         DigestSession.objects.filter(session_key__in=[digest_token(orphan), digest_token(young)]).update(expire_date=now)
         before = self.snapshot()
-        with mock.patch("wainak_identity.deletion.timezone.now", return_value=now):
+        with mock.patch("wainek_identity.deletion.timezone.now", return_value=now):
             report = expire_orphaned_staged_accounts()
         self.assertEqual(report["eligible_orphaned_accounts"], 1)
         self.assertEqual(report["purged_unverified_accounts"], 0)
         self.assertTrue(before == self.snapshot(), "Dry run must not touch any inspected rows")
-        with mock.patch("wainak_identity.deletion.timezone.now", return_value=now):
+        with mock.patch("wainek_identity.deletion.timezone.now", return_value=now):
             report = expire_orphaned_staged_accounts(dry_run=False)
         self.assertEqual(report["purged_unverified_accounts"], 1)
         self.assertFalse(report["production_retention_approved"])
@@ -147,7 +147,7 @@ class DeletionWebTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 expire_orphaned_staged_accounts(dry_run=False)
         self.assertTrue(before == self.snapshot(), "Failed cleanup must roll back every inspected row")
-        with override_settings(WAINAK_IDENTITY_SANDBOX=False), self.assertRaises(RuntimeError):
+        with override_settings(WAINEK_IDENTITY_SANDBOX=False), self.assertRaises(RuntimeError):
             expire_orphaned_staged_accounts(dry_run=False)
 
     def open_web(self):
@@ -161,7 +161,7 @@ class DeletionWebTests(unittest.TestCase):
         return response, html
 
     def web(self, method, path, data=None, token=None, *, csrf=True, origin="http://localhost", marker="1"):
-        headers = {"HTTP_HOST": "localhost", "REMOTE_ADDR": "127.0.0.1", "HTTP_X_WAINAK_DELETION_WEB": marker}
+        headers = {"HTTP_HOST": "localhost", "REMOTE_ADDR": "127.0.0.1", "HTTP_X_WAINEK_DELETION_WEB": marker}
         if origin is not None:
             headers["HTTP_ORIGIN"] = origin
         if csrf is not False:
@@ -279,7 +279,7 @@ class DeletionWebTests(unittest.TestCase):
             csrf = match[1]
             def mutation(path, method, data, token=None):
                 nonlocal csrf
-                headers = {"Origin": origin, "X-Wainak-Deletion-Web": "1", "X-CSRFToken": csrf,
+                headers = {"Origin": origin, "X-Wainek-Deletion-Web": "1", "X-CSRFToken": csrf,
                            "Content-Type": "application/json"}
                 if token:
                     headers["X-Session-Token"] = token
@@ -317,7 +317,7 @@ class DeletionWebTests(unittest.TestCase):
 
     def test_fake_duplicate_pending_does_not_keep_an_old_orphan_alive(self):
         original, _ = self.signup()
-        from wainak.domain import POLICY_VERSION
+        from wainek.domain import POLICY_VERSION
         status, body = self.call("POST", AUTH+"auth/signup", {
             "email": "alpha@example.invalid", "password": self.password, "birth_date": "1995-01-01",
             "is_muslim": True, "terms_version": POLICY_VERSION, "privacy_version": POLICY_VERSION})
@@ -341,7 +341,7 @@ class DeletionWebTests(unittest.TestCase):
         User.objects.update(date_joined=now-timedelta(hours=25))
         last = User.objects.order_by("pk").last()
         DigestSession.objects.filter(user=last).update(expire_date=now-timedelta(seconds=1))
-        with mock.patch("wainak_identity.deletion.DEV_ORPHAN_BATCH_SIZE", 2):
+        with mock.patch("wainek_identity.deletion.DEV_ORPHAN_BATCH_SIZE", 2):
             first = expire_orphaned_staged_accounts(dry_run=False)
             self.assertEqual(first["scanned_candidates"], 2)
             self.assertEqual(first["purged_unverified_accounts"], 0)
@@ -353,9 +353,9 @@ class DeletionWebTests(unittest.TestCase):
 
     def test_pending_delete_rejects_expired_framework_verification_flow(self):
         pending, _ = self.signup()
-        from wainak_identity.sessions import SessionStore
+        from wainek_identity.sessions import SessionStore
         issued = SessionStore(pending).get("account_email_verification_code")["at"]
-        with mock.patch("wainak_identity.deletion.time.time", return_value=issued+600.001):
+        with mock.patch("wainek_identity.deletion.time.time", return_value=issued+600.001):
             status, body = self.pending_delete(pending)
         self.status(status, 410, body)
         self.assertEqual(User.objects.count(), 1)

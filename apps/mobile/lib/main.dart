@@ -17,13 +17,13 @@ import 'src/local_cards/app.dart';
 import 'src/local_cards/controller.dart' show localCardsModeAllowed;
 
 void main() {
-  const devEnabled = bool.fromEnvironment('WAINAK_DEV_MODE');
+  const devEnabled = bool.fromEnvironment('WAINEK_DEV_MODE');
   const mode = String.fromEnvironment(
-    'WAINAK_REPOSITORY',
+    'WAINEK_REPOSITORY',
     defaultValue: 'fake',
   );
-  const baseUrl = String.fromEnvironment('WAINAK_API_BASE_URL');
-  const iosArchivePreview = bool.fromEnvironment('WAINAK_IOS_ARCHIVE_PREVIEW');
+  const baseUrl = String.fromEnvironment('WAINEK_API_BASE_URL');
+  const iosArchivePreview = bool.fromEnvironment('WAINEK_IOS_ARCHIVE_PREVIEW');
   if (!devEnabled) {
     runApp(const DisabledBuild());
     return;
@@ -65,7 +65,7 @@ void main() {
     return;
   }
   if (mode == 'fake') {
-    runApp(WainakApp(repository: DevJourneyRepository()));
+    runApp(WainekApp(repository: DevJourneyRepository()));
     return;
   }
   if (mode == 'identity') {
@@ -91,11 +91,11 @@ void main() {
       if (!['127.0.0.1', 'localhost', '::1', '[::1]'].contains(uri.host)) {
         throw ArgumentError('Only explicit loopback development is supported.');
       }
-      final api = WainakApiClient(
+      final api = WainekApiClient(
         baseUri: uri,
         transport: createNativeTransport(),
       );
-      runApp(ConnectedWainakApp(repository: HttpJourneyRepository(api)));
+      runApp(ConnectedWainekApp(repository: HttpJourneyRepository(api)));
       return;
     } catch (_) {
       runApp(
@@ -115,7 +115,7 @@ class DisabledBuild extends StatelessWidget {
   const DisabledBuild({
     super.key,
     this.message =
-        'وينك قيد التطوير. الخدمات الفعلية غير متصلة. هذه النسخة لا تنشئ حسابًا ولا ترسل بيانات.',
+        'wainek قيد التطوير. الخدمات الفعلية غير متصلة. هذه النسخة لا تنشئ حسابًا ولا ترسل بيانات.',
   });
   final String message;
   @override
@@ -123,7 +123,7 @@ class DisabledBuild extends StatelessWidget {
     locale: const Locale('ar'),
     supportedLocales: const [Locale('ar')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
-    theme: WainakTokens.theme(Brightness.light),
+    theme: WainekTokens.theme(Brightness.light),
     home: Scaffold(
       body: SafeArea(
         child: Padding(padding: EdgeInsets.all(24), child: Text(message)),

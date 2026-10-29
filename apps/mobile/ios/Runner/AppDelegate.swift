@@ -12,7 +12,7 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WainakNativeArchive") {
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "WainekNativeArchive") {
       NativeArchivePlugin.register(with: registrar)
     }
   }

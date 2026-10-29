@@ -4,8 +4,8 @@ import json
 import unittest
 
 import test_domain
-from wainak.api import DevelopmentApplication, relationship_cursor
-from wainak.domain import DomainError
+from wainek.api import DevelopmentApplication, relationship_cursor
+from wainek.domain import DomainError
 
 
 class RelationshipPaginationTests(unittest.TestCase):
@@ -97,7 +97,7 @@ class RelationshipPaginationTests(unittest.TestCase):
         # Repository ordering is not a pagination contract, including SQL loads.
         with self.service.repository.transaction() as state:
             state.relationships = dict(reversed(list(state.relationships.items())))
-        from wainak.domain import DevelopmentService
+        from wainek.domain import DevelopmentService
         restored = DevelopmentService(today=self.service.today, repository=self.service.repository)
         page = restored.list_relationships(self.actor, first['next_cursor'])
         self.assertEqual([x['id'] for x in page['items']], expected[20:])

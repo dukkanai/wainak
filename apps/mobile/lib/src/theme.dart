@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-abstract final class WainakTokens {
+abstract final class WainekTokens {
   static const background = Color(0xFFFFF9F5);
   static const ink = Color(0xFF2B2528);
   static const muted = Color(0xFF6B5F65);

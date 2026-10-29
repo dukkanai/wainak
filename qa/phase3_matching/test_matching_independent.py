@@ -10,8 +10,8 @@ from unittest import mock
 from django.db import connections, transaction
 from django.test import override_settings
 from allauth.account.models import EmailAddress
-from wainak_identity.repository import service
-from wainak.domain import REPORT_CATEGORIES
+from wainek_identity.repository import service
+from wainek.domain import REPORT_CATEGORIES
 
 BASELINE_HELPERS = None
 RESTART_DATABASE = None
@@ -292,7 +292,7 @@ class MatchingIndependentTests(unittest.TestCase):
 
     def test_inactive_framework_peer_is_hidden_despite_domain_verification_mirror(self):
         self.requested()
-        from wainak_identity.models import User
+        from wainek_identity.models import User
         User.objects.filter(pk=self.ma['id']).update(is_active=False)
         self.assertEqual(self.call('GET','/v1/candidates',token=self.b)[1]['items'],[])
         self.expect_status(self.call('POST',self.path+'/respond',{'decision':'accept'},self.b),409)
@@ -318,7 +318,7 @@ class MatchingIndependentTests(unittest.TestCase):
 
     def test_future_policy_stales_existing_consents_but_preserves_exact_decline(self):
         self.requested()
-        with mock.patch('wainak_identity.repository.POLICY_VERSION','future_qa_policy'):
+        with mock.patch('wainek_identity.repository.POLICY_VERSION','future_qa_policy'):
             self.expect_status(self.call('GET','/v1/candidates',token=self.b),403)
             self.expect_status(self.call('POST',self.path+'/respond',{'decision':'accept'},self.b),403)
             r=self.call('GET',self.path,token=self.b)

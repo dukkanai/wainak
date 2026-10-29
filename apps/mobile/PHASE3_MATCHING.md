@@ -47,6 +47,6 @@ Default widget suite keeps all live fixtures opt-in:
 
 Actual two-session matching UI, after setting all three portable fixture variables described in README.md and selecting the combined backend checkout:
 
-    WAINAK_RUN_MATCHING_WIDGET=1 flutter test --no-pub --concurrency=1 --reporter=expanded test/identity_matching_live_widget_test.dart
+    WAINEK_RUN_MATCHING_WIDGET=1 flutter test --no-pub --concurrency=1 --reporter=expanded test/identity_matching_live_widget_test.dart
 
 The test starts the reviewed private fixture only inside its test body, after compilation. Two independent allauth sessions are created with synthetic example.invalid identities and RAM-only private-pipe verification. Profile/self-assessment setup is API-driven; matching request/retry/recipient acceptance/report/block are widget-driven. One wrapper intentionally drops a real HTTP request response after the server replies, then verifies an explicit same-key retry creates no duplicate. No fabricated recipient response, admin activation endpoint or conversation content is used. Test logs expose only the fixture script path/hash provenance; no passwords/codes/tokens or real mail. Normal cleanup/stream EOF/child exit are required.

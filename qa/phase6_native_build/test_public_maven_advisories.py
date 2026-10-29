@@ -12,7 +12,7 @@ class PublicAdvisoryTests(unittest.TestCase):
         self.assertIn("empty result does not establish database coverage", result["limits"])
 
     def test_private_or_unreviewed_is_rejected_before_fetch(self):
-        for row in [dict(ROW, name="wainak.local:private"), dict(ROW, public_reviewed=False)]:
+        for row in [dict(ROW, name="wainek.local:private"), dict(ROW, public_reviewed=False)]:
             with self.assertRaises(ValueError):
                 checked_coordinates([row])
 

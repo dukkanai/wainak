@@ -19,11 +19,11 @@ NATIVE_COMMANDS = frozenset(['apple-bind', 'binding-input-controls', 'binding-in
 TOOL_CATEGORIES = frozenset(['COMPILER', 'GOMOBILE_BIND', 'GO_MODULE_OFFLINE', 'GO_MODULE_SUM', 'GO_MODULE_UPDATE', 'GO_VERSION', 'GRAPH_MISMATCH', 'SDK_TOOL', 'UNKNOWN_TOOL_FAILURE'])
 
 def declared_tests(repo, source_hashes):
-    result={'wainak.local/historyarchive':set(),'wainak.local/archivebridge':set()}
+    result={'wainek.local/historyarchive':set(),'wainek.local/archivebridge':set()}
     for relative in ('archive/archive_test.go','archive/interop_test.go','archivebridge/bridge_test.go'):
         data=read_regular(repo/relative,1024*1024)
         require(hashlib.sha256(data).hexdigest()==source_hashes.get(relative),'test declaration source changed')
-        package='wainak.local/archivebridge' if relative.startswith('archivebridge/') else 'wainak.local/historyarchive'
+        package='wainek.local/archivebridge' if relative.startswith('archivebridge/') else 'wainek.local/historyarchive'
         result[package].update(re.findall(r'^func ((?:Test|Fuzz)[A-Za-z0-9_]+)\(',data.decode('utf-8'),re.M))
     return {package:frozenset(names) for package,names in result.items()}
 

@@ -137,8 +137,8 @@ def xcconfig(slices):
         require(not any(c in str(path) for c in '\n\r"$\\'), 'unsafe_xcconfig_path')
     return '\n'.join([
         '// Generated only after native artifact verification; static link, never embed.',
-        'SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) DEBUG WAINAK_ARCHIVE_BRIDGE',
-        'GCC_PREPROCESSOR_DEFINITIONS = $(inherited) WAINAK_ARCHIVE_BRIDGE=1',
+        'SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(inherited) DEBUG WAINEK_ARCHIVE_BRIDGE',
+        'GCC_PREPROCESSOR_DEFINITIONS = $(inherited) WAINEK_ARCHIVE_BRIDGE=1',
         'FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*] = $(inherited) "' + str(slices['device']) + '"',
         'FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*] = $(inherited) "' + str(slices['simulator']) + '"',
         'OTHER_LDFLAGS = $(inherited) -framework Archivebridge -framework Foundation',
@@ -160,8 +160,8 @@ def unsigned_settings(items, sdk):
     require(b.get('CONFIGURATION') == 'Debug' and b.get('PLATFORM_NAME') == sdk, 'wrong_configuration')
     require(b.get('IPHONEOS_DEPLOYMENT_TARGET') == '15.0', 'deployment_target')
     require(b.get('ARCHS') == 'arm64', 'runner_architecture')
-    require('WAINAK_ARCHIVE_BRIDGE' in b.get('SWIFT_ACTIVE_COMPILATION_CONDITIONS', '').split(), 'native_swift_disabled')
-    require('WAINAK_ARCHIVE_BRIDGE=1' in b.get('GCC_PREPROCESSOR_DEFINITIONS', '').split(), 'native_objc_disabled')
+    require('WAINEK_ARCHIVE_BRIDGE' in b.get('SWIFT_ACTIVE_COMPILATION_CONDITIONS', '').split(), 'native_swift_disabled')
+    require('WAINEK_ARCHIVE_BRIDGE=1' in b.get('GCC_PREPROCESSOR_DEFINITIONS', '').split(), 'native_objc_disabled')
     require('-framework Archivebridge' in b.get('OTHER_LDFLAGS', ''), 'native_link_disabled')
     return b
 

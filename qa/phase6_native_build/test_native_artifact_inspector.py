@@ -26,7 +26,7 @@ def apk(extra=None, align=16384):
 
 class ArtifactInspectorTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory(prefix="wainak-artifact-inspector-")
+        self.tmp = tempfile.TemporaryDirectory(prefix="wainek-artifact-inspector-")
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / "fixture.apk"
 

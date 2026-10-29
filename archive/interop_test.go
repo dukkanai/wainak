@@ -47,7 +47,7 @@ func privateFD3(t *testing.T) string {
 
 func cliEnvironment(t *testing.T) []string {
 	t.Helper()
-	root := os.Getenv("WAINAK_ARCHIVE_SCAN_ROOT")
+	root := os.Getenv("WAINEK_ARCHIVE_SCAN_ROOT")
 	if !filepath.IsAbs(root) || filepath.Clean(root) != root {
 		t.Fatal("CLI child sandbox boundary")
 	}
@@ -72,11 +72,11 @@ func cliEnvironment(t *testing.T) []string {
 
 func cliPath(t *testing.T) string {
 	t.Helper()
-	if os.Getenv("WAINAK_ARCHIVE_INTEROP") != "1" {
+	if os.Getenv("WAINEK_ARCHIVE_INTEROP") != "1" {
 		t.Skip("explicit CLI interop opt-in not set")
 	}
-	p := os.Getenv("WAINAK_AGE_CLI")
-	want := os.Getenv("WAINAK_AGE_CLI_SHA256")
+	p := os.Getenv("WAINEK_AGE_CLI")
+	want := os.Getenv("WAINEK_AGE_CLI_SHA256")
 	if !filepath.IsAbs(p) || filepath.Clean(p) != p || len(want) != 64 {
 		t.Fatal("CLI provenance missing")
 	}
@@ -126,7 +126,7 @@ func cliRun(t *testing.T, path string, decrypt bool, input, identity []byte) ([]
 	}
 	cmd := exec.CommandContext(ctx, path, args...)
 	cmd.Env = cliEnvironment(t)
-	cmd.Dir = os.Getenv("WAINAK_ARCHIVE_SCAN_ROOT")
+	cmd.Dir = os.Getenv("WAINEK_ARCHIVE_SCAN_ROOT")
 	cmd.ExtraFiles = []*os.File{rd}
 	cmd.Stdin = bytes.NewReader(input)
 	cmd.WaitDelay = time.Second
@@ -189,7 +189,7 @@ func TestCLIInteroperabilityAndLeaks(t *testing.T) {
 	// canaries are not source literals. This directory is test-owned; it contains only public fixture sources and
 	// the runtime cwd/HOME/TMPDIR. External compiler/module caches are separately
 	// checked unchanged around this already-compiled test by the runner.
-	tmp := os.Getenv("WAINAK_ARCHIVE_SCAN_ROOT")
+	tmp := os.Getenv("WAINEK_ARCHIVE_SCAN_ROOT")
 	if !filepath.IsAbs(tmp) || filepath.Clean(tmp) != tmp {
 		t.Fatal("owned scan root missing")
 	}
@@ -278,7 +278,7 @@ func TestCLIChildCancellation(t *testing.T) {
 	defer inputW.Close()
 	cmd := exec.CommandContext(ctx, path, "-d", "-i", privateFD3(t), "-o", "-")
 	cmd.Env = cliEnvironment(t)
-	cmd.Dir = os.Getenv("WAINAK_ARCHIVE_SCAN_ROOT")
+	cmd.Dir = os.Getenv("WAINEK_ARCHIVE_SCAN_ROOT")
 	cmd.ExtraFiles = []*os.File{keyR}
 	cmd.Stdin = inputR
 	cmd.WaitDelay = time.Second

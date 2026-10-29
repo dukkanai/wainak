@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/identity/client.dart';
+import 'package:wainek_mobile/src/identity/client.dart';
 import '../tool/check_identity_profile_save.dart' as checks;
 import 'identity_widget_test.dart' as helpers;
 import 'support/identity_fixture.dart';

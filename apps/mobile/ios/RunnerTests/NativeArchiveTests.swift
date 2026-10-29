@@ -290,7 +290,7 @@ final class NativeArchiveTests: XCTestCase {
 }
 
 
-#if WAINAK_ARCHIVE_BRIDGE
+#if WAINEK_ARCHIVE_BRIDGE
 /// Conditional real binding test, NOT RUN during source preparation.
 final class LinkedArchiveEngineTests: XCTestCase {
   func testLinkedSyntheticRoundTripAndRepeatedClose() throws {

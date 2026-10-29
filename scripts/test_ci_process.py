@@ -27,7 +27,7 @@ class CommandControls(unittest.TestCase):
 
     def test_timeout_reaps_own_child_and_restores_signal_handler(self):
         handler = signal.getsignal(signal.SIGTERM)
-        with tempfile.TemporaryDirectory(prefix='wainak-command-test-') as directory:
+        with tempfile.TemporaryDirectory(prefix='wainek-command-test-') as directory:
             path = Path(directory) / 'pid'
             source = 'import os,sys,time; open(sys.argv[1],"w").write(str(os.getpid())); os.close(1); os.close(2); time.sleep(60)'
             with self.assertRaises(TimeoutError):
@@ -38,7 +38,7 @@ class CommandControls(unittest.TestCase):
         self.assertEqual(signal.getsignal(signal.SIGTERM), handler)
 
     def test_fixture_grace_allows_finally_cleanup_after_timeout(self):
-        with tempfile.TemporaryDirectory(prefix='wainak-grace-test-') as directory:
+        with tempfile.TemporaryDirectory(prefix='wainek-grace-test-') as directory:
             marker = Path(directory) / 'cleaned'
             source = '''import signal,sys,time
 def cancel(*_):

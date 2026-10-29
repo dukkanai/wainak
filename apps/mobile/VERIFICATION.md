@@ -1,3 +1,5 @@
+Current identity update, 2026-10-29: source now uses wainek and com.nextaura.wainek. The following is the historical verification record; its original names and execution claims are preserved. Current local TestFlight preparation is documented in ../../docs/ios-testflight.md.
+
 # Mobile development verification — 2026-10-24
 
 Status note: this document records its original phase and evidence. For the combined source, current modes and portable test setup, use [README.md](README.md) and [project status](../../docs/STATUS.md). Historical run results do not transfer to later source changes.

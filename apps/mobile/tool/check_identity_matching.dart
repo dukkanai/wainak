@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:wainak_mobile/src/identity/client.dart';
-import 'package:wainak_mobile/src/identity/matching_repository.dart';
+import 'package:wainek_mobile/src/identity/client.dart';
+import 'package:wainek_mobile/src/identity/matching_repository.dart';
 import '../test/support/matching_fixture.dart';
 
 void check(bool value) {

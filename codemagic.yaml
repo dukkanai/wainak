@@ -61,6 +61,50 @@
           "script": "python3 ci/ios/build.py --build-unsigned --logical-workspace-40gib-experiment"
         }
       ]
+    },
+    "ios-testflight": {
+      "name": "iOS TestFlight — internal fake UI and VoiceOver only",
+      "instance_type": "mac_mini_m2",
+      "max_build_duration": 45,
+      "integrations": {
+        "app_store_connect": "Codemagic Wainak"
+      },
+      "environment": {
+        "xcode": "26.4.1",
+        "flutter": "3.47.8",
+        "ios_signing": {
+          "provisioning_profiles": [
+            "wainek_app_store"
+          ],
+          "certificates": [
+            "nextaura_apple_distribution"
+          ]
+        }
+      },
+      "scripts": [
+        {
+          "name": "Source and publication gates",
+          "script": "python3 ci/check_preparation.py && python3 scripts/check_publication.py"
+        },
+        {
+          "name": "Unsigned and signed policy regressions",
+          "script": "python3 -m unittest discover -s ci/tests -p 'test_*.py' -v"
+        },
+        {
+          "name": "Build and verify internal UI IPA",
+          "script": "python3 ci/testflight/build.py --build-internal"
+        }
+      ],
+      "artifacts": [
+        ".ci-work/testflight/verified/wainek-internal.ipa"
+      ],
+      "publishing": {
+        "app_store_connect": {
+          "auth": "integration",
+          "submit_to_testflight": false,
+          "submit_to_app_store": false
+        }
+      }
     }
   }
 }

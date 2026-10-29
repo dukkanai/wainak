@@ -5,7 +5,7 @@
   "upstream_git_blob": "f942246cc662ed95cfd0548cfa57c34d3930e275",
   "function": "parseModuleVersions",
   "source_branch": "Version empty and Replace absent calls AddReplace(mod.Path, mod.Version, mod.Dir, empty)",
-  "original_main": {"Path": "wainak.local/cibinding", "Main": true},
-  "expected_control": {"Old": {"Path": "wainak.local/cibinding"}, "New": {"Path": "<owned-binding>"}},
+  "original_main": {"Path": "wainek.local/cibinding", "Main": true},
+  "expected_control": {"Old": {"Path": "wainek.local/cibinding"}, "New": {"Path": "<owned-binding>"}},
   "cloud_generated_controls_recovered": false
 }

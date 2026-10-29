@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local Wainak operations. Restore only trusted archives into NEW databases."""
+"""Local Wainek operations. Restore only trusted archives into NEW databases."""
 import argparse
 from contextlib import contextmanager
 from datetime import datetime, timezone

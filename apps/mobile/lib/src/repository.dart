@@ -133,7 +133,7 @@ class DevJourneyRepository extends JourneyRepository {
     _require(!registered, 'بدأت الجلسة التجريبية بالفعل.');
     _require(
       age >= 18,
-      'وينك للبالغين 18 سنة فأكثر. لا يمكن متابعة هذا السيناريو.',
+      'wainek للبالغين 18 سنة فأكثر. لا يمكن متابعة هذا السيناريو.',
     );
     _require(
       adult && muslim && terms && privacy,

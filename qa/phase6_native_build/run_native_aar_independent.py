@@ -61,9 +61,9 @@ def main():
    return raw
   graph=objects(run('all_modules',[go,'list','-m','-json','all']))
   check(not any(x.get('Error') for x in graph),'module errors')
-  check(all(x['Path'].startswith('wainak.local/') or x['Path'] in dbmanifest['public_module_allowlist'] for x in graph),'snapshot public graph coverage')
-  run('independent_17',[go,'test','-json','-count=1','-parallel=1','-timeout=90s','-overlay='+str(overlay),'-run=^TestQA','wainak.local/archivebridge'],secret=True)
-  run('independent_vet',[go,'vet','-overlay='+str(overlay),'wainak.local/archivebridge'])
+  check(all(x['Path'].startswith('wainek.local/') or x['Path'] in dbmanifest['public_module_allowlist'] for x in graph),'snapshot public graph coverage')
+  run('independent_17',[go,'test','-json','-count=1','-parallel=1','-timeout=90s','-overlay='+str(overlay),'-run=^TestQA','wainek.local/archivebridge'],secret=True)
+  run('independent_vet',[go,'vet','-overlay='+str(overlay),'wainek.local/archivebridge'])
   run('native_buildinfo',[go,'version','-m',str(A/'artifacts/libgojni.so')])
   run('gomobile_buildinfo',[go,'version','-m',str(A/'bin/gomobile')])
   # Materially safer replacement: all scanner database reads use reviewed localSource.

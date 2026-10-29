@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"filippo.io/age"
-	a "wainak.local/historyarchive"
+	a "wainek.local/historyarchive"
 )
 
 const qaOwner = "owner_qqqqqqqqqqqqqqqq"

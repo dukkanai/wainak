@@ -8,11 +8,11 @@ plugins {
 }
 
 // No implicit AAR lookup/download: artifact path and expected digest are explicit.
-val archivePath = providers.gradleProperty("wainakArchiveAar").orNull
-val archiveHash = providers.gradleProperty("wainakArchiveSha256").orNull
+val archivePath = providers.gradleProperty("wainekArchiveAar").orNull
+val archiveHash = providers.gradleProperty("wainekArchiveSha256").orNull
 require((archivePath == null) == (archiveHash == null)) { "archive_artifact_configuration" }
 val archiveAar = archivePath?.let {
-    require(it == "libs/wainak-archivebridge.aar") { "archive_artifact_path" }
+    require(it == "libs/wainek-archivebridge.aar") { "archive_artifact_path" }
     val candidate = file(it)
     require(candidate.isFile && archiveHash!!.matches(Regex("[a-f0-9]{64}"))) { "archive_artifact_missing" }
     var path = candidate.toPath()
@@ -34,7 +34,7 @@ val archiveAar = archivePath?.let {
 }
 
 android {
-    namespace = "invalid.example.wainak.wainak_mobile"
+    namespace = "com.nextaura.wainek"
     compileSdk = 36
     buildToolsVersion = "36.0.0"
     ndkVersion = "30.0.16248370"
@@ -45,7 +45,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     defaultConfig {
-        applicationId = "invalid.example.wainak.wainak_mobile"
+        applicationId = "com.nextaura.wainek"
         minSdk = 24
         targetSdk = 36
         versionCode = flutter.versionCode

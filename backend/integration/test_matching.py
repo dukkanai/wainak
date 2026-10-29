@@ -10,8 +10,8 @@ from django.db import connection, connections, transaction
 from django.test import Client
 from allauth.account.models import EmailAddress
 import identity_integration as baseline
-from wainak_identity.models import User
-from wainak_identity.repository import service, IdentityDomainService, SharedDomainRepository
+from wainek_identity.models import User
+from wainek_identity.repository import service, IdentityDomainService, SharedDomainRepository
 
 
 class AuthMatchingTests(unittest.TestCase):

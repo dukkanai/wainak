@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	history "wainak.local/historyarchive"
+	history "wainek.local/historyarchive"
 )
 
 const sampleRecords = `[{"event_id":"event_one","occurred_at":"2026-10-24T00:00:00Z","card_id":"sample_card","response_id":"sample_defer"}]`
@@ -419,5 +419,11 @@ func TestExportedABITypesAreNarrow(t *testing.T) {
 	}
 	if count != 7 {
 		t.Fatal("exported function surface changed")
+	}
+}
+
+func TestLegacyWainakBridgeProfileSurvivesBrandRename(t *testing.T) {
+	if Profile != "wainak-synthetic-history-bridge-v1" {
+		t.Fatal("legacy bridge profile changed")
 	}
 }

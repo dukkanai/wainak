@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/identity/app.dart';
-import 'package:wainak_mobile/src/identity/client.dart';
+import 'package:wainek_mobile/src/identity/app.dart';
+import 'package:wainek_mobile/src/identity/client.dart';
 import 'support/identity_fixture.dart';
 
 Future<void> tap(WidgetTester t,String key) async {

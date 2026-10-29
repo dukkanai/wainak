@@ -10,11 +10,11 @@ from django.db import connection, connections, transaction
 from django.test import Client, override_settings
 from django.utils import timezone
 from allauth.account.models import EmailAddress
-from wainak.domain import POLICY_VERSION
-from wainak_identity.mailbox import OUTBOX
-from wainak_identity.models import User, DigestSession, RateBucket, MutationReceipt, DeletionReceipt
-from wainak_identity.repository import service
-from wainak_identity.sessions import SessionStore, digest_token
+from wainek.domain import POLICY_VERSION
+from wainek_identity.mailbox import OUTBOX
+from wainek_identity.models import User, DigestSession, RateBucket, MutationReceipt, DeletionReceipt
+from wainek_identity.repository import service
+from wainek_identity.sessions import SessionStore, digest_token
 
 CONNECT = RESTART_DATABASE = FIXTURE_KEYS = None
 AUTH = "/_allauth/app/v1/"
@@ -149,7 +149,7 @@ class IdentityIntegrationTests(unittest.TestCase):
         self.status(code, 401)
 
     def test_auth_domain_registration_failure_rolls_back_one_transaction(self):
-        from wainak_identity.models import User as UserModel
+        from wainek_identity.models import User as UserModel
         original = UserModel.save
         def failing_save(obj, *args, **kwargs):
             if kwargs.get("update_fields") == ["domain_id"]:
@@ -274,7 +274,7 @@ class IdentityIntegrationTests(unittest.TestCase):
         code, _ = self.call("GET", "/identity/v1/me", token=a)
         self.status(code, 401)
         DigestSession.objects.filter(pk=ra.pk).update(session_data=original_a)
-        with override_settings(WAINAK_SESSION_ENCRYPTION_KEY=Fernet.generate_key()):
+        with override_settings(WAINEK_SESSION_ENCRYPTION_KEY=Fernet.generate_key()):
             code, _ = self.call("GET", "/identity/v1/me", token=a)
             self.status(code, 401)
         code, _ = self.call("GET", "/identity/v1/me", token=a)
@@ -294,7 +294,7 @@ class IdentityIntegrationTests(unittest.TestCase):
         # Exactly the absolute boundary is expired, even with recent activity.
         DigestSession.objects.filter(pk=row.pk).update(created_at=now-timedelta(seconds=86400),
                                                        last_seen_at=now, expire_date=now+timedelta(seconds=1800))
-        with mock.patch("wainak_identity.sessions.timezone.now", return_value=now):
+        with mock.patch("wainek_identity.sessions.timezone.now", return_value=now):
             code, _ = self.call("GET", "/identity/v1/me", token=token)
         self.status(code, 401)
 
@@ -312,7 +312,7 @@ class IdentityIntegrationTests(unittest.TestCase):
 
     def test_atomic_rate_buckets_across_independent_connections_and_expiry(self):
         from concurrent.futures import ThreadPoolExecutor
-        from wainak_identity.rate_limits import consume
+        from wainek_identity.rate_limits import consume
         def attempt(_):
             try:
                 return consume("race", "fixture", "same-subject", 5, 60)
@@ -354,7 +354,7 @@ class IdentityIntegrationTests(unittest.TestCase):
         b, mb = self.ready_account("beta@example.invalid", "female")
         # Existing schema itself rejects arbitrary policy strings. A future
         # policy bump still must fail closed for accounts carrying the old one.
-        with mock.patch("wainak_identity.repository.POLICY_VERSION", "future-fixture-policy"):
+        with mock.patch("wainek_identity.repository.POLICY_VERSION", "future-fixture-policy"):
             code, body = self.call("GET", "/v1/candidates", token=a)
             self.status(code, 403, body)
         with transaction.atomic(), service().repository.transaction() as state:
@@ -535,7 +535,7 @@ class IdentityIntegrationTests(unittest.TestCase):
         code, body = self.call("POST", AUTH+"auth/login", data, HTTP_X_FORWARDED_FOR="198.51.100.44")
         self.status(code, 429, body)
         self.assertEqual(body["error"]["code"], "rate_limited")
-        from wainak_identity.rate_limits import subject_digest
+        from wainek_identity.rate_limits import subject_digest
         self.assertEqual(RateBucket.objects.get(pk=subject_digest(AUTH+"auth/login", "ip", "127.0.0.1")).count, 6)
 
     def test_eligibility_current_terms_and_native_transport_boundary(self):

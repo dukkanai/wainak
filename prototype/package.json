@@ -1,9 +1,9 @@
 {
-  "name": "wainak-prototype-review",
+  "name": "wainek-prototype-review",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local browser QA for the synthetic Wainak prototype; no production backend.",
+  "description": "Local browser QA for the synthetic Wainek prototype; no production backend.",
   "scripts": {
     "test": "node qa/browser.mjs",
     "package": "python3 package_preview.py"

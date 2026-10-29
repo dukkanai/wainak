@@ -1,4 +1,4 @@
-# Wainak backend foundation
+# Wainek backend foundation
 
 **Synthetic development only. Do not use real personal data or expose this server.**
 
@@ -24,7 +24,7 @@ tests verify a single-process lock, **not** multi-process/PostgreSQL transaction
 For an explicitly requested local manual preview only:
 
 ```sh
-PYTHONPATH=backend python3 -m wainak --development --port 8089
+PYTHONPATH=backend python3 -m wainek --development --port 8089
 ```
 
 It binds **127.0.0.1 only**, rejects untrusted Host and any browser Origin, disables

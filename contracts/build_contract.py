@@ -135,7 +135,7 @@ def build():
     route("GET", "/v1/relationships/{relationship_id}/cards", "read_sample_library_cards_without_answers", "Cards")
     route("POST", "/v1/blocks", "block_account_without_payment", "Blocked", "Block")
     route("POST", "/v1/reports", "record_metadata_only_development_report", "ReportReceipt", "Report", status=201)
-    return {"openapi": "3.1.0", "info": {"title": "Wainak phase-one synthetic development contract", "version": "0.1.0-dev",
+    return {"openapi": "3.1.0", "info": {"title": "Wainek phase-one synthetic development contract", "version": "0.1.0-dev",
             "description": "NOT PRODUCTION. Loopback only; default volatile memory, optional marked disposable PostgreSQL repository; synthetic @example.invalid accounts; no real email, authentication, payments, chat transport, medical data, moderation team, evidence upload, or production deletion pipeline. Current permissions override stale UI state. Unknown fields are rejected. JSON body limit: 16384 bytes. The only query parameter is the exact cursor on GET /v1/relationships; other queries and browser Origin headers are rejected."},
             "servers": [{"url": "http://127.0.0.1:8089", "description": "Manual loopback-only preview, never auto-started"}],
             "security": [{"developmentBearer": []}], "paths": paths,

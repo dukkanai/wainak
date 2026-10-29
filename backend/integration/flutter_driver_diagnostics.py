@@ -2,7 +2,7 @@
 import json
 import re
 
-PREFIX = 'WAINAK_FLUTTER_POSTGRES_DIAGNOSTIC '
+PREFIX = 'WAINEK_FLUTTER_POSTGRES_DIAGNOSTIC '
 STAGES = frozenset({'harness', 'preflight', 'control_setup', 'http_start', 'flutter_start',
                    'wait_active', 'restart_active', 'wait_blocked', 'restart_blocked',
                    'flutter_complete', 'cleanup_flutter', 'cleanup_output', 'cleanup_http', 'complete'})

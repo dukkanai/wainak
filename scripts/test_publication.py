@@ -16,7 +16,7 @@ SPEC.loader.exec_module(publication)
 
 class PublicationTest(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix='wainak-publication-')
+        self.temp = tempfile.TemporaryDirectory(prefix='wainek-publication-')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)

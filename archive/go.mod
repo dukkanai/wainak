@@ -1,4 +1,4 @@
-module wainak.local/historyarchive
+module wainek.local/historyarchive
 
 go 1.27.3
 

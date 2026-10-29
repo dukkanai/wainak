@@ -4,9 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from ci.testflight import policy as testflight_policy
+from ci.rename_provenance import source_matches, source_path
+
 BASE = "120a0c24970427438af7c693e772b95050b3fcfc"
 NATIVE = "5ff300d48b38e98212ff8b5a7333dd92f8c1c3ff"
 COMMANDS = [
@@ -43,14 +48,19 @@ def read_json(path: Path):
 
 def validate_workflow(config) -> None:
     # JSON is a strict subset of YAML. Exact keys keep the workflow manually started only:
-    # no triggering, schedules, publishing, artifacts, secret groups or signing.
+    # unsigned recipes retain their original no-signing/no-publishing policy.
+    # The signed recipe has a separate exact internal-only allowlist.
     require(isinstance(config, dict) and set(config) == {"workflows"}, "workflow_root")
     workflows = config["workflows"]
     labels = {
         "ios-unsigned-archive": "iOS unsigned archive — manual compile validation (not runtime)",
         "ios-unsigned-40gib-experiment": "iOS unsigned compile — one 40 GiB logical-space experiment",
     }
-    require(isinstance(workflows, dict) and set(workflows) == set(labels), "workflow_count")
+    require(isinstance(workflows, dict) and set(workflows) == set(labels) | {"ios-testflight"}, "workflow_count")
+    try:
+        testflight_policy.validate_workflow(workflows["ios-testflight"])
+    except testflight_policy.PolicyError as error:
+        raise InvalidPreparation(str(error)) from None
     for key, label in labels.items():
         workflow = workflows[key]
         require(isinstance(workflow, dict), "workflow_type")
@@ -101,8 +111,8 @@ def validate_sources(root: Path, provenance, deltas) -> int:
     for name, original_digest in files.items():
         digest = deltas["files"].get(name, {}).get("after_sha256", original_digest)
         require(isinstance(digest, str) and len(digest) == 64 and all(c in "0123456789abcdef" for c in digest), "digest_format")
-        data = checked_file(root, name).read_bytes()
-        require(len(data) < 1024 * 1024 and hashlib.sha256(data).hexdigest() == digest, "source_digest")
+        data = source_path(root, name).read_bytes()
+        require(len(data) < 1024 * 1024 and source_matches(root, name, digest), "source_digest")
     return len(files)
 
 
@@ -116,7 +126,7 @@ def validate_android(root: Path, baseline, deltas) -> int:
     for name, original_digest in baseline["files"].items():
         digest = deltas["files"].get(name, {}).get("after_sha256", original_digest)
         require(name.startswith("apps/mobile/android/"), "android_scope")
-        require(hashlib.sha256(checked_file(root, name).read_bytes()).hexdigest() == digest, "android_changed")
+        require(source_matches(root, name, digest), "android_changed")
     return len(baseline["files"])
 
 
@@ -124,7 +134,7 @@ def validate_ios(root: Path, manifest) -> int:
     require(manifest.get("schema") == 1 and len(manifest.get("files", {})) == 16, "ios_manifest")
     for name, digest in manifest["files"].items():
         require(name.startswith(("apps/mobile/ios/", "apps/mobile/test/", "apps/mobile/lib/", "docs/")), "ios_file_scope")
-        require(hashlib.sha256(checked_file(root, name).read_bytes()).hexdigest() == digest, "ios_source_digest")
+        require(source_matches(root, name, digest), "ios_source_digest")
     return len(manifest["files"])
 
 
@@ -134,19 +144,20 @@ def validate_parity(root: Path, manifest) -> int:
     expected.update(manifest["new_source_files"])
     for name, digest in expected.items():
         require(name.startswith("apps/mobile/"), "parity_scope")
-        require(hashlib.sha256(checked_file(root, name).read_bytes()).hexdigest() == digest, "parity_source_digest")
+        require(source_matches(root, name, digest), "parity_source_digest")
     return len(expected)
 
 
 def main() -> None:
     validate_workflow(read_json(ROOT / "codemagic.yaml"))
+    require(checked_file(ROOT, "ci/testflight/Signing.xcconfig").read_text() == testflight_policy.SIGNING_CONFIG, "testflight_signing_config")
     source_count = validate_sources(ROOT, read_json(ROOT / "ci/source-provenance.json"), read_json(ROOT / "ci/native-source-deltas.json"))
     android_count = validate_android(ROOT, read_json(ROOT / "ci/android-baseline.json"), read_json(ROOT / "ci/android-source-deltas.json"))
     ios_count = validate_ios(ROOT, read_json(ROOT / "ci/ios-source-provenance.json"))
     parity_count = validate_parity(ROOT, read_json(ROOT / "ci/android-parity-provenance.json"))
     print(json.dumps({"ios_files": ios_count, "parity_files": parity_count, "status": "STATIC_SOURCE_CONFIG_PASS", "native_source_files": source_count,
                       "anchored_android_files": android_count, "native_recipe_executed": False,
-                      "mac_xcode_swift_execution": "NOT_RUN", "signing": "NOT_CONFIGURED"}))
+                      "mac_xcode_swift_execution": "NOT_RUN", "signing": "INTERNAL_RECIPE_PREPARED_NOT_EXECUTED"}))
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ Future<void> rejected(Future<void> Function() action) async {
 
 Future<void> main() async {
   final root = await Directory.systemTemp.createTemp(
-    'wainak-fixture-path-check-',
+    'wainek-fixture-path-check-',
   );
   var passed = 0;
   try {
@@ -34,12 +34,12 @@ Future<void> main() async {
     await script.writeAsString('# selection fixture only; never executed\n');
     final selected = await resolveFixtureScript(
       explicit: script.path,
-      environment: {'WAINAK_IDENTITY_FIXTURE_SCRIPT': 'invalid'},
+      environment: {'WAINEK_IDENTITY_FIXTURE_SCRIPT': 'invalid'},
     );
     check(selected.path == script.path && selected.sha256.length == 64);
     passed++;
     final fromEnv = await resolveFixtureScript(
-      environment: {'WAINAK_IDENTITY_FIXTURE_SCRIPT': script.path},
+      environment: {'WAINEK_IDENTITY_FIXTURE_SCRIPT': script.path},
     );
     check(fromEnv.sha256 == selected.sha256);
     passed++;

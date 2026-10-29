@@ -12,9 +12,9 @@ from django.db import connection, connections
 from django.test import Client, override_settings
 from django.utils import timezone
 from allauth.account.models import EmailAddress
-from wainak_identity.models import User, DigestSession, DeletionReceipt, RateBucket
-from wainak_identity.deletion import expire_orphaned_staged_accounts
-from wainak_identity.sessions import SessionStore, digest_token
+from wainek_identity.models import User, DigestSession, DeletionReceipt, RateBucket
+from wainek_identity.deletion import expire_orphaned_staged_accounts
+from wainek_identity.sessions import SessionStore, digest_token
 import qa_identity_independent as baseline
 
 AUTH = baseline.AUTH
@@ -263,7 +263,7 @@ class DeletionLifecycleTests(unittest.TestCase):
     def test_orphan_maintenance_rejects_non_sandbox_and_non_boolean_apply_flag(self):
         self.signup("qa_pending@example.invalid")
         before = self.snapshot()
-        with override_settings(WAINAK_IDENTITY_SANDBOX=False), self.assertRaises(RuntimeError):
+        with override_settings(WAINEK_IDENTITY_SANDBOX=False), self.assertRaises(RuntimeError):
             expire_orphaned_staged_accounts(dry_run=False)
         with self.assertRaises(ValueError):
             expire_orphaned_staged_accounts(dry_run="false")
@@ -281,7 +281,7 @@ class DeletionLifecycleTests(unittest.TestCase):
     def web(self, method, path, data=None, token=None, *, csrf=True, origin="http://localhost",
             marker="1", client=None, **extra):
         headers = {"HTTP_HOST": "localhost", "REMOTE_ADDR": "127.0.0.1",
-                   "HTTP_X_WAINAK_DELETION_WEB": marker}
+                   "HTTP_X_WAINEK_DELETION_WEB": marker}
         if origin is not None:
             headers["HTTP_ORIGIN"] = origin
         if csrf is not False:
@@ -311,7 +311,7 @@ class DeletionLifecycleTests(unittest.TestCase):
         self.assertNotIn("unsafe-inline", csp)
         self.assertEqual(first["Cache-Control"], "no-store")
         self.assertEqual(first["Referrer-Policy"], "no-referrer")
-        cookie = first.cookies["wainak_deletion_csrf"]
+        cookie = first.cookies["wainek_deletion_csrf"]
         self.assertTrue(cookie["httponly"])
         self.assertEqual(cookie["samesite"], "Strict")
         second = self.web_client.get("/account-deletion", HTTP_HOST="localhost")
@@ -342,12 +342,12 @@ class DeletionLifecycleTests(unittest.TestCase):
         original, _ = self.account("qa_web@example.invalid")
         self.open_web()
         stale = self.web_csrf
-        old_cookie = self.web_client.cookies["wainak_deletion_csrf"].value
+        old_cookie = self.web_client.cookies["wainek_deletion_csrf"].value
         login = self.web("POST", AUTH+"auth/login",
             {"email": "qa_web@example.invalid", "password": self.password})
         self.expect_status(login, 200)
         token = login[1]["meta"]["session_token"]
-        self.assertTrue(old_cookie != self.web_client.cookies["wainak_deletion_csrf"].value)
+        self.assertTrue(old_cookie != self.web_client.cookies["wainek_deletion_csrf"].value)
         self.assertTrue(bool(login[2].get("X-CSRFToken")))
         self.expect_status(self.web("POST", "/identity/v1/reauthenticate",
             {"password": self.password}, token, csrf=stale), 403)
@@ -435,7 +435,7 @@ class DeletionLifecycleTests(unittest.TestCase):
             def request(method, path, data, token=None):
                 nonlocal csrf
                 headers = {"Content-Type": "application/json", "Origin": origin,
-                           "X-Wainak-Deletion-Web": "1", "X-CSRFToken": csrf}
+                           "X-Wainek-Deletion-Web": "1", "X-CSRFToken": csrf}
                 if token:
                     headers["X-Session-Token"] = token
                 req = urllib.request.Request(origin+path, method=method,
@@ -488,7 +488,7 @@ class DeletionLifecycleTests(unittest.TestCase):
         DigestSession.objects.filter(user=orphan).update(expire_date=now)
         # Small injected batch exercises the identical keyset algorithm without
         # manufacturing100 account/password fixtures or claiming capacity testing.
-        with mock.patch("wainak_identity.deletion.DEV_ORPHAN_BATCH_SIZE", 2), mock.patch(
+        with mock.patch("wainek_identity.deletion.DEV_ORPHAN_BATCH_SIZE", 2), mock.patch(
             "django.utils.timezone.now", return_value=now):
             first = expire_orphaned_staged_accounts(dry_run=False)
             self.assertEqual(first["scanned_candidates"], 2)

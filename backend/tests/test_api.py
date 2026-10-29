@@ -3,8 +3,8 @@ import json
 import unittest
 from datetime import date
 
-from wainak.api import DevelopmentApplication, MAX_BODY_BYTES
-from wainak.domain import DevelopmentService, POLICY_VERSION
+from wainek.api import DevelopmentApplication, MAX_BODY_BYTES
+from wainek.domain import DevelopmentService, POLICY_VERSION
 
 
 class ApiTests(unittest.TestCase):

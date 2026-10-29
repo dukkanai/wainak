@@ -22,7 +22,7 @@ import unittest
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/"backend"))
 IMAGE="postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb"
-LABEL="com.wainak.disposable-postgres-test"
+LABEL="com.wainek.disposable-postgres-test"
 
 
 def command(args,check=True,timeout=90):
@@ -83,18 +83,18 @@ def run_disposable(extra_test_factory=None, argv=None):
     if not args.run_disposable_postgres:
         parser.error("Explicit --run-disposable-postgres is required; no existing DB is accepted")
     import psycopg
-    from wainak.migrations import apply_initial_migration
+    from wainek.migrations import apply_initial_migration
     os.umask(0o077)
     command(["docker","image","inspect",IMAGE])  # Never pulls implicitly.
     tag=secrets.token_hex(6)
-    name="wainak-pgtest-"+tag
+    name="wainek-pgtest-"+tag
     volume=name+"-data"
-    database="wainak_test_"+tag
+    database="wainek_test_"+tag
     if metadata("container",name) or metadata("volume",volume):
         raise RuntimeError("Generated test resource name already exists; refusing reuse")
     password=secrets.token_urlsafe(48)
     success=False
-    with tempfile.TemporaryDirectory(prefix="wainak-postgres-test-") as directory:
+    with tempfile.TemporaryDirectory(prefix="wainek-postgres-test-") as directory:
         temporary=Path(directory)
         socket=temporary/"socket"
         socket.mkdir(mode=0o755)
@@ -102,7 +102,7 @@ def run_disposable(extra_test_factory=None, argv=None):
         secret.write_text(password+"\n")
         secret.chmod(0o600)
         def connect(db=database):
-            return psycopg.connect(host=str(socket),dbname=db,user="wainak_test_admin",password=password,connect_timeout=3)
+            return psycopg.connect(host=str(socket),dbname=db,user="wainek_test_admin",password=password,connect_timeout=3)
         def wait_ready():
             deadline=time.monotonic()+90
             while time.monotonic()<deadline:
@@ -127,7 +127,7 @@ def run_disposable(extra_test_factory=None, argv=None):
                 "--mount",f"type=volume,source={volume},target=/var/lib/postgresql/data",
                 "--mount",f"type=bind,source={socket},target=/var/run/postgresql",
                 "--mount",f"type=bind,source={secret},target=/run/secrets/test_password,readonly",
-                "--env",f"POSTGRES_DB={database}","--env","POSTGRES_USER=wainak_test_admin",
+                "--env",f"POSTGRES_DB={database}","--env","POSTGRES_USER=wainek_test_admin",
                 "--env","POSTGRES_PASSWORD_FILE=/run/secrets/test_password",
                 "--env","POSTGRES_INITDB_ARGS=--auth-local=scram-sha-256 --auth-host=scram-sha-256",
                 IMAGE,"postgres","-c","listen_addresses=","-c","shared_buffers=32MB","-c","max_connections=20",
@@ -138,7 +138,7 @@ def run_disposable(extra_test_factory=None, argv=None):
                 raise RuntimeError("Disposable isolation verification failed")
             wait_ready()
             apply_initial_migration(connect,allow_new_disposable_database=True)
-            spec=importlib.util.spec_from_file_location("wainak_postgres_integration",Path(__file__).with_name("test_postgres.py"))
+            spec=importlib.util.spec_from_file_location("wainek_postgres_integration",Path(__file__).with_name("test_postgres.py"))
             module=importlib.util.module_from_spec(spec)
             sys.modules[spec.name]=module
             spec.loader.exec_module(module)

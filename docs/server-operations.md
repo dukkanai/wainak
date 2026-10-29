@@ -1,4 +1,4 @@
-# تشغيل وينك ونقله بين الخوادم
+# تشغيل wainek ونقله بين الخوادم
 
 نعتمد Docker Compose على خادم واحد للبداية، مع PostgreSQL مستقل عن خدمات البريد والمواقع الأخرى. هدف النقل إلى خادم أكبر أقل من ثلاث ساعات، بشرط تجهيز الوصول للخادم الجديد مسبقًا وقياس حجم البيانات وسرعة نقلها واستعادتها. هذا هدف تشغيلي يحتاج تجربة كاملة، وليس ضمانًا توفره الحاويات.
 
@@ -127,3 +127,5 @@ python3 ops/manage.py backup --database wainak_restore_20261024
 - [ملفات الأسرار في Docker Compose](https://docs.docker.com/reference/compose-file/secrets/).
 - [نسخ PostgreSQL باستخدام pg_dump](https://www.postgresql.org/docs/17/app-pgdump.html).
 - [استعادة PostgreSQL باستخدام pg_restore](https://www.postgresql.org/docs/17/app-pgrestore.html).
+
+ملاحظة 29 أكتوبر 2026: تغير اسم المنتج إلى `wainek`؛ تبقى أسماء قاعدة البيانات والحاويات وحساب الإدارة وبادئات الاستعادة الواردة في هذا الدليل كما هي، وفق قرار عدم تغيير موارد التشغيل القائمة.

@@ -53,7 +53,7 @@ class StaticTests(unittest.TestCase):
         self.lock['input_modules'][1]=copy.deepcopy(self.lock['input_modules'][0])
         with self.assertRaises(static.InvalidRecipe): static.validate_lock(self.lock,HERE)
     def test_private_public_acquisition_identity(self):
-        row=self.lock['input_modules'][0];row['path']='wainak.local/private'
+        row=self.lock['input_modules'][0];row['path']='wainek.local/private'
         with self.assertRaises(static.InvalidRecipe): static.module_id(row)
     def test_shell_version_injection(self):
         row=self.lock['input_modules'][0];row['version']='v1.0.0;echo bad'
@@ -83,8 +83,8 @@ class StaticTests(unittest.TestCase):
             lock=copy.deepcopy(self.lock)
             for rel in ('archive/go.mod','archivebridge/go.mod'):
                 path=root/rel;path.parent.mkdir(exist_ok=True)
-                text='module wainak.local/test\n\ngo 1.27.3\nrequire (\nfilippo.io/age v1.3.2\ngolang.org/x/crypto v0.58.0\ngolang.org/x/sys v0.49.0\n)\n'
-                if rel.startswith('archivebridge/'):text+='replace wainak.local/historyarchive => ../archive\n'
+                text='module wainek.local/test\n\ngo 1.27.3\nrequire (\nfilippo.io/age v1.3.2\ngolang.org/x/crypto v0.58.0\ngolang.org/x/sys v0.49.0\n)\n'
+                if rel.startswith('archivebridge/'):text+='replace wainek.local/historyarchive => ../archive\n'
                 path.write_text(text)
             (native/'lock.json').write_text(json.dumps(lock))
             with mock.patch.object(static,'validate_sources',return_value={'status':'fixture'}), mock.patch.object(sys,'argv',[str(native/'build.py'),'--check']), mock.patch('subprocess.Popen',side_effect=AssertionError('no subprocess')),mock.patch('urllib.request.urlopen',side_effect=AssertionError('no network')),mock.patch('sys.stdout',new=io.StringIO()):

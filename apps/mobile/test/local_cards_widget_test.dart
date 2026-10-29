@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/local_cards/app.dart';
+import 'package:wainek_mobile/src/local_cards/app.dart';
 
 import '../tool/check_local_cards.dart' as checks;
 

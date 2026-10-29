@@ -7,7 +7,7 @@ import 'client.dart';
 class HttpJourneyRepository extends JourneyRepository {
   HttpJourneyRepository(this.api, {DateTime Function()? clock})
     : _clock = clock ?? DateTime.now;
-  final WainakApiClient api;
+  final WainekApiClient api;
   final DateTime Function() _clock;
   bool _disposed = false;
   int _selectionRevision = 0;

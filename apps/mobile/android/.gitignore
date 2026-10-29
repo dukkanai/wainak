@@ -14,4 +14,4 @@ key.properties
 **/*.jks
 
 # Rebuilt, explicitly SHA-pinned synthetic spike artifact; never source.
-/app/libs/wainak-archivebridge.aar
+/app/libs/wainek-archivebridge.aar

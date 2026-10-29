@@ -3,9 +3,9 @@
 Explicit, separate development mode. Phase1 `fake` and `api` remain available and do not silently change their authentication.
 
 ```
---dart-define=WAINAK_DEV_MODE=true
---dart-define=WAINAK_REPOSITORY=identity
---dart-define=WAINAK_API_BASE_URL=http://127.0.0.1:<owned-fixture-port>
+--dart-define=WAINEK_DEV_MODE=true
+--dart-define=WAINEK_REPOSITORY=identity
+--dart-define=WAINEK_API_BASE_URL=http://127.0.0.1:<owned-fixture-port>
 ```
 
 This mode is native-only; web and invalid origins fail closed. A device's localhost is its own network namespace. No port forwarding, host exposure or device networking is configured here. This is not a deployable service or production login.
@@ -49,11 +49,11 @@ That explicit command may create a fresh192MiB isolated PostgreSQL container/vol
 
 Live evidence, independent race probes, source SHAs and any compile/resource blockers belong in `IDENTITY_VERIFICATION.md`. Tests existing in source are not passed tests. Native Android/iOS builds, real screen readers, full security/release approval and store acceptance remain separate unexecuted gates.
 
-The optional live widget journey uses WAINAK_RUN_IDENTITY_WIDGET=1 with flutter test --no-pub --concurrency=1 test/identity_live_widget_test.dart. This is a nonsecret opt-in, not authorization by itself. Its actual execution status is recorded separately.
+The optional live widget journey uses WAINEK_RUN_IDENTITY_WIDGET=1 with flutter test --no-pub --concurrency=1 test/identity_live_widget_test.dart. This is a nonsecret opt-in, not authorization by itself. Its actual execution status is recorded separately.
 
 ## Integrated fixture selection (test-only)
 
-Live tests now require either an explicit bridge script argument or WAINAK_IDENTITY_FIXTURE_SCRIPT=/absolute/owned/checkout/backend/integration/serve_identity_fixture.py. There is no fallback to another branch. For integration acceptance, set this to the integration checkout being tested, not backend-auth-phase2. The path must be canonical, nonsymlink, a regular file owned by the current OS UID, not group/world writable, and at most1MiB. A fixed local metadata/hash probe checks the file without importing/executing it; missing/invalid selection fails before starting the fixture or PostgreSQL. This is a trusted test capability, never imported by app lib code.
+Live tests now require either an explicit bridge script argument or WAINEK_IDENTITY_FIXTURE_SCRIPT=/absolute/owned/checkout/backend/integration/serve_identity_fixture.py. There is no fallback to another branch. For integration acceptance, set this to the integration checkout being tested, not backend-auth-phase2. The path must be canonical, nonsymlink, a regular file owned by the current OS UID, not group/world writable, and at most1MiB. A fixed local metadata/hash probe checks the file without importing/executing it; missing/invalid selection fails before starting the fixture or PostgreSQL. This is a trusted test capability, never imported by app lib code.
 
 The live driver/widget test writes only nonsecret TEST_FIXTURE_PROVENANCE path+SHA256 to test evidence. No email/password/code/token is logged. Keep the selected fixture source frozen during a run. Run dart --old_gen_heap_size=128 tool/check_identity_fixture_selection.dart for nine path-selection checks without any fixture or DB execution. Existing non-live tests do not need the variable.
 
@@ -61,6 +61,6 @@ The metadata verifier uses O_NOFOLLOW/O_NONBLOCK and fstat before reading. Its o
 
 ## Portable fixture runtime (unified source)
 
-The bridge additionally requires `WAINAK_IDENTITY_FIXTURE_PYTHON` and `WAINAK_IDENTITY_FIXTURE_HOME`, or explicit `python`/`home` arguments. Python must be an absolute executable path; venv interpreter symlinks retain their selected path. The home must be an existing private `0700` directory at its canonical path. There are no host-specific defaults. See [the current mobile guide](README.md) for all three fixture variables.
+The bridge additionally requires `WAINEK_IDENTITY_FIXTURE_PYTHON` and `WAINEK_IDENTITY_FIXTURE_HOME`, or explicit `python`/`home` arguments. Python must be an absolute executable path; venv interpreter symlinks retain their selected path. The home must be an existing private `0700` directory at its canonical path. There are no host-specific defaults. See [the current mobile guide](README.md) for all three fixture variables.
 
 Only the selected home, fixed system PATH/language, and Python no-bytecode/unbuffered/no-user-site flags enter the child environment. The parent environment and credential/import overrides are not inherited. `test/identity_fixture_runtime_test.dart` checks rejection and precedence, private-path validation, immutable environment projection, and an actual small Python child without starting a fixture or database. These checks do not prove a selected interpreter or fixture source trustworthy.

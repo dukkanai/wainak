@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/native_archive/app.dart';
-import 'package:wainak_mobile/src/native_archive/channel.dart';
-import 'package:wainak_mobile/src/native_archive/controller.dart';
+import 'package:wainek_mobile/src/native_archive/app.dart';
+import 'package:wainek_mobile/src/native_archive/channel.dart';
+import 'package:wainek_mobile/src/native_archive/controller.dart';
 
 // Independent synthetic ports only. Passing these cases is not native evidence.
 final class QaPort implements ArchiveProbePort {
@@ -42,7 +42,7 @@ final class QaPort implements ArchiveProbePort {
 
 void qaAgree(ArchiveProbeController c) => c.acknowledge(c.viewToken, true);
 Future<void> qaTick() => Future<void>.delayed(Duration.zero);
-const qaChannel = MethodChannel('wainak/native_archive_v1');
+const qaChannel = MethodChannel('wainek/native_archive_v1');
 const qaReceipt = <String, Object>{
   'schema': 1,
   'profile': 'age-x25519-history-v1',

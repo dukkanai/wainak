@@ -9,7 +9,7 @@ final class NativeArchivePlugin: NSObject, FlutterPlugin {
 
   static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(
-      name: "wainak/native_archive_v1", binaryMessenger: registrar.messenger())
+      name: "wainek/native_archive_v1", binaryMessenger: registrar.messenger())
     #if DEBUG
     let allowed = true
     #else

@@ -42,7 +42,7 @@ native build mode is provided.
    `proxy.golang.org` and `sum.golang.org`, `GOTOOLCHAIN=local` and no inherited
    credentials/proxies/Go configuration. The official Go client authenticates
    SumDB records; returned module h1/go.mod h1 and metadata SHA must equal the
-   reviewed lock. No private `wainak.local` module identity is sent for lookup.
+   reviewed lock. No private `wainek.local` module identity is sent for lookup.
 3. The future acquisition set contains26 input versions **plus net0.60.0** as an
    explicit target-pruning alternative. Historical sys20220715 is metadata-only
    for the pre-Go1.17 esbuild graph. This is not an extra selected dependency root.

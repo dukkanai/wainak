@@ -3,9 +3,9 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/identity/app.dart';
-import 'package:wainak_mobile/src/identity/client.dart';
-import 'package:wainak_mobile/src/api/transport_io.dart';
+import 'package:wainek_mobile/src/identity/app.dart';
+import 'package:wainek_mobile/src/identity/client.dart';
+import 'package:wainek_mobile/src/api/transport_io.dart';
 import '../tool/identity_fixture_bridge.dart';
 
 class IdentityLoopbackBinding extends AutomatedTestWidgetsFlutterBinding {
@@ -95,7 +95,7 @@ Future<void> deleteLive(WidgetTester t, String password) async {
 
 void main() {
   IdentityLoopbackBinding();
-  final enabled = Platform.environment['WAINAK_RUN_IDENTITY_WIDGET'] == '1';
+  final enabled = Platform.environment['WAINEK_RUN_IDENTITY_WIDGET'] == '1';
   testWidgets(
     'real identity widgets -> Django/allauth -> fresh PostgreSQL with private RAM mailbox',
     (t) async {

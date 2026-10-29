@@ -1,10 +1,10 @@
 import unittest
 from datetime import date
 
-from wainak.domain import DevelopmentService, POLICY_VERSION
-from wainak.migrations import RepositoryConfigurationError, apply_initial_migration
-from wainak.postgres import PostgresRepository
-from wainak.repository import MemoryRepository
+from wainek.domain import DevelopmentService, POLICY_VERSION
+from wainek.migrations import RepositoryConfigurationError, apply_initial_migration
+from wainek.postgres import PostgresRepository
+from wainek.repository import MemoryRepository
 
 
 class RepositoryTests(unittest.TestCase):

@@ -65,7 +65,7 @@ class BoundedServer(WSGIServer):
 def serve_private_fixture(stop, lifetime_seconds):
     from django.core.wsgi import get_wsgi_application
     from django.db import connections
-    from wainak_identity.mailbox import OUTBOX
+    from wainek_identity.mailbox import OUTBOX
     server = make_server("127.0.0.1", 0, get_wsgi_application(), server_class=BoundedServer, handler_class=QuietHandler)
     server.timeout = .2
     worker_stop = threading.Event()
@@ -77,7 +77,7 @@ def serve_private_fixture(stop, lifetime_seconds):
         finally:
             # Django connections are thread-local: close in the owning thread.
             connections.close_all()
-    worker = threading.Thread(target=work, name="wainak-private-identity-http", daemon=False)
+    worker = threading.Thread(target=work, name="wainek-private-identity-http", daemon=False)
     worker.start()
     try:
         write_message(1, {"type": "ready", "mode": "identity_fixture", "private_mailbox": True,
@@ -129,7 +129,7 @@ def main(argv=None):
         with contextlib.redirect_stdout(SilentOutput()), contextlib.redirect_stderr(SilentOutput()):
             import run_postgres
             def extra(connect, restart, temporary):
-                from wainak_identity.bootstrap import configure, ephemeral_keys
+                from wainek_identity.bootstrap import configure, ephemeral_keys
                 configure(connect, keys=ephemeral_keys())
                 class PrivateFixture(unittest.TestCase):
                     def runTest(self):

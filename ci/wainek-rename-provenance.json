@@ -1,0 +1,193 @@
+{
+  "schema": 1,
+  "base_commit": "9bb2aa7731911c1b9d16c76ec4f276ec599f7755",
+  "scope": "Current renamed source overlay; original provenance and artifact evidence remain unchanged",
+  "files": {
+    "apps/mobile/android/.gitignore": {
+      "path": "apps/mobile/android/.gitignore",
+      "before_sha256": "2b236ebd1414a4d5fcc1896ea13d841209b42a9da43a67ab8d7f64b6e2710b21",
+      "after_sha256": "e3a156f3aa3a8a1b8e763393d3d1d78a7568c8a7c11a85b6c540143c0bedcbc4",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/android/app/build.gradle.kts": {
+      "path": "apps/mobile/android/app/build.gradle.kts",
+      "before_sha256": "428103c0f2c34184e9e044c5fb9e3e129a73d7962dbc27e093efa1da1d9f54f4",
+      "after_sha256": "ca076d0e15ac93a7b565f2cd86a1520672a1a2686553098cb7814b61f37972c0",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/android/app/src/archiveBridge/kotlin/invalid/example/wainak/wainak_mobile/ArchiveEngineFactory.kt": {
+      "path": "apps/mobile/android/app/src/archiveBridge/kotlin/com/nextaura/wainek/ArchiveEngineFactory.kt",
+      "before_sha256": "67c175aa79bcdb846b93e88f0ff608c14babf8cedfd03a3785740171072df725",
+      "after_sha256": "f82a33f11e6245bc3ccca14cd4653649895421cc20e24b59e996bfad4c8afa95",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/android/app/src/archiveUnavailable/kotlin/invalid/example/wainak/wainak_mobile/ArchiveEngineFactory.kt": {
+      "path": "apps/mobile/android/app/src/archiveUnavailable/kotlin/com/nextaura/wainek/ArchiveEngineFactory.kt",
+      "before_sha256": "72cc40739739ea75636c43e110f5c717135731abd1d759905afc511ae7da3e9f",
+      "after_sha256": "7bd91d36e8ca4709b80da74e80214910f5344b9025aac9e4e44d1ee98c6671f0",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/android/app/src/main/AndroidManifest.xml": {
+      "path": "apps/mobile/android/app/src/main/AndroidManifest.xml",
+      "before_sha256": "f46e2ffbacbaba43afc3e8c4d64846d9daa9a30333d2197b0ae940628f2c3d3f",
+      "after_sha256": "5950a26aad2f6a5425b78ee21efbf11ca64d79f53c039a735179b5ecafb2304a",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/android/app/src/main/kotlin/invalid/example/wainak/wainak_mobile/ArchiveEngine.kt": {
+      "path": "apps/mobile/android/app/src/main/kotlin/com/nextaura/wainek/ArchiveEngine.kt",
+      "before_sha256": "0271e8bf58847a3d818ddc6147bad6b073f173319c059a6ffd8f1f0c82ea9b07",
+      "after_sha256": "1fe3f4a20c9f38631c54c0ed705ff783f55adca00a74b18de910b2c7ec5c6b36",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/android/app/src/main/kotlin/invalid/example/wainak/wainak_mobile/ArchiveHandleFence.kt": {
+      "path": "apps/mobile/android/app/src/main/kotlin/com/nextaura/wainek/ArchiveHandleFence.kt",
+      "before_sha256": "9fdcd384397edbb015ee59abdc98dbc9a97fa195ea203b1f99700cf00db5c685",
+      "after_sha256": "ed8589202d14bce11465448d5f5d73c93a135059a4e7c2efd1efb7bf646b3180",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/android/app/src/main/kotlin/invalid/example/wainak/wainak_mobile/MainActivity.kt": {
+      "path": "apps/mobile/android/app/src/main/kotlin/com/nextaura/wainek/MainActivity.kt",
+      "before_sha256": "600991ab50dd1b1f742e1ccca5523c585f2a754cd1b57792e42036b1ae360c2c",
+      "after_sha256": "12445c038fac01b7663706b7369681eccb00f7d315ca9930e823a8ac76dfedb9",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/android/app/src/main/kotlin/invalid/example/wainak/wainak_mobile/NativeArchiveChannel.kt": {
+      "path": "apps/mobile/android/app/src/main/kotlin/com/nextaura/wainek/NativeArchiveChannel.kt",
+      "before_sha256": "b1caaee059093f99ccfdf73bf6c1c5621e3a625115b5a3bb96f23bd1c450c320",
+      "after_sha256": "d5483894c73b161ae5df9b62655a80bd3e05e06e7454206d78864e7cd1b4ae7c",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/ios/Runner.xcodeproj/project.pbxproj": {
+      "path": "apps/mobile/ios/Runner.xcodeproj/project.pbxproj",
+      "before_sha256": "0efb391114e5e18909b91e89b577ddd11370c91070e1c00757db854c37e9d133",
+      "after_sha256": "6f45473cfdc40a74ecc51308dffea8bb01c7a54a7d9416eeb3c1c04dc2f0f1b1",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/ios/Runner/AppDelegate.swift": {
+      "path": "apps/mobile/ios/Runner/AppDelegate.swift",
+      "before_sha256": "f55dfa9395039c582122f1260784ed7b53b2e8bffad13a925fb77faa96f833d6",
+      "after_sha256": "174f0165e46b0a451937f5fee4f01fb10d204fd87abaf631174117fa6101249c",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/ios/Runner/ArchiveEngine.swift": {
+      "path": "apps/mobile/ios/Runner/ArchiveEngine.swift",
+      "before_sha256": "0849301f0d3b3315da311f78f301c844a9e98e85f36972ac1915fbdef217352b",
+      "after_sha256": "a5949586dc317975f52b650b2a0322a4407d52cdb6e4dc5afa950a9e5941e39e",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/ios/Runner/ArchiveNativeBridge.h": {
+      "path": "apps/mobile/ios/Runner/ArchiveNativeBridge.h",
+      "before_sha256": "44c4438bd168ae5c6d1174b3e1eb1b3a5b282636ce88e3f373266256b188f86f",
+      "after_sha256": "a769e5218eb09cc8030cc8b25946a58d530fae4a430fb08eb505948e0a9b33d5",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/ios/Runner/ArchiveNativeBridge.m": {
+      "path": "apps/mobile/ios/Runner/ArchiveNativeBridge.m",
+      "before_sha256": "aaf3225063d8ec94e9f36fea9f43bc98b38a2c4ab14ac39a84905644cad193dc",
+      "after_sha256": "34345e938b79d027034ec3bc8c9e81b45f3ef0bf2dddcce20facc3e3517d4e60",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/ios/Runner/ArchiveProbeCoordinator.swift": {
+      "path": "apps/mobile/ios/Runner/ArchiveProbeCoordinator.swift",
+      "before_sha256": "b470d4738b05b519059414a4e79ad1159d32ae4b91722850ba71e405d9b69319",
+      "after_sha256": "c5b3831fc1ed87cfb62221a67f59f3d03ccf596e93213cfc9be547ad8d3fca9b",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/ios/Runner/GoArchiveEngine.swift": {
+      "path": "apps/mobile/ios/Runner/GoArchiveEngine.swift",
+      "before_sha256": "8d1aecf0f4f0f3f55981da9880154effcbd6370c37bdc13c7b1fe6409c8aa1b1",
+      "after_sha256": "9e67173e516779f85b128150a5c750049c1cc55401ac371c12bcee0283818b01",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/ios/Runner/NativeArchivePlugin.swift": {
+      "path": "apps/mobile/ios/Runner/NativeArchivePlugin.swift",
+      "before_sha256": "1e30aab2de92ebfde32ef2aecf1cb03ede5ef080631d274fc898152b4acc8d4c",
+      "after_sha256": "00755e5236fb87190dcfc4000c712346b407e178ab24e303753c28eb25c61a68",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/ios/RunnerTests/NativeArchiveTests.swift": {
+      "path": "apps/mobile/ios/RunnerTests/NativeArchiveTests.swift",
+      "before_sha256": "70c7d44ed9412de8fdba24b18e00c1e8687e81433e633410797a4360d09d88fc",
+      "after_sha256": "16c89dbf2051e2a502956ab3aa818958faebf4123a397fc4a12f358c8c103f8d",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/lib/main.dart": {
+      "path": "apps/mobile/lib/main.dart",
+      "before_sha256": "2ed2586c1c6737e1fcbbe98850155e99c4b72a9fcc66ae2cd4f6f0e7710f7f36",
+      "after_sha256": "0201e04c7beef9b9d4e4ed8608cc8d8abebe9b1b0fb828dd2b7a3f22042c18dd",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/lib/src/native_archive/app.dart": {
+      "path": "apps/mobile/lib/src/native_archive/app.dart",
+      "before_sha256": "8c7c6083a699d11ee361f97504b9b6526bd867d96a933a1e2098d46c039ede6f",
+      "after_sha256": "d6ae3871459930705587c9a6630be6df4f8fb010213bac515070fc37e8d793b5",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/lib/src/native_archive/channel.dart": {
+      "path": "apps/mobile/lib/src/native_archive/channel.dart",
+      "before_sha256": "bd3e1108cb4bd941eaca05754728dc1abbd7bcdd770eb89bd5f593efe4a4443f",
+      "after_sha256": "1c3f679958cf8034807b183e9d6b769c8d6322110d5d73c5057ccdae9bb626e2",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/test/native_archive_capacity_test.dart": {
+      "path": "apps/mobile/test/native_archive_capacity_test.dart",
+      "before_sha256": "5c5526588d13228ff998ec9ff6513a8b17dc2db546f445dfb382eb00c5054dff",
+      "after_sha256": "8a3c672a5e5e7dc10ab1baeefb47127579a39bc4dd3d1ad7ff5e5d62d0a83fcc",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/test/native_archive_entry_test.dart": {
+      "path": "apps/mobile/test/native_archive_entry_test.dart",
+      "before_sha256": "07c14dc6b0736522e1107505c9c02ea6aaa6a66302dec5da43f970a6e2ca17f7",
+      "after_sha256": "3e313431b9ab28a8a4a417783300578e960c129de6e0e2670f4a6775ea9b29bc",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/test/native_archive_platform_test.dart": {
+      "path": "apps/mobile/test/native_archive_platform_test.dart",
+      "before_sha256": "a46439c18aee3ef8f2da7542f35150800121664f7e13cd7045ac77de78e7c514",
+      "after_sha256": "9ea3e748f0ed448668dfe09e415e49427c277c99467fc5a10a1911edfcd23729",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "apps/mobile/tool/kotlin/ArchiveHandleFenceCheck.kt": {
+      "path": "apps/mobile/tool/kotlin/ArchiveHandleFenceCheck.kt",
+      "before_sha256": "eafd7690ce0e60ce0223dd82078b720364cf31c09a25c6e5e92060fa786a1cfe",
+      "after_sha256": "c9c96d08fdb91dc0b1f8dfa2dd95e14dbad06190f42504201cea1e441a97e228",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "archive/archive_test.go": {
+      "path": "archive/archive_test.go",
+      "before_sha256": "ec0aa6352375e556b411ff0bfcc33c27acf8d90f7ae9877fbdc33fb42d51ead0",
+      "after_sha256": "ffa0fb9592e256c238fc6ea6a604077cd63e5a27f64b84ff948e7568adb42fff",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "archive/go.mod": {
+      "path": "archive/go.mod",
+      "before_sha256": "68e37b3d448d929b2a6ac03a0d0364e851b1b9e1cf6cf67f1ab4e12b7a154823",
+      "after_sha256": "d5d984f5677fe195ae8e212894ccf0972271b6833182b4d6c51937bbb13af5e1",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "archive/interop_test.go": {
+      "path": "archive/interop_test.go",
+      "before_sha256": "80061c03c2bcc19d2f709a6ff131d162dc5573ab3e5ff331ff910d02d4304072",
+      "after_sha256": "a34128622ec0b79d5f8c3c4e849482a5bb5927cffeb3318482102af847135186",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "archivebridge/bridge.go": {
+      "path": "archivebridge/bridge.go",
+      "before_sha256": "3cf7dcf2f25454bcf3c16dd3a6189382babcb93fe7fb2913a60383aeb48df415",
+      "after_sha256": "fad02456471d212706d05c6794882ef79daa044936622c58d0828f880da62842",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "archivebridge/bridge_test.go": {
+      "path": "archivebridge/bridge_test.go",
+      "before_sha256": "c58856dcf372791b03553924111ae9c403afb0501ceacf3bc230a6ffafdc52a1",
+      "after_sha256": "7a69c63be0b49fb3b253c2d76e3a57f31fd98011e756e96305e36ba68fc9ebd9",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    },
+    "archivebridge/go.mod": {
+      "path": "archivebridge/go.mod",
+      "before_sha256": "8fe3d9077d27830843a138ad522156fa367a922039e61b50761275c858dedf3e",
+      "after_sha256": "25492c2aa424fa5ca8377d62f8e3e187765f63070242d7e793212d5c9c03af96",
+      "reason": "Owner-approved wainek source/package/channel/display rename; wire archive identifiers retained. Source verification only; no new native build acceptance."
+    }
+  }
+}

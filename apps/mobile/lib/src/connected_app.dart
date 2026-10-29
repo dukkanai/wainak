@@ -6,14 +6,14 @@ import 'app.dart' show Notice, Panel, Choice, ActionButton;
 import 'repository.dart';
 import 'theme.dart';
 
-class ConnectedWainakApp extends StatefulWidget {
-  const ConnectedWainakApp({super.key, required this.repository});
+class ConnectedWainekApp extends StatefulWidget {
+  const ConnectedWainekApp({super.key, required this.repository});
   final JourneyRepository repository;
   @override
-  State<ConnectedWainakApp> createState() => _ConnectedWainakAppState();
+  State<ConnectedWainekApp> createState() => _ConnectedWainekAppState();
 }
 
-class _ConnectedWainakAppState extends State<ConnectedWainakApp> {
+class _ConnectedWainekAppState extends State<ConnectedWainekApp> {
   ThemeMode mode = ThemeMode.system;
   @override
   void dispose() {
@@ -27,9 +27,9 @@ class _ConnectedWainakAppState extends State<ConnectedWainakApp> {
     supportedLocales: const [Locale('ar')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     debugShowCheckedModeBanner: false,
-    title: 'وينك · خدمة تطوير',
-    theme: WainakTokens.theme(Brightness.light),
-    darkTheme: WainakTokens.theme(Brightness.dark),
+    title: 'wainek · خدمة تطوير',
+    theme: WainekTokens.theme(Brightness.light),
+    darkTheme: WainekTokens.theme(Brightness.dark),
     themeMode: mode,
     home: ConnectedJourney(
       repository: widget.repository,
@@ -164,7 +164,7 @@ class _ConnectedJourneyState extends State<ConnectedJourney> {
           64,
           MediaQuery.textScalerOf(context).scale(24) + 24,
         ),
-        title: const Text('وينك'),
+        title: const Text('wainek'),
         leading: step == _Step.eligibility
             ? null
             : IconButton(

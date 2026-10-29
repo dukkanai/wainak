@@ -26,7 +26,7 @@ enum ArchiveEngineFactory {
   static func make() -> ArchiveEngine {
     // Both Swift and Clang conditions must be supplied by the reviewed artifact
     // verifier. A missing/mismatched native framework fails compilation/linking.
-    #if WAINAK_ARCHIVE_BRIDGE
+    #if WAINEK_ARCHIVE_BRIDGE
     return GoArchiveEngine()
     #else
     return UnavailableArchiveEngine()

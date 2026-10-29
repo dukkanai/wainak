@@ -4,7 +4,7 @@ import threading
 import unittest
 from datetime import date
 
-from wainak.domain import DevelopmentService, DomainError, POLICY_VERSION
+from wainek.domain import DevelopmentService, DomainError, POLICY_VERSION
 
 
 class DomainTests(unittest.TestCase):

@@ -26,7 +26,7 @@ def checked_coordinates(rows):
             raise ValueError("coordinate_name")
         if not isinstance(version, str) or not re.fullmatch(r"[A-Za-z0-9_.+~-]{1,160}", version):
             raise ValueError("coordinate_version")
-        if any(x in name.lower() for x in ("wainak", "chatenu", "invalid.example")):
+        if any(x in name.lower() for x in ("wainek", "chatenu", "invalid.example")):
             raise ValueError("private_coordinate")
         pair = (name, version)
         if pair not in out:

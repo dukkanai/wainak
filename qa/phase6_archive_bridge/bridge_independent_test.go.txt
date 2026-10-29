@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	history "wainak.local/historyarchive"
+	history "wainek.local/historyarchive"
 )
 
 // Independent tests contain public synthetic literals only. Runtime keys and

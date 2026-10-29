@@ -1,0 +1,7 @@
+// Used only by the explicit TestFlight driver, never the unsigned recipe.
+CODE_SIGNING_ALLOWED = YES
+CODE_SIGNING_REQUIRED = YES
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = Apple Distribution
+CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
+DEVELOPMENT_TEAM = 9G7GPBG7FB

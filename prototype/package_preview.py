@@ -127,7 +127,7 @@ def publish_outputs(payloads):
     linked files and output-directory drift fail closed. The manifest is last;
     this is not a cross-file transaction or a hostile same-user filesystem lock.
     """
-    if set(payloads) != {'wainak-preview.html', 'wainak-prototype.zip', 'manifest.json'}:
+    if set(payloads) != {'wainek-preview.html', 'wainek-prototype.zip', 'manifest.json'}:
         raise ValueError('Unexpected output inventory')
     RELEASES.mkdir(mode=0o700, exist_ok=True)
     directory = open_directory(RELEASES)
@@ -147,7 +147,7 @@ def publish_outputs(payloads):
         directory_current()
         previous = {name: output_target(directory, name) for name in payloads}
         for name, data in payloads.items():
-            temp = '.wainak-package-' + uuid.uuid4().hex
+            temp = '.wainek-package-' + uuid.uuid4().hex
             fd = os.open(temp, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW |
                          os.O_NONBLOCK, 0o600, dir_fd=directory)
             with os.fdopen(fd, 'w+b') as stream:
@@ -168,7 +168,7 @@ def publish_outputs(payloads):
         directory_current()
         if any(output_target(directory, name) != previous[name] for name in payloads):
             raise ValueError('Existing output changed before publication')
-        for name in ('wainak-preview.html', 'wainak-prototype.zip', 'manifest.json'):
+        for name in ('wainek-preview.html', 'wainek-prototype.zip', 'manifest.json'):
             directory_current()
             if output_target(directory, name) != previous[name]:
                 raise ValueError('Output leaf changed before publication')
@@ -259,16 +259,16 @@ def main():
     archive = io.BytesIO()
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
         for relative in inputs:
-            output.writestr('wainak-prototype/' + relative, local_asset(relative))
-        output.writestr('wainak-preview.html', html)
+            output.writestr('wainek-prototype/' + relative, local_asset(relative))
+        output.writestr('wainek-preview.html', html)
         try:
             readme = read_local(ROOT, 'README.md').decode('utf-8')
         except FileNotFoundError:
             readme = None
         if readme is not None:
-            output.writestr('README.md', readme.replace('releases/wainak-preview.html', 'wainak-preview.html').replace('releases/wainak-prototype.zip', 'wainak-prototype.zip').replace('[تقرير التنفيذ](../docs/reviews/iteration-01.md) عند اكتماله', 'تقرير التنفيذ في مستودع المشروع: docs/reviews/iteration-01.md'))
-    payloads = {'wainak-preview.html': html.encode('utf-8'),
-                'wainak-prototype.zip': archive.getvalue()}
+            output.writestr('README.md', readme.replace('releases/wainek-preview.html', 'wainek-preview.html').replace('releases/wainek-prototype.zip', 'wainek-prototype.zip').replace('[تقرير التنفيذ](../docs/reviews/iteration-01.md) عند اكتماله', 'تقرير التنفيذ في مستودع المشروع: docs/reviews/iteration-01.md'))
+    payloads = {'wainek-preview.html': html.encode('utf-8'),
+                'wainek-prototype.zip': archive.getvalue()}
     manifest = {name: {'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)}
                 for name, data in payloads.items()}
     payloads['manifest.json'] = (json.dumps(manifest, indent=2) + '\n').encode('utf-8')

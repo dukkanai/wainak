@@ -33,9 +33,9 @@ class QuietRequests(WSGIRequestHandler):
 def serve(connect, port, pipe):
     # fork creates a new application process with the private connection factory.
     # There are no open database connections at fork and no secret in process argv.
-    from wainak.api import DevelopmentApplication
-    from wainak.domain import DevelopmentService
-    from wainak.postgres import PostgresRepository
+    from wainek.api import DevelopmentApplication
+    from wainek.domain import DevelopmentService
+    from wainek.postgres import PostgresRepository
     app = DevelopmentApplication(enable_development=True, service=DevelopmentService(
         repository=PostgresRepository(connect, enable_synthetic_persistence=True)))
     try:
@@ -275,8 +275,8 @@ def _run_chain(connect, restart_database, temporary, mobile_root, tools_root, re
                        "HOME": str(tools_root / "home"), "PUB_CACHE": str(tools_root / "pub-cache"),
                        "FLUTTER_ROOT": str(tools_root / "flutter"), "CI": "true", "LANG": "C.UTF-8",
                        "FLUTTER_SUPPRESS_ANALYTICS": "true", "DART_SUPPRESS_ANALYTICS": "true",
-                       "WAINAK_TEST_BASE_URL": f"http://127.0.0.1:{port}",
-                       "WAINAK_TEST_CONTROL_DIR": str(control)}
+                       "WAINEK_TEST_BASE_URL": f"http://127.0.0.1:{port}",
+                       "WAINEK_TEST_CONTROL_DIR": str(control)}
         # Optional VM tuning is explicit caller-owned test configuration, not a
         # change to the SDK, cgroup, system service, or global environment.
         for key in ("DART_VM_OPTIONS", "FLUTTER_TOOL_ARGS"):

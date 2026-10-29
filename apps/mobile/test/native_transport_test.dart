@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/api/transport_io.dart';
+import 'package:wainek_mobile/src/api/transport_io.dart';
 
 void main() {
   test(

@@ -116,7 +116,7 @@ class SourceInventoryTests(unittest.TestCase):
 
 class ExecutionProofTests(unittest.TestCase):
     def project(self,events,expected=None):
-        package='wainak.local/historyarchive'
+        package='wainek.local/historyarchive'
         raw=b''.join(json.dumps(dict(Package=package,**row)).encode()+b'\n' for row in events)
         return h.project_go_events(raw,{'TestOne','FuzzOne'},package,expected)
     def test_package_pass_only_is_not_test_evidence(self):
@@ -151,7 +151,7 @@ class RealChildTests(unittest.TestCase):
     def native(self):
         runtime=n.Runtime.__new__(n.Runtime)
         runtime.repo=runtime.work=self.root;runtime.sequence=0;runtime.commands=[];runtime.last_command=None
-        runtime.guard=Mock();runtime.test_names={'wainak.local/historyarchive':frozenset({'TestOne'})}
+        runtime.guard=Mock();runtime.test_names={'wainek.local/historyarchive':frozenset({'TestOne'})}
         runtime.lock={'limits':{'process_seconds':10,'process_output_bytes':4096}}
         return runtime
     def args(self,seconds):

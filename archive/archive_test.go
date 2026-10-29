@@ -196,7 +196,7 @@ func TestStrictJSON(t *testing.T) {
 		strings.Replace(good, `"event_one"`, `"\ud800"`, 1),
 		strings.Replace(good, `"sample_defer"`, `null`, 1),
 		strings.Repeat("[", 9) + `"x"` + strings.Repeat("]", 9),
-		strings.Replace(good, "wainak-history-v1", "wainak-history-v99", 1),
+		strings.Replace(good, "wainak-history-v1", "wainek-history-v99", 1),
 		strings.Replace(good, "sample_v1", "unknown_v1", 1),
 		strings.Replace(good, "sample_defer", "not_allowed", 1),
 		strings.Replace(good, "2026-10-24T00:00:00Z", "2026-10-24T00:00:00+00:00", 1),
@@ -419,4 +419,27 @@ func FuzzStrictHistoryJSON(f *testing.F) {
 			t.Fatal("accepted schema not stable")
 		}
 	})
+}
+
+// Brand changes must not make previously exported v1 history unreadable.
+func TestLegacyWainakWireVersionSurvivesBrandRename(t *testing.T) {
+	if SchemaVersion != "wainak-history-v1" {
+		t.Fatal("legacy wire version changed")
+	}
+	c, err := NewCatalog("sample_v1", map[string][]string{"sample_card": {"sample_defer", "sample_yes"}})
+	if err != nil || c == nil {
+		t.Fatal("catalog")
+	}
+	var legacy Snapshot
+	raw := []byte(`{"schema_version":"wainak-history-v1","owner_ref":"owner_aaaaaaaaaaaaaaaa","catalog_version":"sample_v1","records":[]}`)
+	if err := json.Unmarshal(raw, &legacy); err != nil {
+		t.Fatal(err)
+	}
+	if err := validate(legacy, c, "owner_aaaaaaaaaaaaaaaa"); err != nil {
+		t.Fatal("legacy schema rejected")
+	}
+	legacy.SchemaVersion = "wainek-history-v1"
+	if validate(legacy, c, "owner_aaaaaaaaaaaaaaaa") == nil {
+		t.Fatal("unversioned format change accepted")
+	}
 }

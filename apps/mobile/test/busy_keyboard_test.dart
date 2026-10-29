@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/connected_app.dart';
+import 'package:wainek_mobile/src/connected_app.dart';
 import 'connected_widget_test.dart' as fixture;
 
 Future<bool> focusAdultByTab(WidgetTester t) async {
@@ -21,7 +21,7 @@ void main() {
     t,
   ) async {
     final api = fixture.FixtureApi()..holdRegistration = true;
-    await t.pumpWidget(ConnectedWainakApp(repository: fixture.repository(api)));
+    await t.pumpWidget(ConnectedWainekApp(repository: fixture.repository(api)));
     for (final key in ['api-adult', 'api-muslim', 'api-terms', 'api-privacy']) {
       await fixture.tap(t, key);
     }

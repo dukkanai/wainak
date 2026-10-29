@@ -87,8 +87,8 @@ class RelationshipDto {
 
 /// Phase-one contract client used by the explicit native development repository.
 /// Tokens exist only in this object; no automatic retries, persistence or logging.
-class WainakApiClient {
-  WainakApiClient({required this.baseUri, required this.transport}) {
+class WainekApiClient {
+  WainekApiClient({required this.baseUri, required this.transport}) {
     final loopback = [
       '127.0.0.1',
       '::1',

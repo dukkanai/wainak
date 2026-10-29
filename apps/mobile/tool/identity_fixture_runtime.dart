@@ -47,11 +47,11 @@ FixtureRuntimeSelection resolveFixtureRuntime({
 }) {
   final selectedEnvironment = environment ?? Platform.environment;
   final selectedPython = _absolutePath(
-    python ?? selectedEnvironment['WAINAK_IDENTITY_FIXTURE_PYTHON'],
+    python ?? selectedEnvironment['WAINEK_IDENTITY_FIXTURE_PYTHON'],
     'python',
   );
   final selectedHome = _absolutePath(
-    home ?? selectedEnvironment['WAINAK_IDENTITY_FIXTURE_HOME'],
+    home ?? selectedEnvironment['WAINEK_IDENTITY_FIXTURE_HOME'],
     'home',
   );
   try {

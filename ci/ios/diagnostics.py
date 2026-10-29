@@ -43,7 +43,7 @@ def safe_error(error):
 
 def emit(event, **fields):
     # Call sites supply only fixed labels and safe_error projections, never arbitrary exceptions.
-    print('WAINAK_CI_DIAGNOSTIC ' + json.dumps({'event': event, **fields}, sort_keys=True), flush=True)
+    print('WAINEK_CI_DIAGNOSTIC ' + json.dumps({'event': event, **fields}, sort_keys=True), flush=True)
 
 
 def cleanup_process(process, selector):

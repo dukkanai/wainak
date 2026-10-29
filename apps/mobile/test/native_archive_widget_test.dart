@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/native_archive/app.dart';
-import 'package:wainak_mobile/src/native_archive/controller.dart';
+import 'package:wainek_mobile/src/native_archive/app.dart';
+import 'package:wainek_mobile/src/native_archive/controller.dart';
 
 import 'native_archive_test.dart' show ProbeFixture;
 

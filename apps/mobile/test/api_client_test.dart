@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/api/client.dart';
-import 'package:wainak_mobile/src/api/transport.dart';
+import 'package:wainek_mobile/src/api/client.dart';
+import 'package:wainek_mobile/src/api/transport.dart';
 
 class RecordingTransport implements ApiTransport {
   final calls =
@@ -56,7 +56,7 @@ Map<String, dynamic> relation({
     'can_disclose_identity': false,
   },
 };
-Future<void> login(WainakApiClient api, RecordingTransport transport) async {
+Future<void> login(WainekApiClient api, RecordingTransport transport) async {
   transport.responses.add(
     ApiResponse(
       201,
@@ -86,7 +86,7 @@ void main() {
       'https://example.com?q=x',
     ]) {
       expect(
-        () => WainakApiClient(
+        () => WainekApiClient(
           baseUri: Uri.parse(bad),
           transport: RecordingTransport(),
         ),
@@ -94,7 +94,7 @@ void main() {
       );
     }
     expect(
-      WainakApiClient(
+      WainekApiClient(
         baseUri: Uri.parse('http://127.0.0.1:8766'),
         transport: RecordingTransport(),
       ).hasSession,
@@ -103,7 +103,7 @@ void main() {
   });
   test('required declarations cannot be silently asserted', () async {
     final t = RecordingTransport();
-    final api = WainakApiClient(
+    final api = WainekApiClient(
       baseUri: Uri.parse('http://127.0.0.1:8766'),
       transport: t,
     );
@@ -123,7 +123,7 @@ void main() {
     'registration versions and token are kept separate from account DTO',
     () async {
       final t = RecordingTransport();
-      final api = WainakApiClient(
+      final api = WainekApiClient(
         baseUri: Uri.parse('http://127.0.0.1:8766'),
         transport: t,
       );
@@ -149,7 +149,7 @@ void main() {
     'request carries idempotency key; 409 is not retried or raw-message exposed',
     () async {
       final t = RecordingTransport();
-      final api = WainakApiClient(
+      final api = WainekApiClient(
         baseUri: Uri.parse('http://127.0.0.1:8766'),
         transport: t,
       );
@@ -179,7 +179,7 @@ void main() {
   );
   test('401 invalidates session without implicit reauthentication', () async {
     final t = RecordingTransport();
-    final api = WainakApiClient(
+    final api = WainekApiClient(
       baseUri: Uri.parse('http://127.0.0.1:8766'),
       transport: t,
     );
@@ -245,7 +245,7 @@ void main() {
     'report has metadata only and account deletion clears session',
     () async {
       final t = RecordingTransport();
-      final api = WainakApiClient(
+      final api = WainekApiClient(
         baseUri: Uri.parse('http://127.0.0.1:8766'),
         transport: t,
       );

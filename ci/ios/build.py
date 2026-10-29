@@ -32,8 +32,8 @@ EXPERIMENT_FLAG = '--logical-workspace-40gib-experiment'
 SIGNING = ['CODE_SIGNING_ALLOWED=NO', 'CODE_SIGNING_REQUIRED=NO', 'CODE_SIGN_IDENTITY=',
            'DEVELOPMENT_TEAM=', 'PROVISIONING_PROFILE=', 'PROVISIONING_PROFILE_SPECIFIER=',
            'CODE_SIGN_STYLE=Manual']
-DEFINES = ['--dart-define=WAINAK_DEV_MODE=true', '--dart-define=WAINAK_REPOSITORY=native_archive',
-           '--dart-define=WAINAK_IOS_ARCHIVE_PREVIEW=true']
+DEFINES = ['--dart-define=WAINEK_DEV_MODE=true', '--dart-define=WAINEK_REPOSITORY=native_archive',
+           '--dart-define=WAINEK_IOS_ARCHIVE_PREVIEW=true']
 TESTS = ['test/native_archive_test.dart', 'test/native_archive_widget_test.dart',
          'test/native_archive_entry_test.dart', 'test/native_archive_platform_test.dart',
          'test/native_archive_capacity_test.dart']
@@ -355,8 +355,8 @@ def main():
                     '-sdk', sdk, '-destination', destination, '-derivedDataPath', str(work / ('derived-' + sdk)),
                     '-disableAutomaticPackageResolution', '-onlyUsePackageVersionsFromResolvedFile',
                     'ARCHS=arm64', 'ONLY_ACTIVE_ARCH=YES', 'IPHONEOS_DEPLOYMENT_TARGET=15.0',
-                    'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG WAINAK_ARCHIVE_BRIDGE',
-                    'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) WAINAK_ARCHIVE_BRIDGE=1',
+                    'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG WAINEK_ARCHIVE_BRIDGE',
+                    'GCC_PREPROCESSOR_DEFINITIONS=$(inherited) WAINEK_ARCHIVE_BRIDGE=1',
                     'FRAMEWORK_SEARCH_PATHS=$(inherited) "' + str(slices['device' if sdk == 'iphoneos' else 'simulator']) + '"',
                     unsigned_linker_setting(sdk), *SIGNING]
             settings_command, compile_command = xcode_commands(base, sdk)

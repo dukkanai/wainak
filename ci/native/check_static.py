@@ -7,6 +7,9 @@ import os
 from pathlib import Path
 import re
 import stat
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
+from ci.rename_provenance import source_matches
 
 EXPECTED_PROOFS = {'proofs/auxiliary-module-metadata.json': '8931cc6885b275384a8c4e27860ffb9bf95494120663513a1f34608140e3f24c', 'proofs/candidate-graph.json': '71ededfd405d45db884cf22cd4f68c378e5995153af36531a9d57a312e54e291', 'proofs/new-module-authenticated-metadata.json': '224205964c8cdaa4b9e5a2132a0a843dd2eb04e17b48835c81db1a69d93a72ee', 'proofs/prior-pins.json': 'b3f6b089001c537e7302626f22217a52740317226ba3c06c06e340f996c4a31b'}
 EXPECTED_SOURCE = {'archive/archive.go': '20ed943c8e8a4c4c8f1b3c19c422c3530678302b408884c8c311b71efa0d639e', 'archive/archive_test.go': 'ec0aa6352375e556b411ff0bfcc33c27acf8d90f7ae9877fbdc33fb42d51ead0', 'archive/interop_test.go': '80061c03c2bcc19d2f709a6ff131d162dc5573ab3e5ff331ff910d02d4304072', 'archivebridge/bridge.go': '3cf7dcf2f25454bcf3c16dd3a6189382babcb93fe7fb2913a60383aeb48df415', 'archivebridge/bridge_test.go': 'c58856dcf372791b03553924111ae9c403afb0501ceacf3bc230a6ffafdc52a1'}
@@ -57,7 +60,7 @@ def read_json(path):
 def module_id(row):
     path, version = row['path'], row['version']
     require(re.fullmatch(r'[A-Za-z0-9._~/-]+', path) is not None, 'invalid public module path')
-    require(not path.startswith('wainak.local/') and '..' not in path.split('/'), 'nonpublic module identity')
+    require(not path.startswith(('wainek.local/','wainak.local/')) and '..' not in path.split('/'), 'nonpublic module identity')
     require(re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?(?:\+incompatible)?', version) is not None,
             'unversioned module')
     for name in ('sum','go_mod_sum'):
@@ -155,18 +158,18 @@ def validate_source_inventory(repo, hashes):
 def validate_sources(repo, lock):
     validate_source_inventory(repo, lock['source_hashes'])
     for relative, digest in lock['source_hashes'].items():
-        require(sha(repo/relative) == digest, 'reviewed Go source/test bytes changed')
+        require(source_matches(repo,relative,digest), 'reviewed Go source/test bytes changed')
     for relative,digest in lock['source_module_hashes'].items():
-        require(sha(repo/relative)==digest, 'source module/sum bytes changed')
+        require(source_matches(repo,relative,digest), 'source module/sum bytes changed')
     for relative in ('archive/go.mod','archivebridge/go.mod'):
-        require(sha(repo/relative)==lock['source_module_hashes'][relative], 'source module bytes changed')
+        require(source_matches(repo,relative,lock['source_module_hashes'][relative]), 'source module bytes changed')
         text = read_regular(repo/relative).decode()
         require(re.search(r'^go 1\.27\.3$', text, re.M) is not None, 'source Go version changed')
         for path, version in [('filippo.io/age','v1.3.2'),('golang.org/x/crypto','v0.58.0'),('golang.org/x/sys','v0.49.0')]:
             require(re.search(r'(?m)^\s*(?:require )?'+re.escape(path)+r'\s+'+re.escape(version)+r'(?:\s|$)', text) is not None,
                     'source manifest does not pin reviewed runtime policy')
         replacements = [line.strip() for line in text.splitlines() if line.startswith('replace ')]
-        require(replacements == ([] if relative.startswith('archive/') else ['replace wainak.local/historyarchive => ../archive']),
+        require(replacements == ([] if relative.startswith('archive/') else ['replace wainek.local/historyarchive => ../archive']),
                 'unexpected source replacement')
         require(not re.search(r'(?m)^(exclude|toolchain)\s', text), 'unexpected source graph control')
     return {'status':'PASS_STATIC_SOURCE_PREPARATION_ONLY','input_modules':26,'native_build_run':False}

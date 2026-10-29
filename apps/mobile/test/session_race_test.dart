@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:wainak_mobile/src/api/client.dart';
-import 'package:wainak_mobile/src/api/transport.dart';
+import 'package:wainek_mobile/src/api/client.dart';
+import 'package:wainek_mobile/src/api/transport.dart';
 
 class DeferredTransport implements ApiTransport {
   final replies = <Completer<ApiResponse>>[];
@@ -33,7 +33,7 @@ ApiResponse registration({bool validAccount = true}) => ApiResponse(
         : null,
   }),
 );
-Future<Map<String, dynamic>> register(WainakApiClient api) => api.register(
+Future<Map<String, dynamic>> register(WainekApiClient api) => api.register(
   email: 'fixture@example.invalid',
   birthDate: '1997-01-01',
   isMuslim: true,
@@ -43,7 +43,7 @@ Future<Map<String, dynamic>> register(WainakApiClient api) => api.register(
 void main() {
   test('register response after close cannot resurrect session', () async {
     final t = DeferredTransport();
-    final api = WainakApiClient(
+    final api = WainekApiClient(
       baseUri: Uri.parse('http://127.0.0.1:8089'),
       transport: t,
     );
@@ -65,7 +65,7 @@ void main() {
   });
   test('old 401 cannot clear a newer session', () async {
     final t = DeferredTransport();
-    final api = WainakApiClient(
+    final api = WainekApiClient(
       baseUri: Uri.parse('http://127.0.0.1:8089'),
       transport: t,
     );
@@ -90,7 +90,7 @@ void main() {
   });
   test('old deletion completion cannot clear newer session', () async {
     final t = DeferredTransport();
-    final api = WainakApiClient(
+    final api = WainekApiClient(
       baseUri: Uri.parse('http://127.0.0.1:8089'),
       transport: t,
     );
@@ -113,7 +113,7 @@ void main() {
   });
   test('invalid account shape does not install bearer session', () async {
     final t = DeferredTransport();
-    final api = WainakApiClient(
+    final api = WainekApiClient(
       baseUri: Uri.parse('http://127.0.0.1:8089'),
       transport: t,
     );

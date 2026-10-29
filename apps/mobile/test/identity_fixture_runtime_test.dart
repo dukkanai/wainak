@@ -7,7 +7,7 @@ void main() {
   late Directory root;
   late String fixtureHome;
   setUp(() async {
-    root = await Directory.systemTemp.createTemp('wainak-fixture-runtime-');
+    root = await Directory.systemTemp.createTemp('wainek-fixture-runtime-');
     fixtureHome = (await Directory('${root.path}/home').create()).path;
     final permission = await Process.run('/usr/bin/chmod', [
       '0700',
@@ -40,8 +40,8 @@ void main() {
   test('explicit and environment runtime selections are portable', () {
     final fromEnvironment = resolveFixtureRuntime(
       environment: {
-        'WAINAK_IDENTITY_FIXTURE_PYTHON': '/usr/bin/python3',
-        'WAINAK_IDENTITY_FIXTURE_HOME': fixtureHome,
+        'WAINEK_IDENTITY_FIXTURE_PYTHON': '/usr/bin/python3',
+        'WAINEK_IDENTITY_FIXTURE_HOME': fixtureHome,
       },
     );
     expect(fromEnvironment.python, '/usr/bin/python3');
@@ -50,8 +50,8 @@ void main() {
       python: '/usr/bin/python3',
       home: fixtureHome,
       environment: const {
-        'WAINAK_IDENTITY_FIXTURE_PYTHON': 'invalid',
-        'WAINAK_IDENTITY_FIXTURE_HOME': 'invalid',
+        'WAINEK_IDENTITY_FIXTURE_PYTHON': 'invalid',
+        'WAINEK_IDENTITY_FIXTURE_HOME': 'invalid',
       },
     );
     expect(explicit.home, fixtureHome);
@@ -107,8 +107,8 @@ void main() {
   test('child environment excludes credentials and import overrides', () {
     final selected = resolveFixtureRuntime(
       environment: {
-        'WAINAK_IDENTITY_FIXTURE_PYTHON': '/usr/bin/python3',
-        'WAINAK_IDENTITY_FIXTURE_HOME': fixtureHome,
+        'WAINEK_IDENTITY_FIXTURE_PYTHON': '/usr/bin/python3',
+        'WAINEK_IDENTITY_FIXTURE_HOME': fixtureHome,
         'SYNTHETIC_PARENT_SECRET': 'must-not-be-forwarded',
         'PYTHONPATH': '/untrusted-path',
         'HOME': '/unrelated-home',
