@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "certificate_sha256": null,
+  "certificate_sha1": null,
+  "profile_sha256": null,
+  "profile_uuid": null,
+  "asc_key_id": null,
+  "asc_issuer_id": null
+}

@@ -63,8 +63,9 @@ def download(spec, target, guard):
     p.require(digest.hexdigest()==spec['archive_sha256'],'github_sdk_archive_hash')
 
 
-def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300):
-    p.require(label in LABELS,'github_command_identity')
+def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
+                allowed_labels=LABELS,safe_reasons=SAFE_POLICY_REASONS):
+    p.require(label in allowed_labels,'github_command_identity')
     detail={};started=time.monotonic();outcome='FAILED';phase='pre_verification';command_outcome='NOT_RUN';reason='NONE'
     print(json.dumps({'event':'GITHUB_MAC_COMMAND','command':label,'outcome':'START'}),flush=True)
     try:
@@ -80,7 +81,7 @@ def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300):
         return result.stdout
     except BaseException as error:
         value=error.args[0] if isinstance(error,p.PolicyError) and error.args else None
-        reason=value if type(value) is str and value in SAFE_POLICY_REASONS | sdk.SAFE_POLICY_REASONS else 'OTHER'
+        reason=value if type(value) is str and value in safe_reasons | sdk.SAFE_POLICY_REASONS else 'OTHER'
         raise
     finally:
         process_kind=detail.get('failure_kind','NONE')
@@ -162,6 +163,9 @@ def execute():
     print(json.dumps({'status':'PASS_UNSIGNED_FAKE_UI_COMPILE_ONLY','source_commit':os.environ['GITHUB_SHA'],
         'executable_sha256':hashlib.sha256((app/'Runner').read_bytes()).hexdigest(),
         'runtime_voiceover':'NOT_RUN','apple_upload':False,'artifact_publication':False}),flush=True)
+    # In-process handoff only: retain the SAME frozen SDK baseline and deadline.
+    # The standalone unsigned entry point does not invoke any signing code.
+    return {'work':work,'mobile':mobile,'env':env,'deadline':deadline,'overlay':overlay,'guard':guard}
 
 
 def main():

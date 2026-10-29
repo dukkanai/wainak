@@ -1,0 +1,59 @@
+{
+  "run": {
+    "conclusion": "success",
+    "createdAt": "2026-10-29T08:46:49Z",
+    "databaseId": 40844611484,
+    "event": "workflow_dispatch",
+    "headSha": "bae51c1a724901580def79a500fe7f8d0590ef66",
+    "status": "completed",
+    "updatedAt": "2026-10-29T08:52:25Z",
+    "url": "https://github.com/dukkanai/wainak/actions/runs/40844611484"
+  },
+  "evidence": [
+    {
+      "event": "GITHUB_MAC_COMMAND",
+      "command": "compile_unsigned",
+      "outcome": "PASS",
+      "command_outcome": "PASS",
+      "verification_phase": "complete",
+      "safe_reason": "NONE",
+      "elapsed_seconds": 141.221,
+      "failure_kind": "NONE",
+      "process_failure_kind": "NONE",
+      "exit_code": 0,
+      "cleanup_failed": false,
+      "output_bytes": 356,
+      "group_before_cleanup": {
+        "status": "OK",
+        "members": 0,
+        "zombies": 0,
+        "live": 0,
+        "unknown_state": 0,
+        "same_uid": 0,
+        "leader": 0,
+        "parent_is_init": 0
+      },
+      "group_after_cleanup": {
+        "status": "OK",
+        "members": 0,
+        "zombies": 0,
+        "live": 0,
+        "unknown_state": 0,
+        "same_uid": 0,
+        "leader": 0,
+        "parent_is_init": 0
+      },
+      "cleanup_errors": [],
+      "cleanup_errors_truncated": false
+    },
+    {
+      "status": "PASS_UNSIGNED_FAKE_UI_COMPILE_ONLY",
+      "source_commit": "bae51c1a724901580def79a500fe7f8d0590ef66",
+      "executable_sha256": "c487797422b489ed75e57151f0890d3294f8147ab854a333e5b30c7fef984198",
+      "runtime_voiceover": "NOT_RUN",
+      "apple_upload": false,
+      "artifact_publication": false
+    }
+  ],
+  "log_sha256": "af9aa6faa2e52366f08ebe8cc1253bdfe90474169dd1d1bf51b0eeff2a5e03c9"
+}

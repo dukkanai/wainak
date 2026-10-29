@@ -13,6 +13,7 @@ FORBIDDEN_PARTS = {'.runtime', 'backups', '.codex', '.playwright-mcp', 'secrets'
                    'credentials', 'node_modules', '__pycache__', '.dart_tool',
                    '.ci-work', '.ci-github', '.gradle', '.venv', 'build'}
 FORBIDDEN_SUFFIXES = {'.pem', '.key', '.p12', '.pfx', '.dump', '.pyc', '.log',
+                      '.p8', '.mobileprovision', '.provisionprofile', '.keychain', '.keychain-db',
                       '.apk', '.aab', '.aar', '.ipa', '.xcarchive', '.xcframework'}
 PATTERNS = {
     'private key': re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),

@@ -1,0 +1,107 @@
+# wainek: تجهيز TestFlight الداخلي على GitHub
+
+هذه حزمة تجهيز ومراجعة بتاريخ 29 أكتوبر 2026. المسار الموقع غير مفعّل: ملف `ci/github/internal-signing-pins.json` يحمل `enabled: false` وجميع البصمات والمعرفات غير المتوفرة `null`. الملف النشط `.github/workflows/ci.yml` لم يتغير. لم تُقرأ أو تُنقل قيم Apple credentials، ولم تُنشأ بيئة GitHub أو أسرار أو مفاتيح أو شهادات أو صلاحيات، ولم يحدث تشغيل موقع أو رفع.
+
+## دليل Mac الذي ثبت بالفعل
+
+جُلب سجل التشغيل [40844611484](https://github.com/dukkanai/wainak/actions/runs/40844611484) مباشرة باستخدام `gh run view --log`. نجح على الالتزام `bae51c1a724901580def79a500fe7f8d0590ef66`، بالنتيجة `PASS_UNSIGNED_FAKE_UI_COMPILE_ONLY`.
+
+استغرق `compile_unsigned` مقدار 141.221 ثانية، exit_code صفر، cleanup_failed false، وعدد أفراد مجموعة العمليات صفر قبل التنظيف وبعده. بصمة ملف Runner التنفيذي:
+
+```text
+c487797422b489ed75e57151f0890d3294f8147ab854a333e5b30c7fef984198
+```
+
+الملخص القابل للنشر محفوظ في `docs/evidence/github-unsigned-40844611484.json`. السجل الأصلي وبيانات التشغيل محفوظان خارج المستودع في `/home/chatbot/wainak-artifacts/github-signed-plan-40844611484/`. بصمة السجل الأصلي:
+
+```text
+af9aa6faa2e52366f08ebe8cc1253bdfe90474169dd1d1bf51b0eeff2a5e03c9
+```
+
+هذا دليل بناء نسخة fake غير موقعة فقط. runtime وVoiceOver لم يُختبرا، ولم تنتج عنه إتاحة TestFlight أو Apple upload. يبقى الدليل منسوبًا إلى الالتزام السابق؛ لا يُنسب إلى تغييرات التوقيع الجديدة.
+
+## الملفات المعدة للمراجعة
+
+- `ci/github/internal_policy.py`: عقد المهمة، الهوية، البصمات، فحص بيانات حماية البيئة، وتوليد اقتراح workflow دون كتابته في المسار النشط.
+- `ci/github/internal-testflight.job.json`: تعريف المهمة المقترحة الكامل.
+- `ci/github/internal-testflight.workflow.candidate`: نسخة مقترحة من CI الحالي تضيف `mac-internal` إلى workflow المسجل أصلًا. وجودها هنا لا يسجل workflow ولا ينشئ environment.
+- `ci/github/internal_testflight.py`: سائق التحقق والبناء الموقع والرفع والتنظيف. `--build` و`--upload` يرفضان التنفيذ قبل إكمال البصمات وتفعيل القرار المراجع. `--check` لا يحتاج أسرارًا.
+- `ci/tests/test_github_internal.py`: نماذج اصطناعية لفشل الأوامر والتوقيع والتصدير والتنظيف والرفع والتلاعب واحتواء التشخيص.
+
+لا يستعمل هذا المسار أدوات Codemagic ولا يغيّر وصفاته. التغيير في `mac_unsigned.py` يتيح إعادة استخدام التنفيذ نفسه داخل العملية مع كائن SDK المجمّد والمهلة نفسيهما، ويتيح مجموعة أسماء تشخيص ثابتة إضافية للسائق الموقع. استدعاء unsigned المستقل لا يستدعي التوقيع.
+
+## التسلسل المقترح بعد الموافقات
+
+1. المشغل يراجع الالتزام الكامل ورقم Apple build غير المستخدم، ثم يطلب `workflow_dispatch` على فرع `dev/ios-testflight-internal-20261029` فقط. لا إعادة تلقائية لمحاولة مرفوعة أو غامضة، و`GITHUB_RUN_ATTEMPT` يجب أن يساوي 1.
+2. المهمة تنتظر موافقة بيئة `wainek-internal-testflight` المحمية. لا يتم تفعيل الملف المرشح قبل وجود هذه الحماية والتحقق منها حيًا.
+3. يستخدم GitHub جهاز `macos-26` القياسي، arm64، بحد 45 دقيقة، و`contents: read` فقط. لا large أو self-hosted أو permissions إضافية. يتم فحص المضيف وXcode وSDK والأرشيف والمساحة كما في المسار الناجح.
+4. يعاد تشغيل فحوص المصدر والنشر والاختبارات والتحليل والبناء غير الموقع. لا تمرر أسرار التوقيع إلى عمليات هذه الفحوص. بعد نجاحها، يستخدم السائق نفس مرجع SDK الذي جرى تجميده والتحقق منه؛ لا إعادة تجميد تقبل drift.
+5. تُستورد نسخة الشهادة الموجودة إلى keychain مؤقت. يطابق السائق SHA-256 وSHA-1 للشهادة وSHA-256 وUUID لملف التزويد، وفريق Apple وBundle ID والاسم والانتهاء وentitlements. لا fetch-signing-files ولا إنشاء certificate/profile ولا `allowProvisioningUpdates`.
+6. يُبنى IPA بوضع fake، ويظل `testFlightInternalTestingOnly=true` وسياسة التوقيع Manual ثابتين. تُفحص إعدادات البناء وسياسة export قبل البناء وبعده، وتوقيع التطبيق وشهادته وملفه المضمن ومعماريته وهوية النسخة. تُرفض أسماء ZIP التي تتداخل على Mac بسبب الأحرف أو تطبيع Unicode قبل الاستخراج.
+7. تُستعاد قائمة keychains السابقة وتُحذف مواد التوقيع المملوكة للمهمة. فشل التنظيف يمنع إيصال السماح بالرفع حتى لو نجح البناء. للتنظيف مهلة مستقلة، دون الاعتماد على نجاح SDK أو بقاء مساحة البناء، مع استمرار حارس مجموعة العمليات.
+8. في خطوة منفصلة، يُتاح P8 فقط. يُراجع إيصال المصدر وبصمة IPA وسياسة النسخة، ثم يستخدم `xcrun altool --upload-app` مع API authentication. لا توجد أوامر توزيع خارجي أو App Store submission أو إضافة testers. لا يُرفع IPA إلى GitHub artifacts أو release.
+9. نجاح أمر الرفع يسجل `APPLE_UPLOAD_COMMAND_SUCCEEDED` فقط. معالجة Apple وإتاحة النسخة للمختبرين الداخليين تبقيان `NOT_VERIFIED` حتى التحقق منهما في App Store Connect. التشغيل على الجهاز وVoiceOver اختبار قبول مستقل لاحق.
+
+مرشح workflow يستخدم ملف `ci.yml` المسجل في main لتفادي اشتراط تسجيل workflow جديد على الفرع الافتراضي. عند اعتماد التفعيل، يُطبّق المرشح على فرع التطوير فقط بعد تحديث اختبارات حالة التجهيز ومراجعة الفرق وإعادة اختباره. لا يتطلب ذلك دمج main. يفصل المرشح مجموعات concurrency، ويعطل الإلغاء التلقائي للمهمة الموقعة، ويمنع مهام CI الأخرى من البدء عند اختيار `mac-internal`.
+
+## الأسرار والبيانات المطلوبة، دون نقلها الآن
+
+توضع القيم لاحقًا في Environment secrets المحددة فقط، وليس Repository secrets أو Organization secrets:
+
+- `WAINEK_DISTRIBUTION_P12_B64`: ملف P12 الأصلي الذي يحتوي شهادة `nextaura_apple_distribution` ومفتاحها الخاص، مشفرًا Base64. Base64 ترميز، وليس تشفير حماية.
+- `WAINEK_DISTRIBUTION_P12_PASSWORD`: كلمة مرور P12 الأصلي.
+- `WAINEK_APP_STORE_PROFILE_B64`: ملف `wainek_app_store.mobileprovision` الموجود، مشفرًا Base64.
+- `WAINEK_ASC_PRIVATE_KEY_B64`: ملف P8 الأصلي للمفتاح المتصل حاليًا باسم `Codemagic Wainak`، إن كان محفوظًا لدى المالك وتم اعتماد إعادة استخدامه.
+
+تُقبل ملفات P12 وprofile حتى 36 KiB قبل Base64 لتناسب حدود حجم GitHub secret، وP8 حتى 16 KiB. إذا تجاوزت الملفات الحدود، تتوقف الخطة لمراجعة نقل آمن بديل؛ لا يقسمها السائق ولا يرفعها إلى مستودع عام.
+
+هذه بيانات تعريف عامة مطلوبة لتثبيت الهوية، وليست مفاتيح: certificate SHA-256 وSHA-1، profile SHA-256 وUUID، ASC Key ID وIssuer ID، رقم build غير مستخدم، وهوية مراجع GitHub. تبقى خاناتها غير المتوفرة `null`، ولا نستنتجها من أسماء مراجع Codemagic. هوية التطبيق ثابتة: `com.nextaura.wainek`، الفريق `9G7GPBG7FB`، سجل ASC `6828249128`. SKU التاريخي لا يتغير.
+
+المصادر المقبولة لإعادة الاستخدام:
+
+1. نسخة P12 وكلمة مرورها اللتان حفظهما المالك عند إنشاء شهادة Codemagic. توثيق Codemagic يقول إن التنزيل متاح مرة واحدة عند الإنشاء؛ لا نفترض إمكانية إعادة تنزيل المفتاح الخاص من إعداداته الحالية.
+2. تصدير الشهادة نفسها مع مفتاحها الخاص من Keychain على Mac يملكه صاحب الحساب إن كانت موجودة هناك. ملف CER العام وحده أو provisioning profile لا يعوض المفتاح الخاص.
+3. نسخة P8 المحفوظة عند إنشائه؛ Apple تسمح بتنزيله مرة واحدة. وجود اتصال Codemagic لا يثبت توفر نسخة قابلة للتصدير. لا نستخرج الأسرار عبر build أو logs أو API غير موثق.
+4. إعادة تنزيل ملف provisioning الموجود نفسه من Apple عبر المالك، دون إنشاء بديل؛ بعدها تُثبت بصمته وUUID والشهادة المرتبطة به.
+
+إذا غابت نسخة P12 والمفتاح الخاص من كل مصدر مملوك، لا يمكن إثبات إعادة استخدام الشهادة في GitHub. وإذا غابت نسخة P8، لا يمكن افتراض استعادتها. هذه عوائق تحتاج قرارًا منفصلًا؛ لا ينشئ هذا المسار مفاتيح أو شهادات بديلة، ولا يستهلك بناء Codemagic لاستخراجها. مصادر هذه الحدود: [توثيق Codemagic للتوقيع](https://docs.codemagic.io/yaml-code-signing/signing-ios/)، و[توثيق Apple لمفاتيح API](https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api/)، و[دليل GitHub لاستيراد شهادة Apple](https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications).
+
+## الصلاحيات ومخاطر المستودع العام
+
+أثبتت قراءة GitHub أن المستودع PUBLIC، والفرع الافتراضي main، والحساب الحالي ADMIN، وقائمة environments فارغة. هذه ليست موافقة على استعمال صلاحية الإدارة.
+
+إعداد البيئة المقترح: required reviewer موثوق، prevent self review، منع admin bypass، selected deployment branches مع فرع التطوير المحدد وحده، دون tags أو wildcards. GitHub يتيح مراجعي البيئة للمستودعات العامة على Free، ولا يتيح أسرار البيئة للمهمة قبل الموافقة. يجب وجود شخص مراجع غير مشغّل المهمة؛ منع المراجعة الذاتية مع حساب واحد سيوقف التشغيل. لا نزيل هذا الشرط تلقائيًا. [قواعد حماية GitHub environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
+
+المهمة تقبل workflow_dispatch فقط، والمستودع والفرع وSHA المطابق والـ runner ثابتة. لا pull_request أو pull_request_target أو workflow_run لتشغيل المسار الموقع، ولا تحميل artifacts من تشغيل غير موثوق أو SDK/cache مشترك. جميع actions المستخدمة مثبتة بـ full commit SHA، وcheckout لا يحفظ Git credentials. لا تدخل مدخلات المستخدم في نص shell؛ تمر عبر env ثم تتحقق صيغ SHA ورقم build. ترفض المهمة debug logging المعروف. تُحجب مخرجات العمليات والاستثناءات الخام، وتبقى أسماء المراحل والأسباب الآمنة والمدة والرمز وحالة التنظيف.
+
+هذه الحواجز لا تجعل كودًا خبيثًا داخل SHA معتمد آمنًا. فصل أسرار التوقيع وP8 إلى خطوات يقلل التعرض العرضي، لكنه ليس عزلًا أمنيًا بين العمليات على الجهاز نفسه. خطوة أو dependency خبيثة قد تسرق ما يتاح لاحقًا للمهمة؛ المراجعة المستقلة للالتزام وملفات workflow/dependency lock قبل السماح بالأسرار هي الحد الأساسي. تستخدم أوامر security كلمة مرور الاستيراد في argv على الجهاز المؤقت؛ لا تُسجل argv، لكن كودًا خبيثًا يعمل بالحساب نفسه قد يراها. لا نعتمد على masking وحده. [إرشادات GitHub للأمان](https://docs.github.com/en/actions/reference/security/secure-use).
+
+كذلك شهادة Apple Distribution مرتبطة بالفريق وليست محصورة بهذا التطبيق. ومفتاح ASC الحالي Team/App Manager أوسع من حاجة الرفع؛ Team keys تشمل تطبيقات الفريق، بينما individual keys تتبع صلاحيات المستخدم وتطبيقاته. إعادة استخدام المفتاح الحالي تتطلب قبول هذا النطاق صراحة. بديل أقل صلاحية هو حساب/مفتاح فردي بصلاحية Developer ووصول محدود للتطبيق إذا سمحت ترتيبات الحساب؛ لا ينشأ الآن، ويحتاج مراجعة طريقة authentication واختباراتها بدل تبديل القيم فقط. [نطاق مفاتيح Apple](https://developer.apple.com/documentation/AppStoreConnectAPI/creating-api-keys-for-app-store-connect-api)، و[طرق وأدوار رفع النسخ](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds).
+
+التنظيف best effort عند القتل القسري للـ runner: لا يمكن ضمان تنفيذ finally أو always بعد انقطاع الجهاز. يعتمد التخلص النهائي حينئذ على الجهاز الافتراضي المؤقت لدى GitHub؛ لا توجد نسخ أسرار في artifacts أو caches. فشل الرفع أو تنظيف عمليته بعد اتصال الشبكة قد يعني أن Apple استقبلت النسخة بالفعل؛ يُحظر retry تلقائيًا، ويجب فحص ASC قبل أي محاولة أخرى.
+
+## التحقق المحلي وحدوده
+
+الاختبارات تستخدم ملفات اصطناعية فقط وتغطي كل مرحلة توقيع ورفع، والإيصال وبصمة IPA وسياسة internal-only والهوية والروابط الرمزية واختلاف أسماء Mac والتطبيع، ورفض فك Base64 غير الصالح أو المتجاوز للحد، ورفض إدخال مفاتيح Apple وkeychains إلى Git index حتى لو أضيفت قسرًا. تختبر أيضًا فشل تنظيف keychain مع منع إنشاء إيصال السماح، وعدم تسريب canary من stdout/stderr/argv/exception، واستمرار التمييز بين نجاح الأمر وفشل فحصه اللاحق.
+
+هذه محاكاة Linux لمسار التوقيع. لم تُختبر هنا شهادة Apple حقيقية أو security/codesign أو أماكن اكتشاف profile في Xcode 26.4.1 أو export داخلي أو altool API authentication أو معالجة Apple. نجاح unsigned السابق لا يثبت هذه العمليات الجديدة. أول تجربة موقعّة لاحقة تحتاج مراجعة SHA جديد وموافقة تشغيل مستقلة. تبقى مهلة البناء المشتركة 40 دقيقة، وفحص الموارد وSDK مستمرًا دون تخفيف.
+
+الفحوص المحلية القابلة للتكرار:
+
+```bash
+python3 ci/github/internal_testflight.py --check
+python3 -m unittest discover -s ci/tests -q
+python3 -m unittest discover -s scripts -p 'test_*.py' -q
+python3 -m unittest discover -s ci/native -p 'test_*.py' -q
+python3 -m unittest discover -s qa/phase6_native_build -p 'test_*.py' -q
+python3 ci/check_preparation.py
+python3 ci/native/build.py --check
+python3 ci/ios/build.py --check
+python3 scripts/check_publication.py
+```
+
+## أصغر قرار مطلوب من root
+
+قبل أي نقل أسرار أو تفعيل workflow: تأكيد توفر P12 وكلمة مروره وP8 الأصلي لدى المالك، وتحديد مراجع GitHub مختلف عن المشغّل، ثم الموافقة على إنشاء البيئة `wainek-internal-testflight` فقط بالإعدادات الموصوفة أعلاه. هذا يغيّر إعداد حماية مستمرًا في المستودع ويتيح للمراجع المحدد السماح لمهمة بالوصول إلى أسرار البيئة لاحقًا؛ لا يشمل إضافة صلاحية repo لمراجع غير مخول حاليًا.
+
+هذه الموافقة الأولى لا تشمل نقل الملفات أو إنشاء مفاتيح أو ملء الأسرار أو تشغيل build. بعد التحقق من حماية البيئة حيًا، يلزم قرار محدد عن نقل المواد الموجودة من جهاز المالك إلى Environment secrets وقبول نطاق مفتاح App Manager أو اعتماد بديل أقل صلاحية. بعد ذلك تُملأ البصمات وتراجع نسخة التفعيل واختباراتها، ويصدر SHA نهائي للموافقة على محاولة موقعّة واحدة. لا دمج main ولا نشر عام في أي من هذه الخطوات.

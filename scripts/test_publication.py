@@ -66,6 +66,15 @@ class PublicationTest(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(output.count('excluded file is tracked'), 6)
 
+    def test_forced_apple_material_rejected_without_inspecting_contents(self):
+        names=['AuthKey.P8','app.mobileprovision','app.provisionprofile',
+               'distribution.keychain-db','distribution.keychain','identity.P12']
+        for name in names:self.stage(name,b'CANARY_SYNTHETIC_APPLE_MATERIAL')
+        result,output=self.check()
+        self.assertTrue(result)
+        self.assertEqual(output.count('excluded file is tracked'),len(names))
+        self.assertNotIn('CANARY',output)
+
     def test_source_migrations_fonts_and_icons_are_allowed(self):
         for name in ['backend/migrations/001.sql', 'assets/font.ttf',
                      'assets/icon.png', '.env.example', 'ci/native/build.py']:

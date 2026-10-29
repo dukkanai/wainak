@@ -1,0 +1,244 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Explicit manual target
+        type: choice
+        options: [ci, mac-unsigned, mac-internal]
+        default: ci
+      expected_sha:
+        description: Full reviewed commit SHA required for Mac targets
+        type: string
+        default: ''
+      build_number:
+        description: Owner-reviewed unused positive Apple build number
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ inputs.target }}-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ inputs.target != 'mac-internal' }}
+
+jobs:
+  source:
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}
+    name: Source checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Check published file boundaries and known secret patterns
+        run: python3 scripts/check_publication.py
+      - name: Check Python syntax
+        run: python3 -m compileall -q ops scripts backend contracts qa ci prototype/package_preview.py
+      - name: Check JavaScript syntax
+        run: node --check prototype/dist/app.js
+
+  unit:
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}
+    name: Operations unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - run: python3 -m unittest discover -s ops -p test_manage.py -v
+      - name: Prototype packaging containment regressions
+        run: python3 -m unittest discover -s prototype -p test_package_preview.py -v
+
+  recovery:
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}
+    name: Isolated database recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Restore synthetic data in a disposable Docker project
+        run: python3 ops/test_recovery.py
+
+  browser:
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}
+    name: Prototype browser tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Install locked test dependencies
+        working-directory: prototype
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Package the offline preview
+        run: python3 prototype/package_preview.py
+      - name: Test the delivered HTML and accessibility samples
+        working-directory: prototype
+        env:
+          WAINEK_PREVIEW_URL: file://${{ github.workspace }}/prototype/releases/wainek-preview.html
+          WAINEK_CHROME: /usr/bin/google-chrome
+        run: npm test
+
+  backend:
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}
+    name: Backend contracts and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Backend unit, API and fixture controls
+        run: PYTHONPATH=backend python3 -m unittest discover -s backend/tests -v
+      - name: Independent domain and runner controls
+        run: |
+          PYTHONPATH=backend python3 -m unittest discover -s qa/phase1 -p 'test_*.py' -v
+          python3 -m unittest discover -s qa/phase3_matching -p test_matching_runner.py -v
+      - name: OpenAPI contract matches implementation
+        run: python3 contracts/build_contract.py --check
+      - name: Account deletion browser script controls
+        run: node --test backend/tests/test_web_deletion_script.mjs
+
+  matching:
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}
+    name: Authenticated matching integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Install hashed identity test dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/identity-venv"
+          "$RUNNER_TEMP/identity-venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir --only-binary=:all: --no-deps --require-hashes --index-url https://pypi.org/simple -r backend/requirements-identity.lock
+      - name: Acquire exact disposable database image
+        run: docker pull postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
+      - name: Test exact checked-out commit with independent regressions
+        run: >-
+          "$RUNNER_TEMP/identity-venv/bin/python" qa/phase3_matching/run_matching_independent.py
+          --backend-root "$GITHUB_WORKSPACE" --expected-backend-commit "$(git rev-parse HEAD)"
+          --run-disposable-identity --include-existing-qa
+
+  mobile:
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}
+    name: Flutter development tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: Install hashed identity test dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/identity-venv"
+          "$RUNNER_TEMP/identity-venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir --only-binary=:all: --no-deps --require-hashes --index-url https://pypi.org/simple -r backend/requirements-identity.lock
+      - name: Acquire exact disposable database image
+        run: docker pull postgres:17-alpine@sha256:eee6c6e1b0894fa4fe0075eb054af9fd1cf39a35321c2d4110626cfe506411fb
+      - name: Bootstrap pinned official Flutter SDK
+        run: python3 scripts/bootstrap_flutter.py --tools-root "$RUNNER_TEMP/flutter-tools"
+      - name: Analyze and run host, opt-in and live HTTP gates
+        run: >-
+          python3 scripts/run_flutter_ci.py --tools-root "$RUNNER_TEMP/flutter-tools"
+          --identity-python "$RUNNER_TEMP/identity-venv/bin/python"
+
+  archive:
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}
+    name: Archive and bridge tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Host tests, CLI interoperability, independent QA and race detector
+        run: python3 scripts/run_go_checks.py
+      - name: Dependency locks remain unchanged
+        run: git diff --exit-code -- archive/go.mod archive/go.sum archivebridge/go.mod archivebridge/go.sum qa/phase5_archive/go.mod qa/phase5_archive/go.sum
+
+  native-guards:
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}
+    name: Native build guard tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+      - name: CI result validator negative controls
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+      - name: Configuration and native source consistency
+        run: |
+          python3 ci/check_preparation.py
+          python3 ci/native/build.py --check
+          python3 ci/ios/build.py --check
+      - name: Build lifecycle, resource and artifact guards
+        run: |
+          python3 -m unittest discover -s ci/tests -p 'test_*.py' -v
+          python3 -m unittest discover -s ci/native -p 'test_*.py' -v
+          python3 -m unittest discover -s qa/phase6_native_build -p 'test_*.py' -v
+
+  mac-unsigned:
+    name: Manual standard Mac unsigned UI validation
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.target == 'mac-unsigned' &&
+      github.repository == 'dukkanai/wainak' && github.event.repository.private == false &&
+      github.ref == 'refs/heads/dev/ios-testflight-internal-20261029' && inputs.expected_sha == github.sha
+    runs-on: macos-26
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      WAINEK_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+      WAINEK_RUNNER_LABEL: macos-26
+      WAINEK_EXPECTED_SHA: ${{ inputs.expected_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12.7'
+      - name: Strict unsigned Mac validation without Apple credentials
+        run: python3 ci/github/mac_unsigned.py
+
+  mac-internal: {"name": "Manual internal TestFlight — protected environment required", "if": "github.event_name == 'workflow_dispatch' && inputs.target == 'mac-internal' && github.repository == 'dukkanai/wainak' && github.event.repository.private == false && github.ref == 'refs/heads/dev/ios-testflight-internal-20261029' && inputs.expected_sha == github.sha && github.run_attempt == 1", "runs-on": "macos-26", "timeout-minutes": 45, "permissions": {"contents": "read"}, "environment": "wainek-internal-testflight", "concurrency": {"group": "wainek-internal-testflight", "cancel-in-progress": false}, "env": {"WAINEK_REPOSITORY_VISIBILITY": "${{ github.event.repository.visibility }}", "WAINEK_RUNNER_LABEL": "macos-26", "WAINEK_EXPECTED_SHA": "${{ inputs.expected_sha }}", "WAINEK_BUILD_NUMBER": "${{ inputs.build_number }}", "WAINEK_SIGNED_TARGET": "mac-internal", "WAINEK_SIGNED_ENVIRONMENT": "wainek-internal-testflight"}, "steps": [{"uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "with": {"persist-credentials": false, "ref": "${{ github.sha }}"}}, {"uses": "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0", "with": {"python-version": "3.12.7"}}, {"name": "Check inactive or reviewed configuration", "run": "python3 ci/github/internal_testflight.py --check"}, {"name": "Verify source, SDK, compile and sign internal UI", "env": {"WAINEK_DISTRIBUTION_P12_B64": "${{ secrets.WAINEK_DISTRIBUTION_P12_B64 }}", "WAINEK_DISTRIBUTION_P12_PASSWORD": "${{ secrets.WAINEK_DISTRIBUTION_P12_PASSWORD }}", "WAINEK_APP_STORE_PROFILE_B64": "${{ secrets.WAINEK_APP_STORE_PROFILE_B64 }}"}, "run": "python3 ci/github/internal_testflight.py --build"}, {"name": "Upload verified internal-only IPA to Apple", "env": {"WAINEK_ASC_PRIVATE_KEY_B64": "${{ secrets.WAINEK_ASC_PRIVATE_KEY_B64 }}"}, "run": "python3 ci/github/internal_testflight.py --upload"}, {"name": "Remove owned signing material", "if": "${{ always() }}", "run": "python3 ci/github/internal_testflight.py --cleanup"}]}

@@ -71,3 +71,7 @@
 يفصل سجل GitHub بين `command_outcome` و`verification_phase` و`process_failure_kind`. عند نجاح الأمر وفشل فحصه اللاحق تظهر command_outcome=PASS وexit_code=0 وprocess_failure_kind=NONE، لكن النتيجة الكلية FAILED وfailure_kind=POST_VERIFICATION، مع السبب المحدد. فشل التحقق السابق يعلن NOT_RUN وPRE_VERIFICATION ولا يبدأ الأمر. لا ينتقل السائق إلى التحليل أو البناء عند أي فشل من هذه الحالات.
 
 التجربة المصححة تستخدم SDK كاملًا واحدًا لكل الأوامر، وتثبت تطابق ملفات SDK المولدة بايتًا وبصمة قبل pub_get وبعده، وبعد التحليل واختبار الواجهة. تظل تجربة Linux وليست قبولًا لتنفيذ Mac؛ نجاح اختبارات انتظار Dart على Mac مثبت في المحاولة السابقة، أما اكتمال المسار الجديد على Mac فيتطلب التشغيل التالي من المشغل.
+
+## دليل قبول البناء غير الموقع في 29 أكتوبر 2026
+
+اكتمل GitHub run `40844611484` بنجاح على `bae51c1a724901580def79a500fe7f8d0590ef66`، بنتيجة `PASS_UNSIGNED_FAKE_UI_COMPILE_ONLY`. دليل gh logs وبصمة الملف التنفيذي موثقان في [ملخص الدليل](evidence/github-unsigned-40844611484.json). هذا يثبت عبور حواجز SDK والتحليل والاختبارات والبناء غير الموقع على Mac لهذا الالتزام فقط. لا runtime أو VoiceOver أو Apple upload. تجهيز المسار الموقع اللاحق وحدود تفعيله في [خطة TestFlight على GitHub](github-internal-testflight.md).

@@ -16,6 +16,11 @@ credentials/
 *.key
 *.p12
 *.pfx
+*.p8
+*.mobileprovision
+*.provisionprofile
+*.keychain
+*.keychain-db
 *.dump
 *.log
 .DS_Store
