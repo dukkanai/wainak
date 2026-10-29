@@ -3,6 +3,7 @@ import base64
 import copy
 import datetime as dt
 import json
+from itertools import product
 import plistlib
 from pathlib import Path
 import subprocess
@@ -160,14 +161,45 @@ class DriverGuards(unittest.TestCase):
     def test_preflight_and_increasing_project_counter(self):
         self.assertEqual(b.preflight(self.env(),'darwin','arm64',b.ROOT),'7')
 
+    def test_preflight_resolves_checkout_alias_but_rejects_other_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(strict=True)
+            alias = root/'checkout-alias'
+            alias.symlink_to(root, target_is_directory=True)
+            other = root/'other-checkout'
+            other.mkdir()
+            other_alias = root/'other-alias'
+            other_alias.symlink_to(other, target_is_directory=True)
+            self.assertNotEqual(alias, alias.resolve(strict=True))
+            for checkout in (root, alias):
+                with self.subTest(checkout=checkout.name):
+                    env = {**self.env(), 'CM_BUILD_DIR': str(checkout)}
+                    self.assertEqual(b.preflight(env, 'darwin', 'arm64', root), '7')
+            for checkout in (other, other_alias):
+                with self.subTest(wrong_checkout=checkout.name):
+                    env = {**self.env(), 'CM_BUILD_DIR': str(checkout)}
+                    with self.assertRaisesRegex(p.PolicyError, '^wrong_checkout$'):
+                        b.preflight(env, 'darwin', 'arm64', root)
+            # Reproduce the old fixture bug even on Linux: production ROOT is
+            # canonical, so substituting an unresolved ROOT must still fail.
+            with self.assertRaisesRegex(p.PolicyError, '^wrong_checkout$'):
+                b.preflight({**self.env(), 'CM_BUILD_DIR': str(alias)}, 'darwin', 'arm64', alias)
+
     def test_preflight_rejects_local_wrong_project_and_automatic_runs(self):
-        for key,value in [('CM_PROJECT_ID','other'),('CM_WORKFLOW_NAME','ios-unsigned-archive'),
-                          ('CM_TRIGGER_SOURCE','webhook'),('CM_TRIGGER_SOURCE','schedule'),
-                          ('CM_PULL_REQUEST','true'),('CM_COMMIT','bad'),('CM_BUILD_DIR','/tmp'),
-                          ('PROJECT_BUILD_NUMBER','-1'),('PROJECT_BUILD_NUMBER','1;echo injected')]:
-            with self.subTest(key=key,value=value), self.assertRaises(p.PolicyError):
+        cases = [('CM_PROJECT_ID', 'other', 'wrong_codemagic_project'),
+                 ('CM_WORKFLOW_NAME', 'ios-unsigned-archive', 'wrong_workflow'),
+                 ('CM_TRIGGER_SOURCE', 'webhook', 'manual_non_pr_required'),
+                 ('CM_TRIGGER_SOURCE', 'schedule', 'manual_non_pr_required'),
+                 ('CM_PULL_REQUEST', 'true', 'manual_non_pr_required'),
+                 ('CM_COMMIT', 'bad', 'missing_source_commit'),
+                 ('CM_BUILD_DIR', '/tmp', 'wrong_checkout'),
+                 ('PROJECT_BUILD_NUMBER', '-1', 'project_build_number'),
+                 ('PROJECT_BUILD_NUMBER', '1;echo injected', 'project_build_number')]
+        for key,value,reason in cases:
+            with self.subTest(key=key,value=value), self.assertRaisesRegex(p.PolicyError, '^'+reason+'$'):
                 b.preflight({**self.env(),key:value},'darwin','arm64',b.ROOT)
-        with self.assertRaises(p.PolicyError):b.preflight(self.env(),'linux','x86_64',b.ROOT)
+        with self.assertRaisesRegex(p.PolicyError, '^codemagic_macos_required$'):
+            b.preflight(self.env(),'linux','x86_64',b.ROOT)
 
     def test_real_local_execution_stops_before_any_child(self):
         with mock.patch.object(b.sys,'platform','linux'),mock.patch.object(b,'run_bounded') as run:
@@ -214,14 +246,18 @@ class DriverGuards(unittest.TestCase):
     def test_complete_driver_and_failed_verification_never_publish(self):
         # Execute the real orchestration against synthetic subprocess outputs.
         # No signing tools, providers, network, or real credentials are involved.
-        for failure in (None, 'profile', 'codesign', 'export', 'architecture'):
-            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
-                root = Path(directory)
+        for via_alias, failure in product((False, True), (None, 'profile', 'codesign', 'export', 'architecture')):
+            with self.subTest(via_alias=via_alias, failure=failure), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory).resolve(strict=True)
+                checkout = root
+                if via_alias:
+                    checkout = root/'checkout-alias'
+                    checkout.symlink_to(root, target_is_directory=True)
                 (root/'apps/mobile').mkdir(parents=True)
                 (root/'ci').mkdir()
                 pins = json.loads((b.ROOT/'ci/ios-host-pins.json').read_text())
                 (root/'ci/ios-host-pins.json').write_text(json.dumps(pins))
-                env = {**self.env(), 'CM_BUILD_DIR': str(root)}
+                env = {**self.env(), 'CM_BUILD_DIR': str(checkout)}
                 profile, ent, info = signed_values()
                 info['CFBundleExecutable'] = 'Runner'
                 if failure == 'profile':
@@ -266,11 +302,37 @@ class DriverGuards(unittest.TestCase):
                      mock.patch.object(b.sys, 'platform', 'darwin'), mock.patch.object(b.platform, 'machine', return_value='arm64'), \
                      mock.patch.object(b, 'run_bounded', side_effect=command_result), \
                      mock.patch.object(b.shutil, 'disk_usage', return_value=mock.Mock(free=8*1024**3)), \
-                     mock.patch('builtins.print'):
+                     mock.patch('builtins.print') as printed:
                     if failure is None:
                         b.execute()
+                    elif failure == 'codesign':
+                        with self.assertRaises(subprocess.CalledProcessError) as caught:
+                            b.execute()
+                        self.assertEqual(caught.exception.cmd, 'codesign')
+                        self.assertEqual(caught.exception.returncode, 1)
                     else:
-                        with self.assertRaises((p.PolicyError, subprocess.CalledProcessError)):b.execute()
+                        reason = {'profile': 'profile_team',
+                                  'export': 'export_testFlightInternalTestingOnly',
+                                  'architecture': 'device_architecture'}[failure]
+                        with self.assertRaisesRegex(p.PolicyError, '^'+reason+'$'):
+                            b.execute()
+                self.assertEqual(printed.call_count, 1)
+                report = json.loads(printed.call_args.args[0])
+                if failure is None:
+                    self.assertEqual(report['status'], 'VERIFIED_INTERNAL_IPA')
+                else:
+                    self.assertEqual(report, {
+                        'status': 'FAILED_CLOSED', 'artifact_eligible': False,
+                        'stage': 'profiles_and_export_policy' if failure == 'export' else 'verify_signed_payload',
+                    })
+                expected_last = {'export': ['xcode-project', 'use-profiles'],
+                                 'codesign': ['codesign', '--verify'],
+                                 'profile': ['security', 'cms']}.get(failure, ['lipo', '-archs'])
+                self.assertEqual(calls[-1][:2], expected_last)
+                if failure == 'export':
+                    self.assertFalse(any(cmd[:3] == ['flutter', 'build', 'ipa'] for cmd in calls))
+                else:
+                    self.assertTrue(any(cmd[:3] == ['flutter', 'build', 'ipa'] for cmd in calls))
                 self.assertEqual((root/p.ARTIFACT).is_file(), failure is None)
                 self.assertFalse(any('app-store-connect' in c or '--create' in c for c in calls))
 

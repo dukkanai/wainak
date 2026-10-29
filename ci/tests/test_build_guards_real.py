@@ -72,18 +72,48 @@ class SourceInventoryTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name)
         self.hashes={'archive/a.go':'unused','archivebridge/b.go':'unused'}
+        self.populate_inventory(self.root)
+    def populate_inventory(self, root):
         for relative in self.hashes:
-            p=self.root/relative;p.parent.mkdir();p.write_text('package public\n')
+            p=root/relative;p.parent.mkdir();p.write_text('package public\n')
     def test_exact_inventory(self):self.assertEqual(c.validate_source_inventory(self.root,self.hashes),set(self.hashes))
     def test_only_exact_regular_readmes_are_noncompiler_documentation(self):
         for module in ('archive','archivebridge'):
             (self.root/module/'README.md').write_text('# وثيقة عامة\n',encoding='utf-8')
         self.assertEqual(c.validate_source_inventory(self.root,self.hashes),set(self.hashes))
         for name in ('OTHER.md','README.md.go','README.md.syso','README.MD'):
-            path=self.root/'archive'/name;path.write_text('PUBLIC')
-            try:
-                with self.assertRaises(ValueError):c.validate_source_inventory(self.root,self.hashes)
-            finally:path.unlink()
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory)
+                self.populate_inventory(root)
+                # No pre-existing README.md: on case-insensitive filesystems,
+                # README.MD must be a new entry, not an overwrite of an allowed one.
+                path=root/'archive'/name;path.write_text('PUBLIC')
+                with os.scandir(root/'archive') as entries:
+                    self.assertEqual({entry.name for entry in entries},{'a.go',name})
+                with self.assertRaisesRegex(c.InvalidRecipe,'^unreviewed source input present$'):
+                    c.validate_source_inventory(root,self.hashes)
+    def test_readme_case_alias_follows_actual_filesystem_entries(self):
+        canonical=self.root/'archive'/'README.md'
+        variant=self.root/'archive'/'README.MD'
+        canonical.write_text('PUBLIC original')
+        aliases_existing=variant.exists()
+        variant.write_text('PUBLIC replacement')
+        with os.scandir(self.root/'archive') as entries:
+            names={entry.name for entry in entries}
+        # Exercise the actual volume behavior, not an operating-system guess.
+        # Neither branch skips the guard or changes its exact-name allowlist.
+        with self.subTest(case_alias=aliases_existing):
+            if aliases_existing:
+                self.assertTrue(canonical.samefile(variant))
+                self.assertEqual(names,{'a.go','README.md'})
+                self.assertEqual(canonical.read_text(),'PUBLIC replacement')
+                self.assertEqual(c.validate_source_inventory(self.root,self.hashes),set(self.hashes))
+            else:
+                self.assertFalse(canonical.samefile(variant))
+                self.assertEqual(names,{'a.go','README.md','README.MD'})
+                self.assertEqual(canonical.read_text(),'PUBLIC original')
+                with self.assertRaisesRegex(c.InvalidRecipe,'^unreviewed source input present$'):
+                    c.validate_source_inventory(self.root,self.hashes)
     def test_readme_link_directory_and_fifo_are_rejected(self):
         path=self.root/'archive'/'README.md'
         path.symlink_to(self.root/'archivebridge'/'b.go')
