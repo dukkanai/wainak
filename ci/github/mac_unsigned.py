@@ -17,6 +17,7 @@ from ci.testflight import sdk_overlay as sdk, diagnostics as d, group_observatio
 from ci.testflight.build import child_environment
 from ci.testflight.check_sdk_dispose import check as dispose_check
 from scripts.ci_process import run_bounded
+from scripts import regression_diagnostics as regressions
 
 LABELS=frozenset({'source_commit','source_clean','publication','preparation','regressions','xcode_version',
     'extract_sdk','flutter_version','sdk_head','sdk_inventory','sdk_provider_dependencies','sdk_dependencies','pub_get','analyze','entry_test',
@@ -26,7 +27,8 @@ SAFE_POLICY_REASONS=frozenset({'github_standard_arm_mac','github_manual_public_s
     'github_exact_sha','github_initial_disk','github_checkout','github_time_disk','github_workspace_budget',
     'github_sdk_url','github_sdk_redirect','github_sdk_download_bound','github_sdk_archive_hash',
     'github_fresh_work','github_command_identity','github_source_sha','github_dirty_source',
-    'github_xcode_pin','github_flutter_pin','github_unsigned_result','github_arm64_artifact','github_source_drift'})
+    'github_xcode_pin','github_flutter_pin','github_unsigned_result','github_arm64_artifact','github_source_drift',
+    'github_regressions_failed','github_regressions_unclassified','github_regressions_classifier_failed'})
 
 
 def preflight(env, host, machine, free):
@@ -66,6 +68,7 @@ def download(spec, target, guard):
 def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
                 allowed_labels=LABELS,safe_reasons=SAFE_POLICY_REASONS,output_profile=None,stdout_only=False):
     p.require(label in allowed_labels,'github_command_identity')
+    if label=='regressions':output_profile=regressions.PROFILE
     detail={};started=time.monotonic();outcome='FAILED';phase='pre_verification';command_outcome='NOT_RUN';reason='NONE'
     print(json.dumps({'event':'GITHUB_MAC_COMMAND','command':label,'outcome':'START'}),flush=True)
     try:
@@ -82,7 +85,14 @@ def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
         outcome='PASS';phase='complete'
         return result.stdout
     except BaseException as error:
+        if (output_profile==regressions.PROFILE and phase=='command' and
+                detail.get('failure_kind')=='NONZERO_EXIT' and isinstance(error,RuntimeError)):
+            summary=regressions.safe_project(detail.get('regression_summary'))
+            reason={'IDENTIFIED':'github_regressions_failed','UNCLASSIFIED':'github_regressions_unclassified',
+                    'CLASSIFIER_FAILED':'github_regressions_classifier_failed'}[summary['status']]
+            raise p.PolicyError(reason) from None
         if (output_profile is not None and phase=='command' and
+                output_profile!=regressions.PROFILE and
                 detail.get('failure_kind')=='NONZERO_EXIT' and isinstance(error,RuntimeError)):
             from scripts import security_diagnostics as security
             classified=security.project(detail.get('security_error'))
@@ -107,7 +117,9 @@ def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
              'group_before_cleanup':groups.project(detail.get('group_before_cleanup')),
              'group_after_cleanup':groups.project(detail.get('group_after_cleanup')),
              **d.project_cleanup_errors(detail.get('cleanup_errors',[]))}
-        if output_profile is not None:
+        if output_profile==regressions.PROFILE:
+            row['regression_summary']=regressions.safe_project(detail.get('regression_summary')) if 'regression_summary' in detail else None
+        elif output_profile is not None:
             from scripts import security_diagnostics as security
             row['security_error']=security.project(detail.get('security_error','NOT_APPLICABLE'))
         if stdout_only:

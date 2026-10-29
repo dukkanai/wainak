@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from ci.ios.diagnostics import cleanup_process, project_cleanup_errors, safe_error
 from scripts import security_diagnostics as security
+from scripts import regression_diagnostics as regressions
 
 
 def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024,
@@ -31,7 +32,7 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
     # exception objects or captured output; existing exception contracts remain.
     if diagnostic is not None and type(diagnostic) is not dict:
         raise TypeError('Diagnostic destination must be a plain dictionary')
-    if output_profile is not None and (type(output_profile) is not str or output_profile!=security.PROFILE):
+    if output_profile is not None and (type(output_profile) is not str or output_profile not in {security.PROFILE,regressions.PROFILE}):
         raise ValueError('Unknown output diagnostic profile')
     if type(stdout_only) is not bool or (stdout_only and output_profile is not None):
         raise ValueError('Invalid channel capture mode')
@@ -160,9 +161,15 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
                     diagnostic.update(project_cleanup_errors(cleanup_errors))
                     if group_observer is not None:
                         diagnostic.update(group_before_cleanup=group_before, group_after_cleanup=group_after)
-                    if output_profile is not None:
+                    if output_profile==security.PROFILE:
                         classified='NOT_APPLICABLE'
                         if kind=='NONZERO_EXIT' and code:
                             try:classified=security.project(security.classify(output))
                             except Exception:classified='CLASSIFIER_FAILED'
                         diagnostic['security_error']=classified
+                    if output_profile==regressions.PROFILE and kind=='NONZERO_EXIT' and code:
+                        try:
+                            allowed=regressions.catalogue()
+                            diagnostic['regression_summary']=regressions.project(regressions.classify(output,allowed),allowed)
+                        except Exception:
+                            diagnostic['regression_summary']={'status':'CLASSIFIER_FAILED','failures':[],'errors':[],'tests_run':None}

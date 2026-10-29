@@ -109,6 +109,7 @@ class GithubMacPolicy(unittest.TestCase):
                 self.assertEqual(list(map(str,argv)),list(map(str,expected)))
                 self.assertNotIn('GH_TOKEN',kw['env']);self.assertNotIn('APP_STORE_CONNECT_PRIVATE_KEY',kw['env'])
                 self.assertTrue(kw['check']);self.assertIs(kw['group_observer'],g.groups.capture)
+                self.assertEqual(kw.get('output_profile'),g.regressions.PROFILE if label=='regressions' else None)
                 self.assertGreater(kw['seconds'],0);self.assertLessEqual(kw['seconds'],1200)
                 self.assertEqual(kw['cwd'],mobile if label in {'pub_get','analyze','entry_test','compile_unsigned'} else
                     base/'packages/flutter_tools' if label=='sdk_provider_dependencies' else base if label in {'sdk_head','sdk_inventory'} else work/'analyzer_overlay/flutter_tools' if label=='sdk_dependencies' else root)
@@ -133,6 +134,8 @@ class GithubMacPolicy(unittest.TestCase):
                  mock.patch.object(g,'dispose_check',return_value={'status':'PASS_SDK_DISPOSE_MODELS'}),mock.patch('builtins.print') as printed:
                 if post_failure:
                     with self.assertRaisesRegex(p.PolicyError,'sdk_package_config_changed'):g.execute()
+                elif fail=='regressions':
+                    with self.assertRaisesRegex(p.PolicyError,'^github_regressions_classifier_failed$'):g.execute()
                 elif fail:
                     with self.assertRaisesRegex(RuntimeError,'CANARY'):g.execute()
                 else:g.execute()
