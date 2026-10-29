@@ -244,96 +244,175 @@ class DriverGuards(unittest.TestCase):
                 with self.assertRaises(p.PolicyError):b.safe_unpack(ipa,root/'too-large')
 
     def test_complete_driver_and_failed_verification_never_publish(self):
-        # Execute the real orchestration against synthetic subprocess outputs.
-        # No signing tools, providers, network, or real credentials are involved.
         for via_alias, failure in product((False, True), (None, 'profile', 'codesign', 'export', 'architecture')):
-            with self.subTest(via_alias=via_alias, failure=failure), tempfile.TemporaryDirectory() as directory:
-                root = Path(directory).resolve(strict=True)
-                checkout = root
-                if via_alias:
-                    checkout = root/'checkout-alias'
-                    checkout.symlink_to(root, target_is_directory=True)
-                (root/'apps/mobile').mkdir(parents=True)
-                (root/'ci').mkdir()
-                pins = json.loads((b.ROOT/'ci/ios-host-pins.json').read_text())
-                (root/'ci/ios-host-pins.json').write_text(json.dumps(pins))
-                env = {**self.env(), 'CM_BUILD_DIR': str(checkout)}
-                profile, ent, info = signed_values()
-                info['CFBundleExecutable'] = 'Runner'
-                if failure == 'profile':
-                    profile['TeamIdentifier'] = ['OTHER']
-                calls = []
+            with self.subTest(via_alias=via_alias, failure=failure):
+                self.exercise_driver(via_alias, failure)
 
-                def command_result(command, **kwargs):
-                    cmd = [str(x) for x in command]
-                    calls.append(cmd)
-                    output = ''
-                    if cmd[:3] == ['git', 'rev-parse', 'HEAD']:
-                        output = env['CM_COMMIT']
-                    elif cmd[:2] == ['flutter', '--version']:
-                        output = json.dumps({field: pins['flutter'][key] for field, key in
-                            [('frameworkVersion', 'version'), ('frameworkRevision', 'framework_revision'),
-                             ('engineRevision', 'engine_revision'), ('dartSdkVersion', 'dart_version')]})
-                    elif cmd == ['xcodebuild', '-version']:
-                        output = 'Xcode 26.4.1\nBuild version 17E202\n'
-                    elif cmd[:2] == ['xcode-project', 'use-profiles']:
-                        options = export()
-                        if failure == 'export':options['testFlightInternalTestingOnly'] = False
-                        Path(cmd[cmd.index('--export-options-plist')+1]).write_bytes(plistlib.dumps(options))
-                    elif '-showBuildSettings' in cmd:
-                        output = json.dumps(settings())
-                    elif cmd[:3] == ['flutter', 'build', 'ipa']:
-                        target = root/'apps/mobile/build/ios/ipa'
-                        target.mkdir(parents=True)
-                        with zipfile.ZipFile(target/'fixture.ipa', 'w') as z:
-                            z.writestr('Payload/Runner.app/Info.plist', plistlib.dumps(info))
-                            z.writestr('Payload/Runner.app/Runner', b'public executable fixture')
-                    elif cmd[:2] == ['codesign', '--verify'] and failure == 'codesign':
-                        raise subprocess.CalledProcessError(1, 'codesign')
-                    elif cmd[:2] == ['codesign', '-d']:
-                        output = plistlib.dumps(ent).decode()
-                    elif cmd[:2] == ['security', 'cms']:
-                        output = plistlib.dumps(profile).decode()
-                    elif cmd[:2] == ['lipo', '-archs']:
-                        output = 'x86_64' if failure == 'architecture' else 'arm64'
-                    return subprocess.CompletedProcess(cmd, 0, output, '')
+    def test_every_command_failure_reports_exact_stage_and_never_publishes(self):
+        # Exercise the orchestration for every command and failure class, with
+        # direct and symbolic checkout paths. Real process behavior is tested
+        # separately in test_testflight_diagnostics.py.
+        for alias, label, kind in product((False, True), b.d.COMMAND_STAGES,
+                ('NONZERO_EXIT', 'OUTPUT_BOUND', 'TIMEOUT', 'CANCELLED', 'SPAWN_OR_IO', 'CLEANUP', 'OTHER')):
+            with self.subTest(alias=alias, command=label, failure_kind=kind):
+                self.exercise_driver(alias, command_failure=(label, kind))
 
-                with mock.patch.object(b, 'ROOT', root), mock.patch.dict(b.os.environ, env, clear=True), \
-                     mock.patch.object(b.sys, 'platform', 'darwin'), mock.patch.object(b.platform, 'machine', return_value='arm64'), \
-                     mock.patch.object(b, 'run_bounded', side_effect=command_result), \
-                     mock.patch.object(b.shutil, 'disk_usage', return_value=mock.Mock(free=8*1024**3)), \
-                     mock.patch('builtins.print') as printed:
-                    if failure is None:
-                        b.execute()
-                    elif failure == 'codesign':
-                        with self.assertRaises(subprocess.CalledProcessError) as caught:
-                            b.execute()
-                        self.assertEqual(caught.exception.cmd, 'codesign')
-                        self.assertEqual(caught.exception.returncode, 1)
-                    else:
-                        reason = {'profile': 'profile_team',
-                                  'export': 'export_testFlightInternalTestingOnly',
-                                  'architecture': 'device_architecture'}[failure]
-                        with self.assertRaisesRegex(p.PolicyError, '^'+reason+'$'):
-                            b.execute()
-                self.assertEqual(printed.call_count, 1)
-                report = json.loads(printed.call_args.args[0])
-                if failure is None:
-                    self.assertEqual(report['status'], 'VERIFIED_INTERNAL_IPA')
+    def exercise_driver(self, via_alias, failure=None, command_failure=None):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve(strict=True)
+            checkout = root
+            if via_alias:
+                checkout = root/'checkout-alias'
+                checkout.symlink_to(root, target_is_directory=True)
+            (root/'apps/mobile').mkdir(parents=True)
+            (root/'ci').mkdir()
+            pins = json.loads((b.ROOT/'ci/ios-host-pins.json').read_text())
+            (root/'ci/ios-host-pins.json').write_text(json.dumps(pins))
+            canary = 'SYNTHETIC_PRIVATE_DIAGNOSTIC_CANARY'
+            env = {**self.env(), 'CM_BUILD_DIR': str(checkout), 'CM_API_TOKEN': canary,
+                   'HOME': str(root/canary)}
+            profile, ent, info = signed_values()
+            info['CFBundleExecutable'] = 'Runner'
+            if failure == 'profile':
+                profile['TeamIdentifier'] = ['OTHER']
+            mobile = root/'apps/mobile'
+            export_path = root/'.ci-work/testflight/export.plist'
+            app = root/'.ci-work/testflight/inspect/Payload/Runner.app'
+            commands = [
+                [b.sys.executable, root/'ci/check_preparation.py'],
+                ['git', 'rev-parse', 'HEAD'], ['git', 'status', '--porcelain'],
+                ['flutter', '--version', '--machine'], ['xcodebuild', '-version'],
+                ['flutter', 'pub', 'get', '--enforce-lockfile'],
+                ['flutter', 'analyze', '--no-pub'],
+                ['flutter', 'test', '--no-pub', '--concurrency=1', *p.DEFINES, 'test/testflight_entrypoint_test.dart'],
+                ['git', 'diff', '--exit-code', '--', 'apps/mobile/pubspec.lock'],
+                ['xcode-project', 'use-profiles', '--project', mobile/'ios/Runner.xcodeproj',
+                 '--archive-method', 'app-store', '--export-options-plist', export_path,
+                 '--custom-export-options', json.dumps(p.CUSTOM_EXPORT)],
+                ['flutter', 'build', 'ios', '--config-only', '--release', '--no-pub', '--no-codesign',
+                 '--build-number', '7', *p.DEFINES],
+                ['xcodebuild', '-project', mobile/'ios/Runner.xcodeproj', '-scheme', 'Runner',
+                 '-configuration', 'Release', '-sdk', 'iphoneos', '-showBuildSettings', '-json'],
+                ['flutter', 'build', 'ipa', '--release', '--no-pub', '--build-number', '7',
+                 '--export-options-plist', export_path, *p.DEFINES],
+                ['codesign', '--verify', '--deep', '--strict', app],
+                ['codesign', '-d', '--entitlements', ':-', app],
+                ['security', 'cms', '-D', '-i', app/'embedded.mobileprovision'],
+                ['lipo', '-archs', app/'Runner'],
+            ]
+            labels = list(b.d.COMMAND_STAGES)
+            calls = []
+
+            def command_result(command, **kwargs):
+                cmd = [str(x) for x in command]
+                index = len(calls)
+                self.assertLess(index, len(commands), 'Unexpected extra command')
+                self.assertEqual(cmd, [str(x) for x in commands[index]], 'Unexpected command or arguments')
+                label = labels[index]
+                calls.append(cmd)
+                self.assertTrue(kwargs['check'])
+                self.assertGreater(kwargs['seconds'], 0)
+                self.assertLessEqual(kwargs['seconds'], 1200 if label == 'build_ipa' else 300)
+                self.assertEqual(kwargs['cwd'], mobile if label in {
+                    'pub_get', 'analyze', 'entry_test', 'ios_config', 'build_ipa'} else root)
+                self.assertNotIn('CM_API_TOKEN', kwargs['env'])
+                expected_env = b.child_environment(env)
+                if index >= labels.index('ios_config'):
+                    expected_env['XCODE_XCCONFIG_FILE'] = str(root/'ci/testflight/Signing.xcconfig')
+                self.assertEqual(kwargs['env'], expected_env)
+                kwargs['diagnostic'].update(failure_kind='NONE', exit_code=0,
+                                            output_bytes=0, cleanup_failed=False)
+                if command_failure and command_failure[0] == label:
+                    kind = command_failure[1]
+                    kwargs['diagnostic'].update(failure_kind=kind,
+                        exit_code=7 if kind == 'NONZERO_EXIT' else None, cleanup_failed=kind == 'CLEANUP')
+                    raise RuntimeError(canary)
+                output = ''
+                if label == 'source_commit':
+                    output = env['CM_COMMIT']
+                elif label == 'flutter_version':
+                    output = json.dumps({field: pins['flutter'][key] for field, key in
+                        [('frameworkVersion', 'version'), ('frameworkRevision', 'framework_revision'),
+                         ('engineRevision', 'engine_revision'), ('dartSdkVersion', 'dart_version')]})
+                elif label == 'xcode_version':
+                    output = 'Xcode 26.4.1\nBuild version 17E202\n'
+                elif label == 'use_profiles':
+                    options = export()
+                    if failure == 'export':options['testFlightInternalTestingOnly'] = False
+                    export_path.write_bytes(plistlib.dumps(options))
+                elif label == 'build_settings':
+                    output = json.dumps(settings())
+                elif label == 'build_ipa':
+                    target = mobile/'build/ios/ipa'
+                    target.mkdir(parents=True)
+                    with zipfile.ZipFile(target/'fixture.ipa', 'w') as z:
+                        z.writestr('Payload/Runner.app/Info.plist', plistlib.dumps(info))
+                        z.writestr('Payload/Runner.app/Runner', b'public executable fixture')
+                elif label == 'verify_signature' and failure == 'codesign':
+                    raise subprocess.CalledProcessError(1, 'codesign', output=canary, stderr=canary)
+                elif label == 'read_entitlements':
+                    output = plistlib.dumps(ent).decode()
+                elif label == 'read_profile':
+                    output = plistlib.dumps(profile).decode()
+                elif label == 'architecture':
+                    output = 'x86_64' if failure == 'architecture' else 'arm64'
+                # Commands without structured results still emit hostile output
+                # in the fixture. Source cleanliness/lock commands must be empty.
+                elif label in {'source_preparation', 'pub_get', 'analyze', 'entry_test', 'ios_config', 'verify_signature'}:
+                    output = canary
+                return subprocess.CompletedProcess(cmd, 0, output, canary)
+
+            with mock.patch.object(b, 'ROOT', root), mock.patch.dict(b.os.environ, env, clear=True), \
+                 mock.patch.object(b.sys, 'platform', 'darwin'), mock.patch.object(b.platform, 'machine', return_value='arm64'), \
+                 mock.patch.object(b, 'run_bounded', side_effect=command_result), \
+                 mock.patch.object(b.d.shutil, 'disk_usage', return_value=mock.Mock(free=8*1024**3)), \
+                 mock.patch('builtins.print') as printed:
+                if command_failure:
+                    with self.assertRaisesRegex(RuntimeError, '^'+canary+'$'):b.execute()
+                elif failure is None:
+                    b.execute()
+                elif failure == 'codesign':
+                    with self.assertRaises(subprocess.CalledProcessError) as caught:b.execute()
+                    self.assertEqual(caught.exception.cmd, 'codesign')
+                    self.assertEqual(caught.exception.returncode, 1)
                 else:
-                    self.assertEqual(report, {
-                        'status': 'FAILED_CLOSED', 'artifact_eligible': False,
-                        'stage': 'profiles_and_export_policy' if failure == 'export' else 'verify_signed_payload',
-                    })
-                expected_last = {'export': ['xcode-project', 'use-profiles'],
-                                 'codesign': ['codesign', '--verify'],
-                                 'profile': ['security', 'cms']}.get(failure, ['lipo', '-archs'])
-                self.assertEqual(calls[-1][:2], expected_last)
-                if failure == 'export':
-                    self.assertFalse(any(cmd[:3] == ['flutter', 'build', 'ipa'] for cmd in calls))
-                else:
-                    self.assertTrue(any(cmd[:3] == ['flutter', 'build', 'ipa'] for cmd in calls))
-                self.assertEqual((root/p.ARTIFACT).is_file(), failure is None)
-                self.assertFalse(any('app-store-connect' in c or '--create' in c for c in calls))
+                    reason = {'profile': 'profile_team', 'export': 'export_testFlightInternalTestingOnly',
+                              'architecture': 'device_architecture'}[failure]
+                    with self.assertRaisesRegex(p.PolicyError, '^'+reason+'$'):b.execute()
+            rows = [json.loads(call.args[0]) for call in printed.call_args_list]
+            self.assertNotIn(canary, json.dumps(rows))
+            events = [row for row in rows if row.get('event') == 'TESTFLIGHT_COMMAND']
+            for call in printed.call_args_list:
+                if json.loads(call.args[0]).get('event') in {'TESTFLIGHT_COMMAND', 'TESTFLIGHT_HOST'}:
+                    self.assertIs(call.kwargs.get('flush'), True)
+            self.assertEqual(len(events), 2*len(calls))
+            for index in range(len(calls)):
+                start, end = events[2*index:2*index+2]
+                self.assertEqual(start['command'], labels[index])
+                self.assertEqual(start['outcome'], 'START')
+                self.assertEqual(end['command'], labels[index])
+                self.assertEqual(end['stage'], b.d.COMMAND_STAGES[labels[index]])
+                self.assertEqual(end['outcome'], 'FAILED' if (
+                    command_failure or failure == 'codesign') and index == len(calls)-1 else 'PASS')
+            succeeded = failure is None and command_failure is None
+            self.assertEqual((root/p.ARTIFACT).is_file(), succeeded)
+            if command_failure:
+                label, kind = command_failure
+                self.assertEqual(len(calls), labels.index(label)+1)
+                self.assertEqual(events[-1]['failure_kind'], kind)
+                self.assertEqual(events[-1]['exit_code'], 7 if kind == 'NONZERO_EXIT' else None)
+                if b.d.COMMAND_STAGES[label] != 'preflight':
+                    self.assertEqual(rows[-1], {'status': 'FAILED_CLOSED',
+                        'stage': b.d.COMMAND_STAGES[label], 'artifact_eligible': False})
+            elif succeeded:
+                self.assertEqual(len(calls), len(commands))
+                self.assertEqual(rows[-1]['status'], 'VERIFIED_INTERNAL_IPA')
+            else:
+                self.assertEqual(rows[-1], {'status': 'FAILED_CLOSED', 'artifact_eligible': False,
+                    'stage': 'profiles_and_export_policy' if failure == 'export' else 'verify_signed_payload'})
+                expected_last = {'export': 'use_profiles', 'codesign': 'verify_signature',
+                                 'profile': 'read_profile', 'architecture': 'architecture'}[failure]
+                self.assertEqual(events[-1]['command'], expected_last)
+            self.assertFalse(any('app-store-connect' in c or '--create' in c for c in calls))
 
 if __name__=='__main__':unittest.main()

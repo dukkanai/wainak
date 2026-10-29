@@ -8,7 +8,6 @@ from pathlib import Path, PurePosixPath
 import platform
 import plistlib
 import re
-import shutil
 import stat
 import sys
 import time
@@ -18,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'scripts'))
 from ci.testflight import policy as p
+from ci.testflight import diagnostics as d
 from scripts.ci_process import run_bounded
 
 
@@ -89,48 +89,47 @@ def execute():
     deadline = time.monotonic() + 35*60
     stage = 'preflight'
 
-    def run(command, cwd=ROOT, seconds=300):
-        remaining = int(deadline - time.monotonic())
-        p.require(remaining > 0 and shutil.disk_usage(ROOT).free >= 4*1024**3, 'time_or_disk_limit')
-        result = run_bounded(command, cwd=cwd, env=env, seconds=min(seconds, remaining), check=True)
-        return result.stdout
+    def run(label, command, cwd=ROOT, seconds=300):
+        return d.run_command(label, command, cwd=cwd, env=env, root=ROOT,
+                             deadline=deadline, runner=run_bounded, seconds=seconds)
 
     # Recheck before use-profiles modifies the disposable cloud project.
-    run([sys.executable, ROOT / 'ci/check_preparation.py'])
-    commit = run(['git', 'rev-parse', 'HEAD']).strip()
-    p.require(commit == os.environ['CM_COMMIT'] and not run(['git', 'status', '--porcelain']).strip(), 'dirty_or_wrong_source')
+    run('source_preparation', [sys.executable, ROOT / 'ci/check_preparation.py'])
+    commit = run('source_commit', ['git', 'rev-parse', 'HEAD']).strip()
+    p.require(commit == os.environ['CM_COMMIT'] and not run('source_clean', ['git', 'status', '--porcelain']).strip(), 'dirty_or_wrong_source')
     pins = json.loads((ROOT / 'ci/ios-host-pins.json').read_text())
-    version = json.loads(run(['flutter', '--version', '--machine']))
+    version = json.loads(run('flutter_version', ['flutter', '--version', '--machine']))
     for field, expected in [('frameworkVersion', 'version'), ('frameworkRevision', 'framework_revision'),
                             ('engineRevision', 'engine_revision'), ('dartSdkVersion', 'dart_version')]:
         p.require(version.get(field) == pins['flutter'][expected], 'flutter_pin')
-    p.require(run(['xcodebuild', '-version']).splitlines() == ['Xcode 26.4.1', 'Build version 17E202'], 'xcode_pin')
+    p.require(run('xcode_version', ['xcodebuild', '-version']).splitlines() == ['Xcode 26.4.1', 'Build version 17E202'], 'xcode_pin')
     work.mkdir(mode=0o700, parents=True)
     try:
+        d.emit_host(ROOT, work, version['frameworkVersion'], version['dartSdkVersion'])
         stage = 'flutter_host_checks'
-        run(['flutter', 'pub', 'get', '--enforce-lockfile'], mobile)
-        run(['flutter', 'analyze', '--no-pub'], mobile)
-        run(['flutter', 'test', '--no-pub', '--concurrency=1', *p.DEFINES,
+        run('pub_get', ['flutter', 'pub', 'get', '--enforce-lockfile'], mobile)
+        run('analyze', ['flutter', 'analyze', '--no-pub'], mobile)
+        run('entry_test', ['flutter', 'test', '--no-pub', '--concurrency=1', *p.DEFINES,
              'test/testflight_entrypoint_test.dart'], mobile)
-        p.require(not run(['git', 'diff', '--exit-code', '--', 'apps/mobile/pubspec.lock']).strip(), 'dependency_drift')
+        p.require(not run('lock_diff', ['git', 'diff', '--exit-code', '--', 'apps/mobile/pubspec.lock']).strip(), 'dependency_drift')
         stage = 'profiles_and_export_policy'
         export = work / 'export.plist'
         # ios_signing imports owner-uploaded identities on the disposable host.
         # No fetch-signing-files --create, certificate creation or keychain reset.
-        run(['xcode-project', 'use-profiles', '--project', mobile / 'ios/Runner.xcodeproj',
+        run('use_profiles', ['xcode-project', 'use-profiles', '--project', mobile / 'ios/Runner.xcodeproj',
              '--archive-method', 'app-store', '--export-options-plist', export,
              '--custom-export-options', json.dumps(p.CUSTOM_EXPORT)])
         p.validate_export(plistlib.loads(export.read_bytes()))
         export_hash = hashlib.sha256(export.read_bytes()).hexdigest()
         env['XCODE_XCCONFIG_FILE'] = str(ROOT / 'ci/testflight/Signing.xcconfig')
-        run(['flutter', 'build', 'ios', '--config-only', '--release', '--no-pub', '--no-codesign',
+        run('ios_config', ['flutter', 'build', 'ios', '--config-only', '--release', '--no-pub', '--no-codesign',
              '--build-number', number, *p.DEFINES], mobile)
-        settings = json.loads(run(['xcodebuild', '-project', mobile / 'ios/Runner.xcodeproj',
+        settings = json.loads(run('build_settings', ['xcodebuild', '-project', mobile / 'ios/Runner.xcodeproj',
                                    '-scheme', 'Runner', '-configuration', 'Release', '-sdk', 'iphoneos',
                                    '-showBuildSettings', '-json']))
         p.validate_settings(settings)
         stage = 'signed_internal_export'
-        run(['flutter', 'build', 'ipa', '--release', '--no-pub', '--build-number', number,
+        run('build_ipa', ['flutter', 'build', 'ipa', '--release', '--no-pub', '--build-number', number,
              '--export-options-plist', export, *p.DEFINES], mobile, seconds=1200)
         p.require(hashlib.sha256(export.read_bytes()).hexdigest() == export_hash, 'export_policy_changed')
         p.validate_export(plistlib.loads(export.read_bytes()))
@@ -139,13 +138,13 @@ def execute():
         stage = 'verify_signed_payload'
         ipa = candidates[0]
         app = safe_unpack(ipa, work / 'inspect')
-        run(['codesign', '--verify', '--deep', '--strict', app])
-        entitlements = xml_plist(run(['codesign', '-d', '--entitlements', ':-', app]))
-        profile = xml_plist(run(['security', 'cms', '-D', '-i', app / 'embedded.mobileprovision']))
+        run('verify_signature', ['codesign', '--verify', '--deep', '--strict', app])
+        entitlements = xml_plist(run('read_entitlements', ['codesign', '-d', '--entitlements', ':-', app]))
+        profile = xml_plist(run('read_profile', ['security', 'cms', '-D', '-i', app / 'embedded.mobileprovision']))
         info = plistlib.loads((app / 'Info.plist').read_bytes())
         p.validate_profile(profile, entitlements, info, number)
         p.require(info.get('CFBundleExecutable') == 'Runner', 'executable_name')
-        p.require(run(['lipo', '-archs', app / 'Runner']).strip() == 'arm64', 'device_architecture')
+        p.require(run('architecture', ['lipo', '-archs', app / 'Runner']).strip() == 'arm64', 'device_architecture')
         report = {'status': 'VERIFIED_INTERNAL_IPA', 'source_commit': commit, 'build_number': number,
                   'bundle_identifier': p.BUNDLE, 'team': p.TEAM, 'mode': 'fake',
                   'internal_only_export': True, 'sha256': hashlib.sha256(ipa.read_bytes()).hexdigest(),
@@ -169,9 +168,9 @@ def main():
     parser.parse_args()
     try:
         execute()
-    except Exception as error:
+    except BaseException as error:
         # Never emit provider credentials, decoded provisioning bytes or raw logs.
-        print(json.dumps({'status': 'FAILED', 'error_type': type(error).__name__, 'raw_output': 'withheld'}))
+        print(json.dumps({'status': 'FAILED', 'error_type': d.error_type(error), 'raw_output': 'withheld'}))
         return 1
     return 0
 
