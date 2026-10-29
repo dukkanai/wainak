@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 from ci.ios.diagnostics import cleanup_process, project_cleanup_errors, safe_error
 from scripts import security_diagnostics as security
 from scripts import regression_diagnostics as regressions
+from scripts import ipa_diagnostics as ipa
 
 
 def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024,
@@ -32,7 +33,7 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
     # exception objects or captured output; existing exception contracts remain.
     if diagnostic is not None and type(diagnostic) is not dict:
         raise TypeError('Diagnostic destination must be a plain dictionary')
-    if output_profile is not None and (type(output_profile) is not str or output_profile not in {security.PROFILE,regressions.PROFILE}):
+    if output_profile is not None and (type(output_profile) is not str or output_profile not in {security.PROFILE,regressions.PROFILE,ipa.PROFILE}):
         raise ValueError('Unknown output diagnostic profile')
     if type(stdout_only) is not bool or (stdout_only and output_profile is not None):
         raise ValueError('Invalid channel capture mode')
@@ -173,3 +174,6 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
                             diagnostic['regression_summary']=regressions.project(regressions.classify(output,allowed),allowed)
                         except Exception:
                             diagnostic['regression_summary']={'status':'CLASSIFIER_FAILED','failures':[],'errors':[],'tests_run':None}
+                    if output_profile==ipa.PROFILE:
+                        try:diagnostic['ipa_summary']=ipa.project(ipa.classify(output,code is not None and kind in {'NONE','NONZERO_EXIT','CLEANUP'}))
+                        except Exception:diagnostic['ipa_summary']=ipa.empty('CLASSIFIER_FAILED')

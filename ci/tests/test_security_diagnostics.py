@@ -95,14 +95,16 @@ class Classification(unittest.TestCase):
 
 
 class Integration(unittest.TestCase):
-    def test_import_only_routes_classifier(self):
+    def test_classifier_routes_only_exact_import_or_ipa_commands(self):
         with mock.patch.object(g,'run_checked') as checked:
             run=signed.runner({},time.monotonic()+10)
-            for label,command,enabled in [('keychain_import',['/usr/bin/security','import'],True),
-                ('keychain_import',['unexpected','import'],False),('profile_decode',['/usr/bin/security','cms'],False),
-                ('build_ipa',['flutter','build','ipa'],False)]:
+            for label,command,profile in [('keychain_import',['/usr/bin/security','import'],security.PROFILE),
+                ('keychain_import',['unexpected','import'],None),('profile_decode',['/usr/bin/security','cms'],None),
+                ('build_ipa',['flutter','build','ipa'],signed.ipa_diagnostics.PROFILE),
+                ('build_ipa',['flutter','build','ios'],None),
+                ('ios_config',['flutter','build','ipa'],None)]:
                 run(label,command)
-                self.assertEqual(checked.call_args.kwargs.get('output_profile'),security.PROFILE if enabled else None)
+                self.assertEqual(checked.call_args.kwargs.get('output_profile'),profile)
 
     def test_command_and_final_failure_classification_safe_projection(self):
         for code in sorted(security.CODES-{'NOT_APPLICABLE'}):

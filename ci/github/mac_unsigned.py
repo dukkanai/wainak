@@ -18,6 +18,7 @@ from ci.testflight.build import child_environment
 from ci.testflight.check_sdk_dispose import check as dispose_check
 from scripts.ci_process import run_bounded
 from scripts import regression_diagnostics as regressions
+from scripts import ipa_diagnostics as ipa
 
 LABELS=frozenset({'source_commit','source_clean','publication','preparation','regressions','xcode_version',
     'extract_sdk','flutter_version','sdk_head','sdk_inventory','sdk_provider_dependencies','sdk_dependencies','pub_get','analyze','entry_test',
@@ -85,6 +86,10 @@ def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
         outcome='PASS';phase='complete'
         return result.stdout
     except BaseException as error:
+        if (output_profile==ipa.PROFILE and phase=='command' and
+                detail.get('failure_kind')=='NONZERO_EXIT' and isinstance(error,RuntimeError)):
+            reason=ipa.reason(detail.get('ipa_summary'))
+            raise p.PolicyError(reason) from None
         if (output_profile==regressions.PROFILE and phase=='command' and
                 detail.get('failure_kind')=='NONZERO_EXIT' and isinstance(error,RuntimeError)):
             summary=regressions.safe_project(detail.get('regression_summary'))
@@ -92,7 +97,7 @@ def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
                     'CLASSIFIER_FAILED':'github_regressions_classifier_failed'}[summary['status']]
             raise p.PolicyError(reason) from None
         if (output_profile is not None and phase=='command' and
-                output_profile!=regressions.PROFILE and
+                output_profile not in {regressions.PROFILE,ipa.PROFILE} and
                 detail.get('failure_kind')=='NONZERO_EXIT' and isinstance(error,RuntimeError)):
             from scripts import security_diagnostics as security
             classified=security.project(detail.get('security_error'))
@@ -117,7 +122,9 @@ def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
              'group_before_cleanup':groups.project(detail.get('group_before_cleanup')),
              'group_after_cleanup':groups.project(detail.get('group_after_cleanup')),
              **d.project_cleanup_errors(detail.get('cleanup_errors',[]))}
-        if output_profile==regressions.PROFILE:
+        if output_profile==ipa.PROFILE:
+            row['ipa_summary']=ipa.project(detail.get('ipa_summary')) if 'ipa_summary' in detail else None
+        elif output_profile==regressions.PROFILE:
             row['regression_summary']=regressions.safe_project(detail.get('regression_summary')) if 'regression_summary' in detail else None
         elif output_profile is not None:
             from scripts import security_diagnostics as security

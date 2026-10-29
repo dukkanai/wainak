@@ -339,11 +339,12 @@ class Lifecycle(unittest.TestCase):
                                     'overlay':overlay,'mobile':mobile}
             calls=[];failed=False;unlocked=False
             commands=['keychain_list','keychain_create','keychain_unlock','profile_decode','keychain_import','keychain_access',
-                'keychain_select','signing_identity','ios_config','build_settings','build_ipa','verify_signature','read_entitlements',
+                'keychain_select','signing_identity','ios_config','build_settings','signing_discovery','build_ipa','verify_signature','read_entitlements',
                 'read_profile','extract_certificate','architecture','source_clean','keychain_restore','keychain_delete']
             outputs={'profile_decode':plistlib.dumps(PROFILE).decode(),'keychain_list':'"/original/login.keychain-db"\n',
                 'signing_identity':f'  1) {PINS["certificate_sha1"]} "Apple Distribution: NEXTAURA LLC ({p.TEAM})"\n 1 valid identities found\n',
                 'build_settings':json.dumps(settings()),'read_entitlements':plistlib.dumps(ENT).decode(),
+                'signing_discovery':json.dumps(s.signing_discovery.project(None)),
                 'read_profile':plistlib.dumps(PROFILE).decode(),'architecture':'arm64','source_commit':'a'*40,
                 'xcode_version':'Xcode 26.4.1\nBuild version 17E202\n'}
             if mutation=='profile':outputs['profile_decode']=plistlib.dumps({**PROFILE,'Name':'wrong'}).decode()
@@ -367,6 +368,7 @@ class Lifecycle(unittest.TestCase):
                 'signing_identity':['/usr/bin/security','find-identity','-v','-p','codesigning',keychain],
                 'ios_config':['flutter','build','ios','--config-only','--release','--no-pub','--no-codesign','--build-number','17',*p.DEFINES],
                 'build_settings':['/usr/bin/xcodebuild','-project',mobile/'ios/Runner.xcodeproj','-scheme','Runner','-configuration','Release','-sdk','iphoneos','-showBuildSettings','-json'],
+                'signing_discovery':[s.sys.executable,root/'ci/github/signing_discovery.py'],
                 'build_ipa':['flutter','build','ipa','--release','--no-pub','--build-number','17','--export-options-plist',private/'export.plist',*p.DEFINES],
                 'verify_signature':['/usr/bin/codesign','--verify','--deep','--strict',app],
                 'read_entitlements':['/usr/bin/codesign','-d','--entitlements',':-',app],
@@ -465,7 +467,7 @@ class Lifecycle(unittest.TestCase):
 
     def test_success_and_each_build_command_failure(self):
         stages=['profile_decode','keychain_list','keychain_create','keychain_unlock','keychain_import','keychain_access',
-            'keychain_select','signing_identity','ios_config','build_settings','build_ipa','verify_signature','read_entitlements',
+            'keychain_select','signing_identity','ios_config','build_settings','signing_discovery','build_ipa','verify_signature','read_entitlements',
             'read_profile','extract_certificate','architecture','source_clean','keychain_restore','keychain_delete']
         for stage in [None,*stages]:
             with self.subTest(stage=stage):self.exercise(failure=stage)

@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from ci.testflight import policy as p
 from scripts import security_diagnostics as security
+from scripts import ipa_diagnostics as ipa
 from ci.github import signing_settings
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,6 +48,7 @@ REASONS |= frozenset({'build_number','app_identity','app_platform','profile_team
     'ipa_path','ipa_special_file','missing_runner','extra_application','unexpected_extension_or_archive'})
 REASONS |= frozenset('export_'+key for key in p.CUSTOM_EXPORT)
 REASONS |= security.REASONS
+REASONS |= ipa.REASONS
 REASONS |= signing_settings.REASONS
 REASONS |= frozenset('settings_'+key for key in ('PRODUCT_BUNDLE_IDENTIFIER','DEVELOPMENT_TEAM','CONFIGURATION',
     'PLATFORM_NAME','CODE_SIGNING_ALLOWED','CODE_SIGNING_REQUIRED','CODE_SIGN_STYLE','CODE_SIGN_IDENTITY'))
