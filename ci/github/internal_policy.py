@@ -7,6 +7,9 @@ from ci.testflight import policy as p
 ROOT = Path(__file__).resolve().parents[2]
 BRANCH = 'dev/ios-testflight-internal-20261029'
 ENVIRONMENT = 'wainek-internal-testflight'
+# Public account metadata verified via gh api user; not a credential.
+OWNER_LOGIN = 'dukkanai'
+OWNER_ID = 255427171
 PIN_FILE = ROOT / 'ci/github/internal-signing-pins.json'
 CHECKOUT = 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
 PYTHON = 'actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0'
@@ -62,10 +65,14 @@ def validate_environment(environment, branches):
               {'protected_branches':False,'custom_branch_policies':True}, 'signed_environment')
     rules=environment.get('protection_rules',[])
     reviewers=[r for r in rules if r.get('type')=='required_reviewers']
-    p.require(len(reviewers)==1 and reviewers[0].get('prevent_self_review') is True and
-              1<=len(reviewers[0].get('reviewers',[]))<=6, 'signed_environment')
-    p.require(all(r.get('type') in {'User','Team'} and type(r.get('reviewer',{}).get('id')) is int
-                  and r['reviewer']['id']>0 for r in reviewers[0]['reviewers']), 'signed_environment')
+    # Single-owner operation: a required manual approval, including when the
+    # owner initiated the run. This is a pause, not independent-person review.
+    p.require(len(reviewers)==1 and reviewers[0].get('prevent_self_review') is False and
+              len(reviewers[0].get('reviewers',[]))==1, 'signed_environment')
+    reviewer=reviewers[0]['reviewers'][0]
+    identity=reviewer.get('reviewer',{})
+    p.require(reviewer.get('type')=='User' and type(identity.get('id')) is int and
+              identity['id']==OWNER_ID and identity.get('login')==OWNER_LOGIN, 'signed_environment')
     p.require(type(branches) is list and len(branches)==1 and branches[0].get('name')==BRANCH and
               branches[0].get('type')=='branch', 'signed_environment')
 

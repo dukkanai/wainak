@@ -72,16 +72,25 @@ class Policy(unittest.TestCase):
     def test_environment_protections(self):
         env={'name':q.ENVIRONMENT,'can_admins_bypass':False,
              'deployment_branch_policy':{'protected_branches':False,'custom_branch_policies':True},
-             'protection_rules':[{'type':'required_reviewers','prevent_self_review':True,
-                                 'reviewers':[{'type':'User','reviewer':{'id':123}}]}]}
+             'protection_rules':[{'type':'required_reviewers','prevent_self_review':False,
+                                 'reviewers':[{'type':'User','reviewer':{'id':q.OWNER_ID,'login':q.OWNER_LOGIN}}]}]}
         branches=[{'name':q.BRANCH,'type':'branch'}];q.validate_environment(env,branches)
         for key,value in [('can_admins_bypass',True),('protection_rules',[]),('deployment_branch_policy',None),('name','other')]:
             with self.assertRaises(p.PolicyError):q.validate_environment({**env,key:value},branches)
         for rules in ([],[{'name':'*','type':'branch'}],[{'name':q.BRANCH,'type':'tag'}],branches*2):
             with self.assertRaises(p.PolicyError):q.validate_environment(env,rules)
-        for field,value in [('prevent_self_review',False),('reviewers',[])]:
+        for field,value in [('prevent_self_review',True),('prevent_self_review',0),('reviewers',[])]:
             changed=copy.deepcopy(env);changed['protection_rules'][0][field]=value
             with self.assertRaises(p.PolicyError):q.validate_environment(changed,branches)
+        for reviewer in [
+            {'type':'Team','reviewer':{'id':q.OWNER_ID,'login':q.OWNER_LOGIN}},
+            {'type':'User','reviewer':{'id':123,'login':q.OWNER_LOGIN}},
+            {'type':'User','reviewer':{'id':q.OWNER_ID,'login':'other'}},
+        ]:
+            changed=copy.deepcopy(env);changed['protection_rules'][0]['reviewers']=[reviewer]
+            with self.assertRaises(p.PolicyError):q.validate_environment(changed,branches)
+        changed=copy.deepcopy(env);changed['protection_rules'][0]['reviewers']*=2
+        with self.assertRaises(p.PolicyError):q.validate_environment(changed,branches)
 
     def test_dormant_workflow_exact_and_mutations(self):
         job=json.loads((q.ROOT/'ci/github/internal-testflight.job.json').read_text());q.validate_job(job)
