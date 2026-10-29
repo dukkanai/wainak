@@ -48,7 +48,7 @@ def emit(event, **fields):
 
 CLEANUP_OPERATIONS = frozenset({'poll_direct_child', 'signal_term', 'signal_kill',
     'probe_after_term', 'probe_after_kill', 'reap_direct_child', 'verify_group_gone',
-    'close_selector', 'close_stdout', 'cleanup_process', 'grace_cleanup', 'observer_cleanup'})
+    'close_selector', 'close_stdout', 'close_stderr', 'cleanup_process', 'grace_cleanup', 'observer_cleanup'})
 CLEANUP_TYPES = frozenset(ERROR_TYPES) | {'UnverifiedProcessGroup', 'Exception', 'RuntimeError'}
 
 
@@ -142,6 +142,11 @@ def cleanup_process(process, selector):
             process.stdout.close()
         except BaseException as error:
             record('close_stdout', error)
+    if process is not None and getattr(process,'stderr',None) is not None:
+        try:
+            process.stderr.close()
+        except BaseException as error:
+            record('close_stderr', error)
     return failures
 
 

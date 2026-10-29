@@ -349,6 +349,10 @@ class Lifecycle(unittest.TestCase):
             if mutation=='profile':outputs['profile_decode']=plistlib.dumps({**PROFILE,'Name':'wrong'}).decode()
             if mutation=='identity':outputs['signing_identity']='0 valid identities found'
             if mutation=='settings':outputs['build_settings']=json.dumps([{'target':'Runner','buildSettings':{}}])
+            if mutation=='settings_json':outputs['build_settings']='CANARY\n'+outputs['build_settings']
+            if mutation=='settings_type':outputs['build_settings']='[null]'
+            if mutation=='settings_defines_type':
+                value=settings();value[0]['buildSettings']['DART_DEFINES']=[];outputs['build_settings']=json.dumps(value)
             keychain=private/'distribution.keychain-db';app=work/'signed-inspect/Payload/Runner.app'
             expected_commands={
                 'profile_decode':['/usr/bin/security','cms','-D','-k',keychain,'-i',private/'profile.mobileprovision'],

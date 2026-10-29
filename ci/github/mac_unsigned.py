@@ -64,7 +64,7 @@ def download(spec, target, guard):
 
 
 def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
-                allowed_labels=LABELS,safe_reasons=SAFE_POLICY_REASONS,output_profile=None):
+                allowed_labels=LABELS,safe_reasons=SAFE_POLICY_REASONS,output_profile=None,stdout_only=False):
     p.require(label in allowed_labels,'github_command_identity')
     detail={};started=time.monotonic();outcome='FAILED';phase='pre_verification';command_outcome='NOT_RUN';reason='NONE'
     print(json.dumps({'event':'GITHUB_MAC_COMMAND','command':label,'outcome':'START'}),flush=True)
@@ -74,6 +74,7 @@ def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
         phase='command';command_outcome='FAILED'
         result=run_bounded(command,cwd=cwd,env=env,seconds=min(seconds,max(.01,deadline-time.monotonic())),
             check=True,diagnostic=detail,group_observer=groups.capture,
+            **({'stdout_only':True} if stdout_only else {}),
             **({'output_profile':output_profile} if output_profile is not None else {}))
         command_outcome='PASS';phase='post_verification'
         guard()
@@ -109,6 +110,9 @@ def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300,
         if output_profile is not None:
             from scripts import security_diagnostics as security
             row['security_error']=security.project(detail.get('security_error','NOT_APPLICABLE'))
+        if stdout_only:
+            row.update(stdout_bytes=d.integer(detail.get('stdout_bytes'),0,16*1024**2),
+                       stderr_bytes=d.integer(detail.get('stderr_bytes'),0,16*1024**2),capture_mode='STDOUT_ONLY')
         print(json.dumps(row),flush=True)
 
 

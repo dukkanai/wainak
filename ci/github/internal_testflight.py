@@ -22,6 +22,7 @@ from ci.github import internal_policy as q, mac_unsigned as g
 from ci.testflight import policy as p, diagnostics as d
 from ci.testflight.build import safe_unpack, xml_plist, child_environment
 from scripts import security_diagnostics as security
+from ci.github import signing_settings
 
 LABELS=frozenset({'keychain_list','keychain_create','keychain_unlock','keychain_import','keychain_access',
     'keychain_select','keychain_restore','keychain_delete','signing_identity','profile_decode','ios_config',
@@ -71,6 +72,7 @@ def runner(env, deadline, overlay=None):
         return g.run_checked(label,command,cwd=cwd,env=env,deadline=deadline,
             guard=lambda:g.resource_guard(WORK,ROOT/'apps/mobile',deadline),overlay=overlay,seconds=seconds,
             allowed_labels=LABELS,safe_reasons=g.SAFE_POLICY_REASONS|q.REASONS,
+            **({'stdout_only':True} if label=='build_settings' and command[0]=='/usr/bin/xcodebuild' else {}),
             **({'output_profile':security.PROFILE} if label=='keychain_import' and
                list(command[:2])==['/usr/bin/security','import'] else {}))
     return run
@@ -222,11 +224,9 @@ def compile_internal(pins, number, ctx, secret_source):
         mobile=ctx['mobile']
         run('ios_config',['flutter','build','ios','--config-only','--release','--no-pub','--no-codesign',
             '--build-number',number,*p.DEFINES],cwd=mobile)
-        settings=json.loads(run('build_settings',['/usr/bin/xcodebuild','-project',mobile/'ios/Runner.xcodeproj',
-            '-scheme','Runner','-configuration','Release','-sdk','iphoneos','-showBuildSettings','-json']))
-        p.validate_settings(settings)
-        actual=next(x['buildSettings'] for x in settings if x.get('target')=='Runner')
-        p.require(actual.get('PROVISIONING_PROFILE_SPECIFIER')==pins['profile_uuid'],'signed_settings')
+        settings=run('build_settings',['/usr/bin/xcodebuild','-project',mobile/'ios/Runner.xcodeproj',
+            '-scheme','Runner','-configuration','Release','-sdk','iphoneos','-showBuildSettings','-json'])
+        signing_settings.validate(settings,pins)
         run('build_ipa',['flutter','build','ipa','--release','--no-pub','--build-number',number,
             '--export-options-plist',export,*p.DEFINES],cwd=mobile,seconds=1200)
         p.require(sha(regular(export))==export_hash and plistlib.loads(export.read_bytes())==options,'signed_export')

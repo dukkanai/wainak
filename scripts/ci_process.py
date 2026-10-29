@@ -15,8 +15,11 @@ from scripts import security_diagnostics as security
 
 def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024,
                 check=False, cleanup_grace=0, diagnostic=None, group_observer=None,
-                output_profile=None):
-    """Capture bounded merged output; never print command arguments or child output.
+                output_profile=None, stdout_only=False):
+    """Capture bounded output; never print command arguments or child output.
+
+    Default capture merges channels. stdout_only keeps stderr out of machine
+    output, drains/counts it under the SAME combined limit, and never returns it.
 
     POSIX host tools must keep children in the inherited group. Nested fixture
     drivers additionally own their independently created sessions and containers.
@@ -30,6 +33,8 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
         raise TypeError('Diagnostic destination must be a plain dictionary')
     if output_profile is not None and (type(output_profile) is not str or output_profile!=security.PROFILE):
         raise ValueError('Unknown output diagnostic profile')
+    if type(stdout_only) is not bool or (stdout_only and output_profile is not None):
+        raise ValueError('Invalid channel capture mode')
     kind = 'NONE'
     code = None
     cleanup_failed = False
@@ -37,6 +42,7 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
     group_before = group_after = None
     process = selector = primary = None
     output = bytearray()
+    stderr_bytes = 0
     previous = signal.getsignal(signal.SIGTERM)
 
     observer_cancelled = False
@@ -63,10 +69,11 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
     signal.signal(signal.SIGTERM, cancelled)
     try:
         process = subprocess.Popen([str(value) for value in command], cwd=cwd, env=env,
-                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE if stdout_only else subprocess.STDOUT,
                                    start_new_session=True)
         selector = selectors.DefaultSelector()
         selector.register(process.stdout, selectors.EVENT_READ)
+        if stdout_only:selector.register(process.stderr, selectors.EVENT_READ)
         deadline = time.monotonic() + seconds
         while selector.get_map() or process.poll() is None:
             if time.monotonic() >= deadline:
@@ -76,11 +83,12 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
                 block = os.read(key.fd, 65536)
                 if not block:
                     selector.unregister(key.fileobj)
-                elif len(output) + len(block) > maximum:
+                elif len(output) + stderr_bytes + len(block) > maximum:
                     kind = 'OUTPUT_BOUND'
                     raise RuntimeError('Host CI command exceeded its output limit')
                 else:
-                    output.extend(block)
+                    if stdout_only and key.fileobj is process.stderr:stderr_bytes+=len(block)
+                    else:output.extend(block)
         code = process.wait(timeout=max(.01, deadline - time.monotonic()))
         if code:
             kind = 'NONZERO_EXIT'
@@ -147,7 +155,8 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
                 if diagnostic is not None:
                     diagnostic.clear()
                     diagnostic.update(failure_kind=kind, exit_code=code,
-                                      output_bytes=len(output), cleanup_failed=cleanup_failed)
+                                      output_bytes=len(output)+stderr_bytes, cleanup_failed=cleanup_failed)
+                    if stdout_only:diagnostic.update(stdout_bytes=len(output),stderr_bytes=stderr_bytes)
                     diagnostic.update(project_cleanup_errors(cleanup_errors))
                     if group_observer is not None:
                         diagnostic.update(group_before_cleanup=group_before, group_after_cleanup=group_after)
