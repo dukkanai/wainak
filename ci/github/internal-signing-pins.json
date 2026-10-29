@@ -1,9 +1,10 @@
 {
-  "enabled": false,
-  "certificate_sha256": null,
-  "certificate_sha1": null,
-  "profile_sha256": null,
-  "profile_uuid": null,
-  "asc_key_id": null,
-  "asc_issuer_id": null
+  "enabled": true,
+  "certificate_sha256": "82fcf7f974315bf4d5822233174dcb1ac925f9508ddf167de5070ba4f208e4d8",
+  "certificate_sha1": "625B08B199BA85687150068537A43771638134CC",
+  "profile_sha256": "75c4dc0f6141a0bf2083bf9ae382874fcaa67f131072ee14b924e0857bdb5c5b",
+  "profile_uuid": "32354322-1461-4d95-90a6-9b62285e3a1a",
+  "profile_name": "wainek_github_app_store_20261029",
+  "asc_key_id": "9X6UGZYBYR",
+  "asc_issuer_id": "54a3742f-c62d-468e-a2ae-70e0d8aff797"
 }

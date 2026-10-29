@@ -1,4 +1,5 @@
-"""Dormant GitHub internal-distribution contract. No credential or network access."""
+"""Reviewed GitHub internal-distribution contract. No credential or network access."""
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -15,12 +16,25 @@ CHECKOUT = 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
 PYTHON = 'actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0'
 SIGNING_SECRETS = ('WAINEK_DISTRIBUTION_P12_B64', 'WAINEK_DISTRIBUTION_P12_PASSWORD', 'WAINEK_APP_STORE_PROFILE_B64')
 UPLOAD_SECRETS = ('WAINEK_ASC_PRIVATE_KEY_B64',)
-PIN_FIELDS = {'enabled', 'certificate_sha256', 'certificate_sha1', 'profile_sha256', 'profile_uuid', 'asc_key_id', 'asc_issuer_id'}
+PROFILE_NAME = 'wainek_github_app_store_20261029'
+REVIEWED_PINS = {
+    'enabled': True,
+    'certificate_sha256': '82fcf7f974315bf4d5822233174dcb1ac925f9508ddf167de5070ba4f208e4d8',
+    'certificate_sha1': '625B08B199BA85687150068537A43771638134CC',
+    'profile_sha256': '75c4dc0f6141a0bf2083bf9ae382874fcaa67f131072ee14b924e0857bdb5c5b',
+    'profile_uuid': '32354322-1461-4d95-90a6-9b62285e3a1a',
+    'profile_name': PROFILE_NAME,
+    'asc_key_id': '9X6UGZYBYR',
+    'asc_issuer_id': '54a3742f-c62d-468e-a2ae-70e0d8aff797',
+}
+PIN_FIELDS = set(REVIEWED_PINS)
+ACTIVE_WORKFLOW_SHA256 = '7fe340869761683a8c8ad30145015c67cbd23f1dd55448e339cb3cf921c29f31'
 REASONS = frozenset({'signed_disabled','signed_pin_schema','signed_pin_value','signed_context','signed_input',
     'signed_environment','signed_template','signed_profile_hash','signed_profile_identity','signed_certificate',
     'signed_secret_encoding','signed_secret_bound','signed_existing_path','signed_path','signed_export',
     'signed_source_drift','signed_receipt','signed_ipa_hash','signed_identity_count','signed_settings',
-    'signed_cleanup','signed_upload_ambiguous','signed_no_ipa','signed_debug_logging','signed_p8_shape'})
+    'signed_cleanup','signed_upload_ambiguous','signed_no_ipa','signed_debug_logging','signed_p8_shape',
+    'signed_pin_mismatch','signed_active_workflow'})
 # Fixed codes from the reused signing/ZIP policy, never exception text from tools.
 REASONS |= frozenset({'build_number','app_identity','app_platform','profile_team','not_app_store_profile',
     'profile_expiry_missing','profile_expired','application_identifier','entitlement_team','debug_entitlement',
@@ -40,10 +54,23 @@ def validate_pins(value, active=False):
         p.require(all(value[k] is None for k in PIN_FIELDS-{'enabled'}), 'signed_pin_value')
         return
     patterns = {'certificate_sha256':'[a-f0-9]{64}', 'certificate_sha1':'[A-F0-9]{40}',
-        'profile_sha256':'[a-f0-9]{64}', 'profile_uuid':'[A-F0-9]{8}(?:-[A-F0-9]{4}){3}-[A-F0-9]{12}',
+        'profile_sha256':'[a-f0-9]{64}', 'profile_uuid':'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',
+        'profile_name':re.escape(PROFILE_NAME),
         'asc_key_id':'[A-Z0-9]{10}', 'asc_issuer_id':'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}'}
     for key, pattern in patterns.items():
         p.require(type(value[key]) is str and re.fullmatch(pattern,value[key]) is not None, 'signed_pin_value')
+
+
+def validate_reviewed_pins(value):
+    # Format correctness alone must never authorize a different credential set.
+    validate_pins(value,active=True)
+    p.require(value == REVIEWED_PINS,'signed_pin_mismatch')
+
+
+def validate_active_workflow(source):
+    # Covers triggers, concurrency, permissions and all jobs without a YAML dependency.
+    p.require(type(source) is str and hashlib.sha256(source.encode()).hexdigest()==ACTIVE_WORKFLOW_SHA256,
+              'signed_active_workflow')
 
 
 def context(env):

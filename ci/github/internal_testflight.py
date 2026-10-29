@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dormant GitHub signed internal UI path. --check needs no Apple credentials."""
+"""Protected manual GitHub internal UI path. --check needs no Apple credentials."""
 import argparse
 import base64
 import hashlib
@@ -59,7 +59,7 @@ def decode(value, limit):
 
 
 def preflight(env, pins):
-    q.validate_pins(pins,active=True)  # Before reading any credential value.
+    q.validate_reviewed_pins(pins)  # Before reading any credential value.
     number=q.context(env)
     g.preflight(env,sys.platform,platform.machine(),g.shutil.disk_usage(ROOT).free)
     return number
@@ -86,12 +86,15 @@ def cleanup_runner():
 
 
 def profile_check(profile, pins, number):
-    p.require(profile.get('UUID')==pins['profile_uuid'] and profile.get('Name')==p.PROFILE,'signed_profile_identity')
+    # Preserve the signed profile's actual UUID spelling; never normalize bytes
+    # or reuse Codemagic's independent historical profile reference.
+    p.require(profile.get('UUID')==pins['profile_uuid'] and profile.get('Name')==pins['profile_name'],'signed_profile_identity')
     p.validate_profile(profile,profile.get('Entitlements',{}),
         {'CFBundleIdentifier':p.BUNDLE,'CFBundleVersion':number,'DTPlatformName':'iphoneos'},number)
     certs=profile.get('DeveloperCertificates',[])
-    p.require(type(certs) is list and any(type(c) is bytes and sha(c)==pins['certificate_sha256'] and
-        hashlib.sha1(c).hexdigest().upper()==pins['certificate_sha1'] for c in certs),'signed_certificate')
+    p.require(type(certs) is list and len(certs)==1 and type(certs[0]) is bytes and
+        sha(certs[0])==pins['certificate_sha256'] and
+        hashlib.sha1(certs[0]).hexdigest().upper()==pins['certificate_sha1'],'signed_certificate')
 
 
 def unpack_signed(ipa, destination):
@@ -282,16 +285,18 @@ def main(argv=None):
     for option in ('check','build','upload','cleanup'):mode.add_argument('--'+option,action='store_true')
     args=parser.parse_args(argv)
     try:
-        pins=json.loads(q.PIN_FILE.read_text());q.validate_pins(pins)
-        q.validate_job(json.loads((ROOT/'ci/github/internal-testflight.job.json').read_text()))
-        if args.check:
-            print(json.dumps({'status':'SIGNED_PREPARATION_CONTRACT_PASS','enabled':pins['enabled'],
-                'credentials_read':False,'runtime_signing':'NOT_RUN','apple_upload':False}));return 0
         if args.cleanup:
-            # Cleanup uses no secret values and is available after any failed step.
+            # Do not strand owned signing files after a pin/workflow check fails.
+            # Cleanup uses no secret values and retains host/path/process guards.
             p.require(sys.platform=='darwin' and os.environ.get('GITHUB_REPOSITORY')=='dukkanai/wainak' and
                 Path(os.environ.get('GITHUB_WORKSPACE','/nonexistent')).resolve()==ROOT,'signed_context')
             cleanup(cleanup_runner());return 0
+        pins=json.loads(q.PIN_FILE.read_text());q.validate_reviewed_pins(pins)
+        q.validate_job(json.loads((ROOT/'ci/github/internal-testflight.job.json').read_text()))
+        q.validate_active_workflow((ROOT/'.github/workflows/ci.yml').read_text())
+        if args.check:
+            print(json.dumps({'status':'SIGNED_PREPARATION_CONTRACT_PASS','enabled':pins['enabled'],
+                'credentials_read':False,'runtime_signing':'NOT_RUN','apple_upload':False}));return 0
         number=preflight(os.environ,pins)
         if args.build:
             # All subprocesses receive the existing allowlisted child environment;

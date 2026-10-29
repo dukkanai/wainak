@@ -162,7 +162,7 @@ class GithubMacPolicy(unittest.TestCase):
     def test_workflow_manual_only_standard_read_permissions_no_secret_or_upload(self):
         # Exact reviewed text blocks guard dispatch isolation without a YAML dependency.
         text=(g.ROOT/'.github/workflows/ci.yml').read_text()
-        section=text.split('\n  mac-unsigned:\n')[1]
+        section=text.split('\n  mac-unsigned:\n')[1].split('\n  mac-internal:')[0]
         for expected in ("github.event_name == 'workflow_dispatch'", "inputs.target == 'mac-unsigned'",
                          'github.event.repository.private == false', 'inputs.expected_sha == github.sha',
                          'runs-on: macos-26', 'timeout-minutes: 45', 'contents: read', 'persist-credentials: false'):
@@ -171,7 +171,7 @@ class GithubMacPolicy(unittest.TestCase):
             # Branch name contains testflight; it does not invoke the signed driver.
             if forbidden=='testflight':self.assertNotIn('ci/testflight/build.py',section)
             else:self.assertNotIn(forbidden,section)
-        self.assertEqual(text.count("if: ${{ inputs.target != 'mac-unsigned' }}"),9)
+        self.assertEqual(text.count("if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}"),9)
 
     def test_initial_policy_reasons_are_finite_and_never_print_exception_messages(self):
         for error,expected in [(p.PolicyError('github_initial_disk'),'github_initial_disk'),

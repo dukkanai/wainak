@@ -21,11 +21,11 @@ PROFILE_BYTES=b'synthetic-provisioning-envelope'
 PINS={'enabled':True,'certificate_sha256':hashlib.sha256(CERT).hexdigest(),
       'certificate_sha1':hashlib.sha1(CERT).hexdigest().upper(),
       'profile_sha256':hashlib.sha256(PROFILE_BYTES).hexdigest(),
-      'profile_uuid':'12345678-1234-1234-1234-123456789ABC',
+      'profile_uuid':'12345678-1234-1234-1234-123456789abc','profile_name':q.PROFILE_NAME,
       'asc_key_id':'ABCDEF1234','asc_issuer_id':'12345678-1234-1234-1234-123456789abc'}
 ENT={'application-identifier':p.TEAM+'.'+p.BUNDLE,'com.apple.developer.team-identifier':p.TEAM,
      'get-task-allow':False,'beta-reports-active':True}
-PROFILE={'UUID':PINS['profile_uuid'],'Name':p.PROFILE,'TeamIdentifier':[p.TEAM],
+PROFILE={'UUID':PINS['profile_uuid'],'Name':PINS['profile_name'],'TeamIdentifier':[p.TEAM],
          'ExpirationDate':datetime.datetime(2099,1,1),'Entitlements':ENT,'DeveloperCertificates':[CERT]}
 INFO={'CFBundleIdentifier':p.BUNDLE,'CFBundleVersion':'17','DTPlatformName':'iphoneos','CFBundleExecutable':'Runner'}
 
@@ -39,17 +39,38 @@ def settings():
 
 class Policy(unittest.TestCase):
     def test_disabled_before_credential_reads(self):
-        pins=json.loads(q.PIN_FILE.read_text())
-        self.assertFalse(pins['enabled'])
+        pins={key:None for key in q.PIN_FIELDS};pins['enabled']=False
         class Unreadable(dict):
             def get(self,*args):raise AssertionError('environment read before activation')
             def __getitem__(self,key):raise AssertionError('credential read')
         with self.assertRaisesRegex(p.PolicyError,'signed_disabled'):s.preflight(Unreadable(),pins)
         for mode in ('--build','--upload'):
-            with mock.patch.object(s,'compile_internal') as build,mock.patch.object(s,'upload') as upload,mock.patch('builtins.print') as out:
+            with mock.patch.object(q,'PIN_FILE',mock.Mock(read_text=lambda:json.dumps(pins))), \
+                 mock.patch.object(s,'compile_internal') as build,mock.patch.object(s,'upload') as upload,mock.patch('builtins.print') as out:
                 self.assertEqual(s.main([mode]),1)
                 self.assertEqual(json.loads(out.call_args.args[0])['safe_reason'],'signed_disabled')
                 build.assert_not_called();upload.assert_not_called()
+
+    def test_exact_public_pins_and_valid_format_substitution_rejected(self):
+        expected={
+            'enabled':True,
+            'certificate_sha256':'82fcf7f974315bf4d5822233174dcb1ac925f9508ddf167de5070ba4f208e4d8',
+            'certificate_sha1':'625B08B199BA85687150068537A43771638134CC',
+            'profile_sha256':'75c4dc0f6141a0bf2083bf9ae382874fcaa67f131072ee14b924e0857bdb5c5b',
+            'profile_uuid':'32354322-1461-4d95-90a6-9b62285e3a1a',
+            'profile_name':'wainek_github_app_store_20261029',
+            'asc_key_id':'9X6UGZYBYR','asc_issuer_id':'54a3742f-c62d-468e-a2ae-70e0d8aff797',
+        }
+        value=json.loads(q.PIN_FILE.read_text());self.assertEqual(value,expected)
+        q.validate_reviewed_pins(value)
+        for key in ('certificate_sha256','certificate_sha1','profile_sha256','profile_uuid','asc_key_id','asc_issuer_id'):
+            replacement=('1' if value[key][0]!='1' else '2')+value[key][1:]
+            changed={**value,key:replacement};q.validate_pins(changed,active=True)
+            with self.subTest(key=key),self.assertRaisesRegex(p.PolicyError,'signed_pin_mismatch'):
+                q.validate_reviewed_pins(changed)
+        with self.assertRaises(p.PolicyError):q.validate_reviewed_pins({**value,'profile_uuid':value['profile_uuid'].upper()})
+        self.assertEqual(p.PROFILE,'wainek_app_store')
+        self.assertEqual(p.CERTIFICATE,'nextaura_apple_distribution')
 
     def test_pin_schema_mutations(self):
         q.validate_pins(PINS,active=True)
@@ -68,6 +89,62 @@ class Policy(unittest.TestCase):
             with self.subTest(key=key),self.assertRaises(p.PolicyError):q.context({**valid,key:'CANARY'})
         for key,value in [('RUNNER_DEBUG','1'),('ACTIONS_STEP_DEBUG','true'),('ACTIONS_RUNNER_DEBUG','TRUE')]:
             with self.assertRaisesRegex(p.PolicyError,'signed_debug_logging'):q.context({**valid,key:value})
+
+    def test_signed_preflight_rejects_wrong_trigger_source_and_host_without_secrets(self):
+        class Guarded(dict):
+            def __getitem__(self,key):
+                if key in (*q.SIGNING_SECRETS,*q.UPLOAD_SECRETS):raise AssertionError('secret read')
+                return super().__getitem__(key)
+        env=Guarded({'WAINEK_SIGNED_TARGET':'mac-internal','WAINEK_SIGNED_ENVIRONMENT':q.ENVIRONMENT,
+            'GITHUB_RUN_ATTEMPT':'1','WAINEK_EXPECTED_SHA':'a'*40,'WAINEK_BUILD_NUMBER':'17',
+            'GITHUB_ACTIONS':'true','GITHUB_REPOSITORY':'dukkanai/wainak','GITHUB_EVENT_NAME':'workflow_dispatch',
+            'GITHUB_REF':'refs/heads/'+q.BRANCH,'GITHUB_SHA':'a'*40,'GITHUB_WORKSPACE':str(s.ROOT),
+            'RUNNER_ENVIRONMENT':'github-hosted','RUNNER_OS':'macOS','RUNNER_ARCH':'ARM64',
+            'WAINEK_REPOSITORY_VISIBILITY':'public','WAINEK_RUNNER_LABEL':'macos-26'})
+        with mock.patch.object(s.sys,'platform','darwin'),mock.patch.object(s.platform,'machine',return_value='arm64'), \
+             mock.patch.object(g.shutil,'disk_usage',return_value=mock.Mock(free=12*g.GIB)):
+            self.assertEqual(s.preflight(env,q.REVIEWED_PINS),'17')
+            for key,value in [('GITHUB_REPOSITORY','fork/wainak'),('GITHUB_EVENT_NAME','pull_request'),
+                              ('GITHUB_EVENT_NAME','pull_request_target'),('GITHUB_EVENT_NAME','push'),
+                              ('GITHUB_REF','refs/heads/main'),('GITHUB_RUN_ATTEMPT','2'),
+                              ('WAINEK_EXPECTED_SHA','b'*40),('WAINEK_BUILD_NUMBER','17; CANARY'),
+                              ('WAINEK_REPOSITORY_VISIBILITY','private'),('WAINEK_RUNNER_LABEL','macos-26-large')]:
+                with self.subTest(key=key,value=value),self.assertRaises(p.PolicyError):
+                    s.preflight(Guarded({**env,key:value}),q.REVIEWED_PINS)
+        with mock.patch.object(s.sys,'platform','linux'),mock.patch.object(g.shutil,'disk_usage',return_value=mock.Mock(free=12*g.GIB)):
+            with self.assertRaisesRegex(p.PolicyError,'github_standard_arm_mac'):s.preflight(env,q.REVIEWED_PINS)
+
+    def test_active_entrypoint_routes_only_after_contract_checks(self):
+        for mode in ('--check','--build','--upload'):
+            with self.subTest(mode=mode),mock.patch.object(s,'preflight',return_value='17'), \
+                 mock.patch.object(g,'execute',return_value={'fixture':'context'}) as unsigned, \
+                 mock.patch.object(s,'compile_internal') as compile_,mock.patch.object(s,'upload') as upload, \
+                 mock.patch('builtins.print') as printed:
+                self.assertEqual(s.main([mode]),0)
+                self.assertEqual(unsigned.call_count,int(mode=='--build'))
+                self.assertEqual(compile_.call_count,int(mode=='--build'))
+                self.assertEqual(upload.call_count,int(mode=='--upload'))
+                self.assertNotIn('CANARY',str(printed.call_args_list))
+        for error in ('signed_pin_mismatch','signed_active_workflow'):
+            target='validate_reviewed_pins' if error=='signed_pin_mismatch' else 'validate_active_workflow'
+            with mock.patch.object(q,target,side_effect=p.PolicyError(error)), \
+                 mock.patch.object(g,'execute') as unsigned,mock.patch.object(s,'upload') as upload, \
+                 mock.patch('builtins.print') as printed:
+                self.assertEqual(s.main(['--build']),1);self.assertEqual(s.main(['--upload']),1)
+                unsigned.assert_not_called();upload.assert_not_called()
+                self.assertEqual(json.loads(printed.call_args.args[0])['safe_reason'],error)
+
+    def test_cleanup_entrypoint_survives_invalid_pins_with_host_guard_intact(self):
+        with mock.patch.object(q,'PIN_FILE',mock.Mock(read_text=mock.Mock(side_effect=AssertionError('pins must not block cleanup')))), \
+             mock.patch.object(s.sys,'platform','darwin'), \
+             mock.patch.dict(s.os.environ,{'GITHUB_REPOSITORY':'dukkanai/wainak','GITHUB_WORKSPACE':str(s.ROOT)},clear=True), \
+             mock.patch.object(s,'cleanup') as cleanup,mock.patch.object(s,'cleanup_runner'),mock.patch('builtins.print'):
+            self.assertEqual(s.main(['--cleanup']),0);cleanup.assert_called_once()
+            cleanup.reset_mock()
+            with mock.patch.object(s.sys,'platform','linux'):
+                self.assertEqual(s.main(['--cleanup']),1);cleanup.assert_not_called()
+            with mock.patch.object(s,'cleanup',side_effect=p.PolicyError('signed_cleanup')):
+                self.assertEqual(s.main(['--cleanup']),1)
 
     def test_environment_protections(self):
         env={'name':q.ENVIRONMENT,'can_admins_bypass':False,
@@ -92,12 +169,21 @@ class Policy(unittest.TestCase):
         changed=copy.deepcopy(env);changed['protection_rules'][0]['reviewers']*=2
         with self.assertRaises(p.PolicyError):q.validate_environment(changed,branches)
 
-    def test_dormant_workflow_exact_and_mutations(self):
+    def test_active_workflow_exact_and_mutations(self):
         job=json.loads((q.ROOT/'ci/github/internal-testflight.job.json').read_text());q.validate_job(job)
         source=(q.ROOT/'.github/workflows/ci.yml').read_text()
-        self.assertNotIn('mac-internal',source);self.assertNotIn('secrets.',source)
         candidate=(q.ROOT/'ci/github/internal-testflight.workflow.candidate').read_text()
-        self.assertEqual(q.candidate_workflow(source),candidate)
+        self.assertEqual(source,candidate);q.validate_active_workflow(source)
+        self.assertIn('options: [ci, mac-unsigned, mac-internal]',source)
+        self.assertEqual(source.count("if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}"),9)
+        self.assertIn("cancel-in-progress: ${{ inputs.target != 'mac-internal' }}",source)
+        for changed in (source.replace('branches: [main]','branches: [main, dev]'),
+                        source.replace('  pull_request:', '  pull_request_target:'),
+                        source.replace('contents: read','contents: write'),
+                        source.replace('options: [ci, mac-unsigned, mac-internal]','options: [mac-internal]'),
+                        source.replace("inputs.target != 'mac-internal'",'true'),
+                        source.replace('wainek-internal-testflight','other-environment')):
+            with self.assertRaisesRegex(p.PolicyError,'signed_active_workflow'):q.validate_active_workflow(changed)
         self.assertIn("inputs.target != 'mac-internal'",candidate)
         self.assertNotIn('pull_request_target',candidate)
         self.assertNotIn('upload-artifact',candidate)
@@ -115,11 +201,14 @@ class Policy(unittest.TestCase):
 
     def test_profile_negative_cases(self):
         s.profile_check(PROFILE,PINS,'17')
-        cases={'Name':'wrong','UUID':'wrong','TeamIdentifier':['wrong'],'DeveloperCertificates':[b'other'],
+        cases={'Name':p.PROFILE,'UUID':PINS['profile_uuid'].upper(),'TeamIdentifier':['wrong'],'DeveloperCertificates':[b'other'],
                'ProvisionedDevices':[],'ExpirationDate':datetime.datetime(2000,1,1)}
         for key,value in cases.items():
             with self.subTest(key=key),self.assertRaises(p.PolicyError):s.profile_check({**PROFILE,key:value},PINS,'17')
         with self.assertRaises(p.PolicyError):s.profile_check(PROFILE,{**PINS,'certificate_sha1':'A'*40},'17')
+        for certificates in ([CERT,CERT],[CERT,b'other'],[]):
+            with self.assertRaisesRegex(p.PolicyError,'signed_certificate'):
+                s.profile_check({**PROFILE,'DeveloperCertificates':certificates},PINS,'17')
         for key,value in [('get-task-allow',True),('beta-reports-active',False),('application-identifier','wrong')]:
             with self.assertRaises(p.PolicyError):s.profile_check({**PROFILE,'Entitlements':{**ENT,key:value}},PINS,'17')
 
