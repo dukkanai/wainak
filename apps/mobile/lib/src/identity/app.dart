@@ -29,7 +29,7 @@ class _IdentityAppState extends State<IdentityApp> {
     supportedLocales: const [Locale('ar')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     debugShowCheckedModeBanner: false,
-    title: 'wainek · اختبار الهوية',
+    title: 'wainek',
     theme: WainekTokens.theme(Brightness.light),
     darkTheme: WainekTokens.theme(Brightness.dark),
     themeMode: mode,

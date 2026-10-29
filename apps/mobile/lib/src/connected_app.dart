@@ -27,7 +27,7 @@ class _ConnectedWainekAppState extends State<ConnectedWainekApp> {
     supportedLocales: const [Locale('ar')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     debugShowCheckedModeBanner: false,
-    title: 'wainek · خدمة تطوير',
+    title: 'wainek',
     theme: WainekTokens.theme(Brightness.light),
     darkTheme: WainekTokens.theme(Brightness.dark),
     themeMode: mode,

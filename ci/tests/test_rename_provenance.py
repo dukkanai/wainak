@@ -26,6 +26,12 @@ class ProductIdentityTests(unittest.TestCase):
                      'android/app/src/main/kotlin/com/nextaura/wainek/NativeArchiveChannel.kt']:
             self.assertIn('wainek/native_archive_v1', (mobile/name).read_text())
         self.assertIn('name: wainek_mobile', (mobile/'pubspec.yaml').read_text())
+        web = json.loads((mobile/'web/manifest.json').read_text())
+        self.assertEqual(web['name'], 'wainek')
+        self.assertEqual(web['short_name'], 'wainek')
+        self.assertIn('<title>wainek</title>', (mobile/'web/index.html').read_text())
+        for name in ('app.dart', 'connected_app.dart', 'identity/app.dart'):
+            self.assertIn("title: 'wainek',", (mobile/'lib/src'/name).read_text())
 
     def test_persisted_database_identity_is_preserved(self):
         root = Path(__file__).resolve().parents[2]
