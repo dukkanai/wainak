@@ -39,16 +39,17 @@ SAFE_POLICY_REASONS = frozenset({
     'sdk_delta_before', 'sdk_delta_helper', 'sdk_delta_lock_archive',
     'sdk_delta_method', 'sdk_delta_schema', 'sdk_existing_overlay',
     'sdk_flutter_missing', 'sdk_generated_config_missing', 'sdk_generated_file',
-    'sdk_git_attributes', 'sdk_inventory_case_collision', 'sdk_inventory_entry',
-    'sdk_inventory_incomplete', 'sdk_inventory_path', 'sdk_overlay_drift',
-    'sdk_overlay_inventory', 'sdk_overlay_symlink', 'sdk_package_config',
-    'sdk_package_config_changed', 'sdk_package_duplicate', 'sdk_package_library',
-    'sdk_package_missing_tool', 'sdk_package_tool_root', 'sdk_package_uri',
+    'sdk_generated_role', 'sdk_git_attributes', 'sdk_inventory_case_collision',
+    'sdk_inventory_entry', 'sdk_inventory_incomplete', 'sdk_inventory_path',
+    'sdk_overlay_drift', 'sdk_overlay_inventory', 'sdk_overlay_symlink',
+    'sdk_package_config', 'sdk_package_config_changed', 'sdk_package_duplicate',
+    'sdk_package_graph_changed', 'sdk_package_library', 'sdk_package_missing_tool',
+    'sdk_package_tool_root', 'sdk_package_uri', 'sdk_package_version_changed',
     'sdk_regular_file', 'sdk_source_drift', 'sdk_source_revision',
     'sdk_source_symlink', 'sdk_stage_identity', 'sdk_tool_lock_changed',
     'sdk_tool_lock_hash', 'sdk_tool_lock_missing',
 })
-STAGES=frozenset({"source_inventory","source_snapshot","source_copy","tool_dependencies","package_config","final_verification"})
+STAGES=frozenset({"source_inventory","source_snapshot","provider_dependencies","source_copy","tool_dependencies","package_config","final_verification"})
 
 
 def safe_reason(error):
@@ -163,18 +164,43 @@ def package_config(raw, original, package_root):
     return (json.dumps(config, sort_keys=True)+'\n').encode()
 
 
+def optional_generated(path):
+    return read_regular(path) if path.exists() or path.is_symlink() else None
+
+
+def bytes_fingerprint(data):
+    return {'state':'absent' if data is None else 'regular',
+            'sha256':None if data is None else digest(data),'bytes':None if data is None else len(data)}
+
+
+def generated_matches(path, expected, role):
+    p.require(role in {'provider_package_config','provider_package_graph','provider_version'},'sdk_generated_role')
+    actual=None
+    try:
+        if path.is_symlink():info={'state':'symlink','sha256':None,'bytes':None}
+        else:
+            actual=optional_generated(path)
+            info=bytes_fingerprint(actual)
+    except (OSError,p.PolicyError):info={'state':'unreadable','sha256':None,'bytes':None}
+    matches=info['state'] in {'absent','regular'} and actual==expected
+    if not matches:
+        print(json.dumps({'event':'SDK_GENERATED_FILE_CHECK','file_role':role,'outcome':'FAILED',
+              'expected':bytes_fingerprint(expected),'actual':info}),flush=True)
+    return matches
+
+
 class Overlay:
-    def __init__(self, base, destination, entries, baseline, config_bytes, files):
+    def __init__(self, base, destination, entries, baseline, config_bytes, files, *, graph_bytes=None, version_bytes=None, initial_config_bytes=None):
         self.base, self.destination, self.entries = base, destination, entries
         self.baseline, self.config_bytes, self.files = baseline, config_bytes, files
+        self.graph_bytes, self.version_bytes, self.initial_config_bytes = graph_bytes, version_bytes, initial_config_bytes
 
     def verify(self):
         p.require(snapshot(self.base, self.entries) == self.baseline, 'sdk_base_changed')
-        original_config=self.base/'packages/flutter_tools/.dart_tool/package_config.json'
-        if self.config_bytes is None:
-            p.require(not original_config.exists() and not original_config.is_symlink(), 'sdk_package_config_changed')
-        else:
-            p.require(read_regular(original_config) == self.config_bytes, 'sdk_package_config_changed')
+        generated=self.base/'packages/flutter_tools/.dart_tool'
+        p.require(generated_matches(generated/'package_config.json',self.config_bytes,'provider_package_config'),'sdk_package_config_changed')
+        p.require(generated_matches(generated/'package_graph.json',self.graph_bytes,'provider_package_graph'),'sdk_package_graph_changed')
+        p.require(generated_matches(generated/'version',self.version_bytes,'provider_version'),'sdk_package_version_changed')
         p.require(digest(read_regular(self.base/'packages/flutter_tools/pubspec.lock')) == delta()[0]['tool_pubspec_lock_sha256'],
                   'sdk_tool_lock_hash')
         found = set()
@@ -197,7 +223,10 @@ class Overlay:
                 'base_revision': manifest['framework_revision'], 'before_sha256': manifest['before_sha256'],
                 'after_sha256': manifest['after_sha256'], 'helper_sha256': manifest['helper_sha256'],
                 'base_source_inventory_sha256': digest(json.dumps(self.baseline, sort_keys=True).encode()),
-                'provider_sdk_modified': False, 'provider_package_config_present': self.config_bytes is not None,
+                'provider_sdk_source_modified': False, 'provider_dependencies_initialized': True,
+                'provider_config_before': bytes_fingerprint(self.initial_config_bytes),
+                'provider_config_baseline': bytes_fingerprint(self.config_bytes),
+                'provider_package_config_present': self.config_bytes is not None,
                 'tool_pubspec_lock_sha256':manifest['tool_pubspec_lock_sha256'], 'execution': 'dart_source_no_cached_tool_snapshot'}
 
 
@@ -217,9 +246,19 @@ def prepare(work, run):
         lock=read_regular(lock_path)
         p.require(digest(lock)==manifest['tool_pubspec_lock_sha256'],'sdk_tool_lock_hash')
         original_config=base/'packages/flutter_tools/.dart_tool/package_config.json'
-        # A shipped snapshot does not require a generated package_config.
-        # Preserve its presence/absence and bytes; never use it to resolve our copy.
-        raw=read_regular(original_config) if original_config.exists() or original_config.is_symlink() else None
+        initial_raw=optional_generated(original_config)
+    with step('provider_dependencies'):
+        # Flutter's universal cache initializes these lazily during pub get.
+        # Initialize explicitly with the pinned lock and the SAME child cache,
+        # validate source/lock, then freeze generated bytes. Never rebaseline later.
+        run('sdk_provider_dependencies',[base/'bin/cache/dart-sdk/bin/dart','pub','get','--enforce-lockfile','--no-precompile'],
+            cwd=base/'packages/flutter_tools')
+        p.require(snapshot(base,entries)==baseline,'sdk_base_changed')
+        p.require(read_regular(lock_path)==lock,'sdk_tool_lock_changed')
+        raw=read_regular(original_config)
+        package_config(raw,original_config,base/'packages/flutter_tools')
+        graph=read_regular(original_config.parent/'package_graph.json')
+        version=optional_generated(original_config.parent/'version')
     destination = work/'analyzer_overlay'
     with step('source_copy'):
         p.require(not destination.exists() and not destination.is_symlink(), 'sdk_existing_overlay')
@@ -252,6 +291,6 @@ def prepare(work, run):
         (destination/'package_config.json').write_bytes(config)
         files['package_config.json']=digest(config)
     with step('final_verification'):
-        result = Overlay(base, destination, entries, baseline, raw, files)
+        result = Overlay(base, destination, entries, baseline, raw, files, graph_bytes=graph, version_bytes=version, initial_config_bytes=initial_raw)
         result.verify()
     return result

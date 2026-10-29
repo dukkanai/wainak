@@ -19,7 +19,7 @@ from ci.testflight.check_sdk_dispose import check as dispose_check
 from scripts.ci_process import run_bounded
 
 LABELS=frozenset({'source_commit','source_clean','publication','preparation','regressions','xcode_version',
-    'extract_sdk','flutter_version','sdk_head','sdk_inventory','sdk_dependencies','pub_get','analyze','entry_test',
+    'extract_sdk','flutter_version','sdk_head','sdk_inventory','sdk_provider_dependencies','sdk_dependencies','pub_get','analyze','entry_test',
     'compile_unsigned','verify_unsigned','source_unchanged','architecture'})
 GIB=1024**3
 SAFE_POLICY_REASONS=frozenset({'github_standard_arm_mac','github_manual_public_standard_only',
@@ -63,6 +63,42 @@ def download(spec, target, guard):
     p.require(digest.hexdigest()==spec['archive_sha256'],'github_sdk_archive_hash')
 
 
+def run_checked(label,command,*,cwd,env,deadline,guard,overlay,seconds=300):
+    p.require(label in LABELS,'github_command_identity')
+    detail={};started=time.monotonic();outcome='FAILED';phase='pre_verification';command_outcome='NOT_RUN';reason='NONE'
+    print(json.dumps({'event':'GITHUB_MAC_COMMAND','command':label,'outcome':'START'}),flush=True)
+    try:
+        guard()
+        if overlay:overlay.verify()
+        phase='command';command_outcome='FAILED'
+        result=run_bounded(command,cwd=cwd,env=env,seconds=min(seconds,max(.01,deadline-time.monotonic())),
+            check=True,diagnostic=detail,group_observer=groups.capture)
+        command_outcome='PASS';phase='post_verification'
+        guard()
+        if overlay:overlay.verify()
+        outcome='PASS';phase='complete'
+        return result.stdout
+    except BaseException as error:
+        value=error.args[0] if isinstance(error,p.PolicyError) and error.args else None
+        reason=value if type(value) is str and value in SAFE_POLICY_REASONS | sdk.SAFE_POLICY_REASONS else 'OTHER'
+        raise
+    finally:
+        process_kind=detail.get('failure_kind','NONE')
+        if type(process_kind) is not str or process_kind not in d.FAILURE_KINDS:process_kind='OTHER'
+        kind=({'pre_verification':'PRE_VERIFICATION','post_verification':'POST_VERIFICATION'}.get(phase,
+            process_kind if process_kind!='NONE' else 'OTHER')) if outcome=='FAILED' else 'NONE'
+        row={'event':'GITHUB_MAC_COMMAND','command':label,'outcome':outcome,'command_outcome':command_outcome,
+             'verification_phase':phase,'safe_reason':reason,'elapsed_seconds':round(time.monotonic()-started,3),
+             'failure_kind':kind,'process_failure_kind':process_kind,
+             'exit_code':d.integer(detail.get('exit_code'),-255,255),
+             'cleanup_failed':detail.get('cleanup_failed') is True,
+             'output_bytes':d.integer(detail.get('output_bytes'),0,16*1024**2),
+             'group_before_cleanup':groups.project(detail.get('group_before_cleanup')),
+             'group_after_cleanup':groups.project(detail.get('group_after_cleanup')),
+             **d.project_cleanup_errors(detail.get('cleanup_errors',[]))}
+        print(json.dumps(row),flush=True)
+
+
 def fresh_work(work, mobile):
     p.require(not work.exists() and not work.is_symlink() and
               not (mobile/'build').exists() and not (mobile/'build').is_symlink(), 'github_fresh_work')
@@ -86,30 +122,7 @@ def execute():
     overlay=None
     def guard():resource_guard(work,mobile,deadline)
     def run(label,command,cwd=ROOT,seconds=300):
-        p.require(label in LABELS,'github_command_identity')
-        guard()
-        if overlay:overlay.verify()
-        detail={};started=time.monotonic();outcome='FAILED'
-        print(json.dumps({'event':'GITHUB_MAC_COMMAND','command':label,'outcome':'START'}),flush=True)
-        try:
-            result=run_bounded(command,cwd=cwd,env=env,seconds=min(seconds,max(.01,deadline-time.monotonic())),
-                check=True,diagnostic=detail,group_observer=groups.capture)
-            guard()
-            if overlay:overlay.verify()
-            outcome='PASS'
-            return result.stdout
-        finally:
-            # Reuse the strict finite projector; labels are from our closed set.
-            row={'event':'GITHUB_MAC_COMMAND','command':label,'outcome':outcome,
-                 'elapsed_seconds':round(time.monotonic()-started,3),
-                 'failure_kind':detail.get('failure_kind','OTHER') if detail.get('failure_kind') in d.FAILURE_KINDS else 'OTHER',
-                 'exit_code':d.integer(detail.get('exit_code'),-255,255),
-                 'cleanup_failed':detail.get('cleanup_failed') is True,
-                 'output_bytes':d.integer(detail.get('output_bytes'),0,16*1024**2),
-                 'group_before_cleanup':groups.project(detail.get('group_before_cleanup')),
-                 'group_after_cleanup':groups.project(detail.get('group_after_cleanup')),
-                 **d.project_cleanup_errors(detail.get('cleanup_errors',[]))}
-            print(json.dumps(row),flush=True)
+        return run_checked(label,command,cwd=cwd,env=env,deadline=deadline,guard=guard,overlay=overlay,seconds=seconds)
     p.require(run('source_commit',['git','rev-parse','HEAD']).strip()==os.environ['GITHUB_SHA'],'github_source_sha')
     p.require(not run('source_clean',['git','status','--porcelain']).strip(),'github_dirty_source')
     run('publication',[sys.executable,'scripts/check_publication.py'])

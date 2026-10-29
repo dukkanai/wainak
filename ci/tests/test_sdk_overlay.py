@@ -103,7 +103,8 @@ class ColdSdkPreparation(unittest.TestCase):
         for failure,reason in [('lock','sdk_tool_lock_hash'),('dependencies','OTHER'),
             ('changed_lock','sdk_tool_lock_changed'),('missing_config','sdk_generated_config_missing'),
             ('missing_graph','sdk_generated_file'),('extra','sdk_overlay_drift'),('source_drift','sdk_source_drift'),
-            ('config_symlink','sdk_generated_config_missing'),('wrong_root','sdk_package_tool_root')]:
+            ('config_symlink','sdk_generated_config_missing'),('wrong_root','sdk_package_tool_root'),
+            ('provider_command','OTHER'),('provider_source','sdk_source_drift'),('provider_lock','sdk_tool_lock_changed'),('provider_root','sdk_package_tool_root')]:
             with self.subTest(failure=failure):self.exercise(False,failure,reason)
 
     def exercise(self,warm,failure=None,reason=None):
@@ -133,6 +134,17 @@ class ColdSdkPreparation(unittest.TestCase):
                 if label=='sdk_inventory':
                     self.assertEqual(argv,['git','ls-tree','-rz','HEAD','--',*s.SOURCE_PATHS]);self.assertEqual(kw['cwd'],base)
                     return raw
+                if label=='sdk_provider_dependencies':
+                    self.assertEqual(argv,[base/'bin/cache/dart-sdk/bin/dart','pub','get','--enforce-lockfile','--no-precompile'])
+                    self.assertEqual(kw['cwd'],base/'packages/flutter_tools')
+                    config.parent.mkdir(exist_ok=True)
+                    if failure=='provider_command':raise RuntimeError('CANARY')
+                    config.write_text(json.dumps({'configVersion':2,'packages':[{'name':'flutter_tools',
+                        'rootUri':'../' if failure!='provider_root' else 'file:///wrong','packageUri':'lib/'}]}))
+                    (config.parent/'package_graph.json').write_text('{}')
+                    if failure=='provider_source':(base/'bin/flutter').write_bytes(b'changed')
+                    if failure=='provider_lock':(base/'packages/flutter_tools/pubspec.lock').write_bytes(b'changed')
+                    return 'CANARY'
                 self.assertEqual(label,'sdk_dependencies')
                 target=work/'analyzer_overlay/flutter_tools'
                 self.assertEqual(argv,[base/'bin/cache/dart-sdk/bin/dart','pub','get','--enforce-lockfile','--no-precompile'])
@@ -158,16 +170,20 @@ class ColdSdkPreparation(unittest.TestCase):
                     expected_stage={'lock':'source_snapshot','dependencies':'tool_dependencies',
                         'changed_lock':'tool_dependencies','source_drift':'tool_dependencies',
                         'extra':'final_verification'}.get(failure,'package_config')
+                    if failure.startswith('provider_'):expected_stage='provider_dependencies'
                     self.assertEqual(rows[-1]['stage'],expected_stage)
                 else:
                     result=s.prepare(work,run);result.verify()
-                    self.assertEqual(result.config_bytes,b'provider untouched config' if warm else None)
-                    self.assertEqual(calls,['sdk_head','sdk_inventory','sdk_dependencies'])
+                    self.assertEqual(result.initial_config_bytes,b'provider untouched config' if warm else None)
+                    self.assertEqual(result.config_bytes,config.read_bytes())
+                    self.assertEqual(calls,['sdk_head','sdk_inventory','sdk_provider_dependencies','sdk_dependencies'])
                     derived=json.loads((result.destination/'package_config.json').read_text())
                     self.assertEqual(derived['packages'][0]['rootUri'],(result.destination/'flutter_tools').as_uri()+'/')
                 self.assertNotIn('CANARY',output.getvalue());self.assertNotIn(str(root),output.getvalue())
-            if failure!='source_drift':
-                self.assertEqual({x.relative_to(base).as_posix():x.read_bytes() for x in base.rglob('*') if x.is_file()},baseline)
+            if failure not in {'source_drift','provider_source','provider_lock'}:
+                current={x.relative_to(base).as_posix():x.read_bytes() for x in base.rglob('*') if x.is_file()}
+                self.assertEqual({k:v for k,v in current.items() if '/.dart_tool/' not in k},
+                                 {k:v for k,v in baseline.items() if '/.dart_tool/' not in k})
 
     def test_policy_reason_catalog_covers_every_sdk_guard_and_hides_canaries(self):
         import ast
@@ -178,3 +194,35 @@ class ColdSdkPreparation(unittest.TestCase):
         self.assertEqual(s.safe_reason(p.PolicyError('CANARY')),'OTHER')
         self.assertEqual(s.safe_reason(RuntimeError('sdk_tool_lock_hash')),'OTHER')
         for label in labels:self.assertEqual(s.safe_reason(p.PolicyError(label)),label)
+
+class GeneratedBaselineGuards(unittest.TestCase):
+    def test_every_generated_file_remains_byte_exact_and_never_rebaselines(self):
+        import io
+        from contextlib import redirect_stdout
+        for role in ('provider_package_config','provider_package_graph','provider_version'):
+            for change in ('content','metadata','deleted','symlink','directory','appeared'):
+                with self.subTest(role=role,change=change),tempfile.TemporaryDirectory() as tmp:
+                    file=Path(tmp)/'public-file';expected=b'{"generator":"dart","pubCache":"original"}'
+                    file.write_bytes(expected)
+                    if change=='content':file.write_bytes(b'CANARY')
+                    if change=='metadata':file.write_bytes(b'{"generator":"dart","pubCache":"CANARY"}')
+                    if change=='deleted':file.unlink()
+                    if change=='symlink':file.unlink();file.symlink_to(Path(tmp)/'CANARY')
+                    if change=='directory':file.unlink();file.mkdir()
+                    if change=='appeared':expected=None
+                    with redirect_stdout(io.StringIO()) as output:
+                        self.assertFalse(s.generated_matches(file,expected,role))
+                        self.assertFalse(s.generated_matches(file,expected,role))
+                    row=json.loads(output.getvalue().splitlines()[0])
+                    self.assertNotIn('CANARY',output.getvalue());self.assertNotIn(tmp,output.getvalue())
+                    self.assertEqual(row['file_role'],role)
+                    self.assertEqual(row['expected'],s.bytes_fingerprint(expected))
+                    if change in {'content','metadata'}:self.assertEqual(row['actual']['sha256'],s.digest(file.read_bytes()))
+
+    def test_successful_byte_match_emits_no_drift_receipt(self):
+        import io
+        from contextlib import redirect_stdout
+        with tempfile.TemporaryDirectory() as tmp,redirect_stdout(io.StringIO()) as output:
+            file=Path(tmp)/'public';self.assertTrue(s.generated_matches(file,None,'provider_package_config'))
+            file.write_bytes(b'public');self.assertTrue(s.generated_matches(file,b'public','provider_package_config'))
+        self.assertEqual(output.getvalue(),'')

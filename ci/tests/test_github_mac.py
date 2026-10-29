@@ -66,7 +66,7 @@ class GithubMacPolicy(unittest.TestCase):
         for fail in (None,*sorted(g.LABELS)):
             with self.subTest(command=fail):self.exercise(fail)
 
-    def exercise(self,fail):
+    def exercise(self,fail,post_failure=False):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp).resolve();mobile=root/'apps/mobile';mobile.mkdir(parents=True)
             (root/'ci').mkdir();pins=json.loads((g.ROOT/'ci/ios-host-pins.json').read_text())
@@ -74,12 +74,14 @@ class GithubMacPolicy(unittest.TestCase):
             work=root/'.ci-github';base=work/'sdk/flutter';app=mobile/'build/ios/iphoneos/Runner.app'
             env=self.env(root);calls=[]
             overlay=mock.Mock(base=base)
+            if post_failure:overlay.verify.side_effect=[None,p.PolicyError('sdk_package_config_changed')]
             overlay.command.return_value=[base/'bin/cache/dart-sdk/bin/dart','reviewed_fixture.dart','analyze','--no-pub']
             overlay.report.return_value={'event':'TESTFLIGHT_SDK_DELTA'}
             def prepare(work_arg,run):
                 self.assertEqual(work_arg,work)
                 run('sdk_head',['git','rev-parse','HEAD'],cwd=base)
                 run('sdk_inventory',['git','ls-tree','-rz','HEAD','--',*g.sdk.SOURCE_PATHS],cwd=base)
+                run('sdk_provider_dependencies',[base/'bin/cache/dart-sdk/bin/dart','pub','get','--enforce-lockfile','--no-precompile'],cwd=base/'packages/flutter_tools')
                 run('sdk_dependencies',[base/'bin/cache/dart-sdk/bin/dart','pub','get','--enforce-lockfile','--no-precompile'],cwd=work/'analyzer_overlay/flutter_tools')
                 return overlay
             commands=[
@@ -92,6 +94,7 @@ class GithubMacPolicy(unittest.TestCase):
                 ('flutter_version',['flutter','--version','--machine']),
                 ('sdk_head',['git','rev-parse','HEAD']),
                 ('sdk_inventory',['git','ls-tree','-rz','HEAD','--',*g.sdk.SOURCE_PATHS]),
+                ('sdk_provider_dependencies',[base/'bin/cache/dart-sdk/bin/dart','pub','get','--enforce-lockfile','--no-precompile']),
                 ('sdk_dependencies',[base/'bin/cache/dart-sdk/bin/dart','pub','get','--enforce-lockfile','--no-precompile']),
                 ('pub_get',['flutter','pub','get','--enforce-lockfile']),('analyze',overlay.command()),
                 ('entry_test',['flutter','test','--no-pub','--concurrency=1',*p.DEFINES,'test/testflight_entrypoint_test.dart']),
@@ -108,7 +111,7 @@ class GithubMacPolicy(unittest.TestCase):
                 self.assertTrue(kw['check']);self.assertIs(kw['group_observer'],g.groups.capture)
                 self.assertGreater(kw['seconds'],0);self.assertLessEqual(kw['seconds'],1200)
                 self.assertEqual(kw['cwd'],mobile if label in {'pub_get','analyze','entry_test','compile_unsigned'} else
-                    base if label in {'sdk_head','sdk_inventory'} else work/'analyzer_overlay/flutter_tools' if label=='sdk_dependencies' else root)
+                    base/'packages/flutter_tools' if label=='sdk_provider_dependencies' else base if label in {'sdk_head','sdk_inventory'} else work/'analyzer_overlay/flutter_tools' if label=='sdk_dependencies' else root)
                 kw['diagnostic'].update(failure_kind='NONE',exit_code=0,output_bytes=0,cleanup_failed=False)
                 if fail==label:
                     kw['diagnostic'].update(failure_kind='NONZERO_EXIT',exit_code=9)
@@ -128,12 +131,19 @@ class GithubMacPolicy(unittest.TestCase):
                  mock.patch.object(g,'run_bounded',side_effect=command),mock.patch.object(g.sdk,'prepare',side_effect=prepare), \
                  mock.patch.object(g,'download',side_effect=lambda spec,target,guard:target.write_bytes(b'fixture')), \
                  mock.patch.object(g,'dispose_check',return_value={'status':'PASS_SDK_DISPOSE_MODELS'}),mock.patch('builtins.print') as printed:
-                if fail:
+                if post_failure:
+                    with self.assertRaisesRegex(p.PolicyError,'sdk_package_config_changed'):g.execute()
+                elif fail:
                     with self.assertRaisesRegex(RuntimeError,'CANARY'):g.execute()
                 else:g.execute()
             rows=[json.loads(call.args[0]) for call in printed.call_args_list]
             self.assertNotIn('CANARY',json.dumps(rows))
-            if fail:
+            if post_failure:
+                self.assertEqual(calls[-1],'pub_get')
+                self.assertEqual(rows[-1]['failure_kind'],'POST_VERIFICATION')
+                self.assertEqual(rows[-1]['command_outcome'],'PASS')
+                self.assertFalse(any(x.get('status')=='PASS_UNSIGNED_FAKE_UI_COMPILE_ONLY' for x in rows))
+            elif fail:
                 self.assertEqual(calls[-1],fail)
                 self.assertFalse(any(x.get('status')=='PASS_UNSIGNED_FAKE_UI_COMPILE_ONLY' for x in rows))
             else:
@@ -172,3 +182,42 @@ class GithubMacPolicy(unittest.TestCase):
             row=json.loads(printed.call_args.args[0])
             self.assertEqual(row['safe_reason'],expected)
             self.assertFalse(row['artifact_eligible']);self.assertNotIn('CANARY',json.dumps(row))
+
+class GithubCommandVerification(unittest.TestCase):
+    def test_command_and_verification_outcomes_are_separate_and_safe(self):
+        import time
+        for case in ('success','pre','post','process','post_resource'):
+            with self.subTest(case=case):
+                overlay=mock.Mock();guard=mock.Mock();detail={}
+                if case=='pre':overlay.verify.side_effect=p.PolicyError('sdk_package_config_changed')
+                if case=='post':overlay.verify.side_effect=[None,p.PolicyError('sdk_package_config_changed')]
+                if case=='post_resource':guard.side_effect=[None,p.PolicyError('github_time_disk')]
+                def run(*args,**kwargs):
+                    kwargs['diagnostic'].update(failure_kind='NONZERO_EXIT' if case=='process' else 'NONE',
+                        exit_code=9 if case=='process' else 0,cleanup_failed=False,output_bytes=351)
+                    if case=='process':raise RuntimeError('CANARY')
+                    return subprocess.CompletedProcess([],0,'CANARY','CANARY')
+                with mock.patch.object(g,'run_bounded',side_effect=run) as runner,mock.patch('builtins.print') as printed:
+                    action=lambda:g.run_checked('pub_get',['fixed'],cwd=g.ROOT,env={'HOME':'CANARY'},
+                        deadline=time.monotonic()+60,guard=guard,overlay=overlay)
+                    if case=='success':self.assertEqual(action(),'CANARY')
+                    else:
+                        with self.assertRaises((p.PolicyError,RuntimeError)):action()
+                row=json.loads(printed.call_args.args[0]);self.assertNotIn('CANARY',json.dumps(row))
+                if case=='pre':
+                    runner.assert_not_called();self.assertEqual(row['command_outcome'],'NOT_RUN')
+                    self.assertEqual(row['failure_kind'],'PRE_VERIFICATION');self.assertIsNone(row['exit_code'])
+                elif case in {'post','post_resource'}:
+                    self.assertEqual(row['command_outcome'],'PASS');self.assertEqual(row['process_failure_kind'],'NONE')
+                    self.assertEqual(row['failure_kind'],'POST_VERIFICATION');self.assertEqual(row['exit_code'],0)
+                    self.assertEqual(row['verification_phase'],'post_verification');self.assertFalse(row['cleanup_failed'])
+                elif case=='process':
+                    self.assertEqual(row['command_outcome'],'FAILED');self.assertEqual(row['failure_kind'],'NONZERO_EXIT')
+                    self.assertEqual(row['verification_phase'],'command')
+                else:
+                    self.assertEqual(row['outcome'],'PASS');self.assertEqual(row['verification_phase'],'complete')
+
+    def test_postverification_failure_stops_full_driver_before_analyze(self):
+        # Full orchestration fixture keeps command ordering and forbids extras.
+        case=GithubMacPolicy()
+        case.exercise(None, post_failure=True)

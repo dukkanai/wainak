@@ -23,6 +23,7 @@ COMMAND_STAGES = {
     'xcode_version': 'preflight',
     'sdk_head': 'sdk_analyzer_overlay',
     'sdk_inventory': 'sdk_analyzer_overlay',
+    'sdk_provider_dependencies': 'sdk_analyzer_overlay',
     'sdk_dependencies': 'sdk_analyzer_overlay',
     'pub_get': 'flutter_host_checks',
     'analyze': 'flutter_host_checks',
