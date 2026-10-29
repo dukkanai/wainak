@@ -71,6 +71,10 @@ class Settings(unittest.TestCase):
 
 
 class Channels(unittest.TestCase):
+    # No finite lifetime competing with the runner's deadline. Default SIGTERM
+    # handling lets the unchanged runner terminate and reap this owned child.
+    PERSISTENT_CHILD='import os,time; os.write(2,b"CANARY");\nwhile True: time.sleep(3600)'
+
     def test_stderr_warning_breaks_old_json_but_stdout_only_passes_same_policy(self):
         payload=json.dumps(valid_settings())
         source='import os; os.write(2,b"CANARY_WARNING\\n"); os.write(1,'+repr(payload.encode())+')'
@@ -84,18 +88,53 @@ class Channels(unittest.TestCase):
         with mock.patch('builtins.print') as printed:settings.validate(result.stdout,PINS)
         self.assertNotIn('CANARY',str(printed.call_args_list)+json.dumps(detail))
 
-    def test_both_streams_share_bound_and_nonzero_timeout_remain_fail_closed(self):
-        cases=[('stderr_flood','import os; os.write(2,b"x"*10000)',128,5,'OUTPUT_BOUND'),
-            ('combined_bound','import os; os.write(1,b"x"*90); os.write(2,b"x"*90)',128,5,'OUTPUT_BOUND'),
-            ('nonzero','import os; os.write(1,b"[]"); os.write(2,b"CANARY"); raise SystemExit(2)',4096,5,'NONZERO_EXIT'),
-            ('timeout','import os,time; os.write(2,b"CANARY"); time.sleep(5)',4096,.15,'TIMEOUT')]
-        for case,source,maximum,seconds,kind in cases:
-            detail={}
-            with self.subTest(case=case),self.assertRaises((RuntimeError,TimeoutError)) as caught:
-                run_bounded([sys.executable,'-c',source],cwd=Path.cwd(),seconds=seconds,maximum=maximum,
-                    check=True,stdout_only=True,diagnostic=detail)
-            self.assertEqual(detail['failure_kind'],kind);self.assertFalse(detail['cleanup_failed'])
-            self.assertNotIn('CANARY',str(caught.exception)+json.dumps(detail))
+    def assert_command_rejected(self,source,maximum,seconds,kind):
+        detail={}
+        exception=TimeoutError if kind=='TIMEOUT' else RuntimeError
+        with self.assertRaises(exception) as caught:
+            run_bounded([sys.executable,'-c',source],cwd=Path.cwd(),seconds=seconds,maximum=maximum,
+                check=True,stdout_only=True,diagnostic=detail)
+        self.assertEqual(detail['failure_kind'],kind);self.assertFalse(detail['cleanup_failed'])
+        self.assertEqual(detail['cleanup_errors'],[])
+        if kind=='NONZERO_EXIT':self.assertEqual(detail['exit_code'],2)
+        self.assertNotIn('CANARY',str(caught.exception)+json.dumps(detail))
+
+    def test_stderr_flood_exceeds_output_bound(self):
+        self.assert_command_rejected('import os; os.write(2,b"x"*10000)',128,5,'OUTPUT_BOUND')
+
+    def test_both_streams_share_output_bound(self):
+        self.assert_command_rejected('import os; os.write(1,b"x"*90); os.write(2,b"x"*90)',128,5,'OUTPUT_BOUND')
+
+    def test_nonzero_exit_remains_fail_closed(self):
+        self.assert_command_rejected('import os; os.write(1,b"[]"); os.write(2,b"CANARY"); raise SystemExit(2)',4096,5,'NONZERO_EXIT')
+
+    def test_persistent_child_times_out_and_is_cleaned(self):
+        self.assert_command_rejected(self.PERSISTENT_CHILD,4096,.15,'TIMEOUT')
+
+    def test_persistent_timeout_after_modeled_spawn_deadline_gap(self):
+        from scripts import ci_process
+        real_spawn=ci_process.subprocess.Popen
+        children=[];events=[];clock={'now':0.0}
+        def spawn(*args,**kwargs):
+            child=real_spawn(*args,**kwargs);children.append(child)
+            # Model the parent losing six seconds before Popen returns, without
+            # a real sleep or depending on host scheduling to create the gap.
+            clock['now']=6.0;events.append('spawn_gap')
+            return child
+        def monotonic():
+            value=clock['now'];clock['now']+=.2;events.append(value)
+            return value
+        # Replace only this module's clock: real process cleanup/reaping keeps
+        # its real clock, signals and permission checks, on Linux and Darwin.
+        with mock.patch.object(ci_process.subprocess,'Popen',side_effect=spawn), \
+             mock.patch.object(ci_process,'time',mock.Mock(monotonic=monotonic)), \
+             mock.patch.object(ci_process,'cleanup_process',wraps=ci_process.cleanup_process) as cleanup:
+            self.assert_command_rejected(self.PERSISTENT_CHILD,4096,.15,'TIMEOUT')
+        self.assertEqual(events,['spawn_gap',6.0,6.2])
+        cleanup.assert_called_once()
+        self.assertIs(cleanup.call_args.args[0],children[0])
+        self.assertIsNotNone(children[0].returncode)
+        self.assertTrue(children[0].stdout.closed);self.assertTrue(children[0].stderr.closed)
 
     def test_stderr_closed_and_cleanup_errors_are_preserved(self):
         from scripts import ci_process
