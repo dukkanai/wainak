@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from ci.testflight import policy as testflight_policy
+from ci.testflight.sdk_overlay import delta as reviewed_sdk_delta
 from ci.rename_provenance import source_matches, source_path
 
 BASE = "120a0c24970427438af7c693e772b95050b3fcfc"
@@ -149,6 +150,7 @@ def validate_parity(root: Path, manifest) -> int:
 
 
 def main() -> None:
+    reviewed_sdk_delta()  # Manifest/helper/method hashes only; no SDK execution.
     validate_workflow(read_json(ROOT / "codemagic.yaml"))
     require(checked_file(ROOT, "ci/testflight/Signing.xcconfig").read_text() == testflight_policy.SIGNING_CONFIG, "testflight_signing_config")
     source_count = validate_sources(ROOT, read_json(ROOT / "ci/source-provenance.json"), read_json(ROOT / "ci/native-source-deltas.json"))

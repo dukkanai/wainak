@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "framework_revision": "737ba8f885dc774b53b442759999a312c9461e4e",
+  "target": "packages/flutter_tools/lib/src/dart/analysis.dart",
+  "before_sha256": "6fc82b932389ffb0c8661c2bd1b1692aef770797eb08a03bc4753169446d99dd",
+  "after_sha256": "50e7e6249746a2c80f4418c09c47c76538467e3fe14eb0c5d4215e34383d3902",
+  "helper_sha256": "baef9b9590224deb4faf2854a81ed3e84d9cefd7e292768aaa0bb713743a1ae7",
+  "old_method_sha256": "a410683587fbe042766ca4fe89e76f2959b58575b35edffd32a2728d3c1c9714",
+  "new_method_sha256": "354dc061b2b0429638c1c5ab29fa610f67ac215edbd75f9776c1af8ef75ea43a",
+  "term_timeout_seconds": 5,
+  "kill_timeout_seconds": 2
+}

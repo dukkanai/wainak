@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'scripts'))
 from ci.testflight import policy as p
 from ci.testflight import diagnostics as d
+from ci.testflight import sdk_overlay as sdk
 from scripts.ci_process import run_bounded
 
 
@@ -88,10 +89,17 @@ def execute():
     env = child_environment(os.environ)
     deadline = time.monotonic() + 35*60
     stage = 'preflight'
+    overlay = None
 
     def run(label, command, cwd=ROOT, seconds=300):
-        return d.run_command(label, command, cwd=cwd, env=env, root=ROOT,
-                             deadline=deadline, runner=run_bounded, seconds=seconds)
+        checked = overlay is not None and label in {
+            'pub_get', 'analyze', 'entry_test', 'ios_config', 'build_ipa'}
+        if checked:overlay.verify()
+        try:
+            return d.run_command(label, command, cwd=cwd, env=env, root=ROOT,
+                                 deadline=deadline, runner=run_bounded, seconds=seconds)
+        finally:
+            if checked:overlay.verify()
 
     # Recheck before use-profiles modifies the disposable cloud project.
     run('source_preparation', [sys.executable, ROOT / 'ci/check_preparation.py'])
@@ -106,9 +114,18 @@ def execute():
     work.mkdir(mode=0o700, parents=True)
     try:
         d.emit_host(ROOT, work, version['frameworkVersion'], version['dartSdkVersion'])
+        stage = 'sdk_analyzer_overlay'
+        overlay = sdk.prepare(work, run)
+        print(json.dumps(overlay.report()), flush=True)
         stage = 'flutter_host_checks'
         run('pub_get', ['flutter', 'pub', 'get', '--enforce-lockfile'], mobile)
-        run('analyze', ['flutter', 'analyze', '--no-pub'], mobile)
+        original_flutter_root = env.get('FLUTTER_ROOT')
+        env['FLUTTER_ROOT'] = str(overlay.base)
+        try:
+            run('analyze', overlay.command(), mobile)
+        finally:
+            if original_flutter_root is None:env.pop('FLUTTER_ROOT', None)
+            else:env['FLUTTER_ROOT'] = original_flutter_root
         run('entry_test', ['flutter', 'test', '--no-pub', '--concurrency=1', *p.DEFINES,
              'test/testflight_entrypoint_test.dart'], mobile)
         p.require(not run('lock_diff', ['git', 'diff', '--exit-code', '--', 'apps/mobile/pubspec.lock']).strip(), 'dependency_drift')

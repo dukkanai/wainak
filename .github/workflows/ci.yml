@@ -5,6 +5,16 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Explicit manual target
+        type: choice
+        options: [ci, mac-unsigned]
+        default: ci
+      expected_sha:
+        description: Full reviewed commit SHA required for mac-unsigned
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -15,6 +25,7 @@ concurrency:
 
 jobs:
   source:
+    if: ${{ inputs.target != 'mac-unsigned' }}
     name: Source checks
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -33,6 +44,7 @@ jobs:
         run: node --check prototype/dist/app.js
 
   unit:
+    if: ${{ inputs.target != 'mac-unsigned' }}
     name: Operations unit tests
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -48,6 +60,7 @@ jobs:
         run: python3 -m unittest discover -s prototype -p test_package_preview.py -v
 
   recovery:
+    if: ${{ inputs.target != 'mac-unsigned' }}
     name: Isolated database recovery
     runs-on: ubuntu-24.04
     timeout-minutes: 12
@@ -62,6 +75,7 @@ jobs:
         run: python3 ops/test_recovery.py
 
   browser:
+    if: ${{ inputs.target != 'mac-unsigned' }}
     name: Prototype browser tests
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -85,6 +99,7 @@ jobs:
         run: npm test
 
   backend:
+    if: ${{ inputs.target != 'mac-unsigned' }}
     name: Backend contracts and tests
     runs-on: ubuntu-24.04
     timeout-minutes: 8
@@ -107,6 +122,7 @@ jobs:
         run: node --test backend/tests/test_web_deletion_script.mjs
 
   matching:
+    if: ${{ inputs.target != 'mac-unsigned' }}
     name: Authenticated matching integration
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -130,6 +146,7 @@ jobs:
           --run-disposable-identity --include-existing-qa
 
   mobile:
+    if: ${{ inputs.target != 'mac-unsigned' }}
     name: Flutter development tests
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -154,6 +171,7 @@ jobs:
           --identity-python "$RUNNER_TEMP/identity-venv/bin/python"
 
   archive:
+    if: ${{ inputs.target != 'mac-unsigned' }}
     name: Archive and bridge tests
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -171,6 +189,7 @@ jobs:
         run: git diff --exit-code -- archive/go.mod archive/go.sum archivebridge/go.mod archivebridge/go.sum qa/phase5_archive/go.mod qa/phase5_archive/go.sum
 
   native-guards:
+    if: ${{ inputs.target != 'mac-unsigned' }}
     name: Native build guard tests
     runs-on: ubuntu-24.04
     timeout-minutes: 12
@@ -193,3 +212,27 @@ jobs:
           python3 -m unittest discover -s ci/tests -p 'test_*.py' -v
           python3 -m unittest discover -s ci/native -p 'test_*.py' -v
           python3 -m unittest discover -s qa/phase6_native_build -p 'test_*.py' -v
+
+  mac-unsigned:
+    name: Manual standard Mac unsigned UI validation
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.target == 'mac-unsigned' &&
+      github.repository == 'dukkanai/wainak' && github.event.repository.private == false &&
+      github.ref == 'refs/heads/dev/ios-testflight-internal-20261029' && inputs.expected_sha == github.sha
+    runs-on: macos-26
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      WAINEK_REPOSITORY_VISIBILITY: ${{ github.event.repository.visibility }}
+      WAINEK_RUNNER_LABEL: macos-26
+      WAINEK_EXPECTED_SHA: ${{ inputs.expected_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12.7'
+      - name: Strict unsigned Mac validation without Apple credentials
+        run: python3 ci/github/mac_unsigned.py

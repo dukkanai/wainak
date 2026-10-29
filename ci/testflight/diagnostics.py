@@ -12,6 +12,7 @@ import tempfile
 import time
 
 from ci.testflight import policy as p
+from ci.testflight import group_observation as groups
 from ci.ios.diagnostics import project_cleanup_errors
 
 COMMAND_STAGES = {
@@ -20,6 +21,8 @@ COMMAND_STAGES = {
     'source_clean': 'preflight',
     'flutter_version': 'preflight',
     'xcode_version': 'preflight',
+    'sdk_head': 'sdk_analyzer_overlay',
+    'sdk_inventory': 'sdk_analyzer_overlay',
     'pub_get': 'flutter_host_checks',
     'analyze': 'flutter_host_checks',
     'entry_test': 'flutter_host_checks',
@@ -80,6 +83,8 @@ def emit_command(label, outcome, started, detail):
         'failure_kind': kind,
         'output_bytes': integer(detail.get('output_bytes'), 0, 16 * 1024 * 1024),
         'cleanup_failed': detail.get('cleanup_failed') is True,
+        'group_before_cleanup': groups.project(detail.get('group_before_cleanup')),
+        'group_after_cleanup': groups.project(detail.get('group_after_cleanup')),
         **project_cleanup_errors(detail.get('cleanup_errors', [])),
         'cleanup_errors_truncated': detail.get('cleanup_errors_truncated') is True or
             (type(detail.get('cleanup_errors')) is list and len(detail['cleanup_errors']) > 16),
@@ -96,7 +101,7 @@ def run_command(label, command, *, cwd, env, root, deadline, runner, seconds=300
             detail['failure_kind'] = 'RESOURCE_GUARD'
             p.require(False, 'time_or_disk_limit')
         result = runner(command, cwd=cwd, env=env, seconds=min(seconds, remaining),
-                        check=True, diagnostic=detail)
+                        check=True, diagnostic=detail, group_observer=groups.capture)
     except BaseException as error:
         if detail.get('failure_kind') in (None, 'NONE'):
             detail['failure_kind'] = failure_kind(error)

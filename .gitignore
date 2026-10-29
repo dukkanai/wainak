@@ -34,3 +34,6 @@ coverage/
 
 # Disposable native/iOS CI tools, logs and unsigned artifacts stay local.
 /.ci-work/
+
+# Disposable manual GitHub Mac SDK and unsigned build workspace.
+.ci-github/

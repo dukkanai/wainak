@@ -11,7 +11,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PARTS = {'.runtime', 'backups', '.codex', '.playwright-mcp', 'secrets',
                    'credentials', 'node_modules', '__pycache__', '.dart_tool',
-                   '.ci-work', '.gradle', '.venv', 'build'}
+                   '.ci-work', '.ci-github', '.gradle', '.venv', 'build'}
 FORBIDDEN_SUFFIXES = {'.pem', '.key', '.p12', '.pfx', '.dump', '.pyc', '.log',
                       '.apk', '.aab', '.aar', '.ipa', '.xcarchive', '.xcframework'}
 PATTERNS = {

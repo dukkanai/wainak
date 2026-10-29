@@ -278,12 +278,25 @@ class DriverGuards(unittest.TestCase):
             mobile = root/'apps/mobile'
             export_path = root/'.ci-work/testflight/export.plist'
             app = root/'.ci-work/testflight/inspect/Payload/Runner.app'
+            sdk_base = root/'public-sdk'
+            overlay = mock.Mock(base=sdk_base)
+            overlay.command.return_value = [sdk_base/'bin/cache/dart-sdk/bin/dart', '--disable-dart-dev',
+                '--packages='+str(root/'.ci-work/testflight/analyzer_overlay/package_config.json'),
+                root/'.ci-work/testflight/analyzer_overlay/flutter_tools/bin/flutter_tools.dart', 'analyze', '--no-pub']
+            overlay.report.return_value = {'event': 'TESTFLIGHT_SDK_DELTA'}
+            def prepare_overlay(work, run):
+                self.assertEqual(work, root/'.ci-work/testflight')
+                run('sdk_head', ['git', 'rev-parse', 'HEAD'], cwd=sdk_base)
+                run('sdk_inventory', ['git', 'ls-tree', '-rz', 'HEAD', '--', *b.sdk.SOURCE_PATHS], cwd=sdk_base)
+                return overlay
             commands = [
                 [b.sys.executable, root/'ci/check_preparation.py'],
                 ['git', 'rev-parse', 'HEAD'], ['git', 'status', '--porcelain'],
                 ['flutter', '--version', '--machine'], ['xcodebuild', '-version'],
+                ['git', 'rev-parse', 'HEAD'],
+                ['git', 'ls-tree', '-rz', 'HEAD', '--', *b.sdk.SOURCE_PATHS],
                 ['flutter', 'pub', 'get', '--enforce-lockfile'],
-                ['flutter', 'analyze', '--no-pub'],
+                overlay.command(),
                 ['flutter', 'test', '--no-pub', '--concurrency=1', *p.DEFINES, 'test/testflight_entrypoint_test.dart'],
                 ['git', 'diff', '--exit-code', '--', 'apps/mobile/pubspec.lock'],
                 ['xcode-project', 'use-profiles', '--project', mobile/'ios/Runner.xcodeproj',
@@ -314,9 +327,10 @@ class DriverGuards(unittest.TestCase):
                 self.assertGreater(kwargs['seconds'], 0)
                 self.assertLessEqual(kwargs['seconds'], 1200 if label == 'build_ipa' else 300)
                 self.assertEqual(kwargs['cwd'], mobile if label in {
-                    'pub_get', 'analyze', 'entry_test', 'ios_config', 'build_ipa'} else root)
+                    'pub_get', 'analyze', 'entry_test', 'ios_config', 'build_ipa'} else sdk_base if label in {'sdk_head','sdk_inventory'} else root)
                 self.assertNotIn('CM_API_TOKEN', kwargs['env'])
                 expected_env = b.child_environment(env)
+                if label == "analyze":expected_env["FLUTTER_ROOT"] = str(sdk_base)
                 if index >= labels.index('ios_config'):
                     expected_env['XCODE_XCCONFIG_FILE'] = str(root/'ci/testflight/Signing.xcconfig')
                 self.assertEqual(kwargs['env'], expected_env)
@@ -365,6 +379,7 @@ class DriverGuards(unittest.TestCase):
             with mock.patch.object(b, 'ROOT', root), mock.patch.dict(b.os.environ, env, clear=True), \
                  mock.patch.object(b.sys, 'platform', 'darwin'), mock.patch.object(b.platform, 'machine', return_value='arm64'), \
                  mock.patch.object(b, 'run_bounded', side_effect=command_result), \
+                 mock.patch.object(b.sdk, 'prepare', side_effect=prepare_overlay), \
                  mock.patch.object(b.d.shutil, 'disk_usage', return_value=mock.Mock(free=8*1024**3)), \
                  mock.patch('builtins.print') as printed:
                 if command_failure:

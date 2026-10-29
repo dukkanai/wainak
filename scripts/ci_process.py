@@ -13,7 +13,7 @@ from ci.ios.diagnostics import cleanup_process, project_cleanup_errors, safe_err
 
 
 def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024,
-                check=False, cleanup_grace=0, diagnostic=None):
+                check=False, cleanup_grace=0, diagnostic=None, group_observer=None):
     """Capture bounded merged output; never print command arguments or child output.
 
     POSIX host tools must keep children in the inherited group. Nested fixture
@@ -30,9 +30,28 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
     code = None
     cleanup_failed = False
     cleanup_errors = []
+    group_before = group_after = None
     process = selector = primary = None
     output = bytearray()
     previous = signal.getsignal(signal.SIGTERM)
+
+    observer_cancelled = False
+
+    def observe():
+        nonlocal observer_cancelled
+        if group_observer is None or process is None:
+            return None
+        try:
+            result = group_observer(process.pid)
+            if type(result) is dict and result.get('observer_cancelled') is True:
+                observer_cancelled = True
+            if type(result) is dict and result.get('observer_cleanup_failed') is True:
+                cleanup_errors.append({'operation': 'observer_cleanup', 'type': 'UnverifiedProcessGroup'})
+            return result
+        except BaseException as error:
+            if isinstance(error, (InterruptedError, KeyboardInterrupt, SystemExit)):
+                observer_cancelled = True
+            return {"status": "UNAVAILABLE"}
 
     def cancelled(*_):
         raise InterruptedError('Host CI command cancelled')
@@ -100,17 +119,20 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
                     # Never let signal/probe/reap failure bypass final group cleanup
                     # or replace the original timeout/cancellation failure.
                     cleanup_errors.append({'operation': 'grace_cleanup', **safe_error(error)})
+            group_before = observe()
             try:
                 failures = cleanup_process(process, selector)
             except BaseException as error:
                 cleanup_errors.append({'operation': 'cleanup_process', **safe_error(error)})
                 cleanup_failed = True
-                if primary is None:
-                    kind = 'CLEANUP'
-                    raise
                 failures = []
             cleanup_errors.extend(failures)
             cleanup_failed = bool(cleanup_errors)
+            group_after = observe()
+            cleanup_failed = bool(cleanup_errors)
+            if observer_cancelled and primary is None:
+                kind = "CANCELLED"
+                raise InterruptedError("Host CI command cancelled")
             if cleanup_failed and primary is None:
                 kind = 'CLEANUP'
                 raise RuntimeError('Host CI owned process cleanup could not be verified')
@@ -123,3 +145,5 @@ def run_bounded(command, *, cwd, env=None, seconds=300, maximum=16 * 1024 * 1024
                     diagnostic.update(failure_kind=kind, exit_code=code,
                                       output_bytes=len(output), cleanup_failed=cleanup_failed)
                     diagnostic.update(project_cleanup_errors(cleanup_errors))
+                    if group_observer is not None:
+                        diagnostic.update(group_before_cleanup=group_before, group_after_cleanup=group_after)

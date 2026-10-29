@@ -1,0 +1,36 @@
+// Wainek reviewed SDK delta: the parent must collect its analysis-server child.
+// A timeout or failed signal is still a failure even if forced cleanup succeeds.
+Future<bool> stopAnalysisServerOwnedProcess(
+  Process process, {
+  Duration termTimeout = const Duration(seconds: 5),
+  Duration killTimeout = const Duration(seconds: 2),
+}) async {
+  final exited = process.exitCode;
+  var signalled = false;
+  try {
+    signalled = process.kill();
+  } catch (_) {
+    // Keep the failure, but still try to collect this owned child below.
+  }
+  try {
+    await exited.timeout(termTimeout);
+  } on TimeoutException {
+    try {
+      ProcessSignal.sigkill.kill(process);
+    } catch (_) {
+      // Never turn inability to signal or wait into successful shutdown.
+    }
+    try {
+      await exited.timeout(killTimeout);
+    } catch (_) {
+      throw StateError('WAINEK_ANALYSIS_SERVER_EXIT_UNVERIFIED');
+    }
+    throw StateError('WAINEK_ANALYSIS_SERVER_TERM_TIMEOUT');
+  } catch (_) {
+    throw StateError('WAINEK_ANALYSIS_SERVER_EXIT_UNVERIFIED');
+  }
+  if (!signalled) {
+    throw StateError('WAINEK_ANALYSIS_SERVER_SIGNAL_FAILED');
+  }
+  return true;
+}

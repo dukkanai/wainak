@@ -52,6 +52,11 @@ class SafeCommandDiagnostics(unittest.TestCase):
         def uncertain_cleanup(*args):
             # Always perform the real cleanup first; simulate only the outcome.
             result = observed_cleanup(*args)
+            if args[0] is not None and args[0].args[0] == '/bin/ps':
+                # Inject failure into the command under test only. The new
+                # census owns a separate process group, tested independently.
+                self.assertEqual(args[0].args, ['/bin/ps', '-axo', 'pid=,ppid=,pgid=,stat=,uid='])
+                return result
             if case in {'cleanup_raise', 'primary_cleanup_raise'}:
                 raise RuntimeError(CANARY)
             if case in {'eperm_cleanup', 'primary_eperm_cleanup'}:
@@ -79,7 +84,15 @@ class SafeCommandDiagnostics(unittest.TestCase):
                 stack.enter_context(mock.patch.object(process.subprocess, 'Popen', side_effect=PermissionError(CANARY)))
             if case in {'cancel', 'other'}:
                 error = InterruptedError(CANARY) if case == 'cancel' else RuntimeError(CANARY)
-                stack.enter_context(mock.patch.object(process.selectors.DefaultSelector, 'select', side_effect=error))
+                real_select = process.selectors.DefaultSelector.select
+                selected = []
+                def select_command(selector, *args, **kwargs):
+                    if not selected:selected.append(selector)
+                    if selector is selected[0]:raise error
+                    return real_select(selector, *args, **kwargs)
+                # Cancellation/I/O injection belongs to the command under test,
+                # not to the independent ps census executed during cleanup.
+                stack.enter_context(mock.patch.object(process.selectors.DefaultSelector, 'select', new=select_command))
             caught = None
             try:
                 result = d.run_command('entry_test', [sys.executable, '-c', source, CANARY],
