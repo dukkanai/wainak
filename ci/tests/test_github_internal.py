@@ -330,10 +330,11 @@ class CMSInput(unittest.TestCase):
 
 
 class Lifecycle(unittest.TestCase):
-    def exercise(self, failure=None, mutation=None, uploading=False):
+    def exercise(self, failure=None, mutation=None, uploading=False,native_cleanup_failure=False):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp).resolve();work=root/'.ci-github';work.mkdir();(work/'home').mkdir();(work/'tmp').mkdir()
+            root=Path(tmp).resolve();work=root/'.ci-github';work.mkdir(mode=0o700);(work/'home').mkdir(mode=0o700);(work/'tmp').mkdir(mode=0o700)
             private=work/'signing';ipa=work/'verified/wainek-internal.ipa';receipt=ipa.parent/'result.json'
+            native_home=root/'native-home';native_home.mkdir(mode=0o700)
             mobile=root/'apps/mobile';mobile.mkdir(parents=True)
             overlay=mock.Mock();ctx={'env':{'PATH':'/safe/path','HOME':str(work/'home')},'deadline':9999999999,
                                     'overlay':overlay,'mobile':mobile}
@@ -402,6 +403,7 @@ class Lifecycle(unittest.TestCase):
                     self.assertNotIn('-A',argv);self.assertIn('/usr/bin/codesign',argv)
                 if label=='keychain_restore':self.assertEqual(argv,['/usr/bin/security','list-keychains','-d','user','-s','/original/login.keychain-db'])
                 if label=='build_ipa':
+                    s.profile_installation.verify(private,PINS)
                     self.assertIn('--no-pub',argv);self.assertTrue(all(x in argv for x in p.DEFINES))
                     options=plistlib.loads((private/'export.plist').read_bytes());p.validate_export(options)
                     dest=mobile/'build/ios/ipa';dest.mkdir(parents=True)
@@ -422,12 +424,18 @@ class Lifecycle(unittest.TestCase):
                 def __getitem__(self,key):secret_reads.append(key);return super().__getitem__(key)
             fake_secrets=SyntheticSecrets({q.SIGNING_SECRETS[0]:base64.b64encode(b'synthetic-p12').decode(),
                           q.SIGNING_SECRETS[1]:'CANARY_PASSWORD',q.SIGNING_SECRETS[2]:base64.b64encode(PROFILE_BYTES).decode()})
+            native_cleanup=s.profile_installation.cleanup
+            def clean_native(*args,**kwargs):
+                if native_cleanup_failure:raise p.PolicyError('signed_native_cleanup')
+                return native_cleanup(*args,**kwargs)
             with mock.patch.multiple(s,ROOT=root,WORK=work,PRIVATE=private,IPA=ipa,RECEIPT=receipt), \
+                 mock.patch.object(s.profile_installation,'native_home',return_value=native_home), \
+                 mock.patch.object(s.profile_installation,'cleanup',side_effect=clean_native), \
                  mock.patch.object(s,'runner',return_value=run),mock.patch.object(s,'cleanup_runner',return_value=run), \
                  mock.patch.object(s.secrets,'token_hex',return_value='synthetic-password'), \
                  mock.patch.dict(s.os.environ,{'GITHUB_SHA':'a'*40},clear=True),mock.patch('builtins.print') as printed:
                 if not uploading:
-                    if failure or mutation:
+                    if failure or mutation or native_cleanup_failure:
                         with self.assertRaises((RuntimeError,p.PolicyError)):s.compile_internal(PINS,'17',ctx,fake_secrets)
                         self.assertFalse(receipt.exists())
                         if failure in {'keychain_list','keychain_create','keychain_unlock','profile_decode'} or mutation=='profile':
@@ -450,6 +458,7 @@ class Lifecycle(unittest.TestCase):
                     fake_key=b'-----BEGIN '+b'PRIVATE KEY-----\nCANARY\n-----END '+b'PRIVATE KEY-----'
                     if mutation=='ipa':ipa.write_bytes(b'tampered')
                     if mutation=='receipt':receipt.write_text(json.dumps({**result,'internal_only_export':False}))
+                    if mutation=='native_journal':(private/s.profile_installation.JOURNAL).write_text('{}')
                     if failure or mutation:
                         with self.assertRaises((RuntimeError,p.PolicyError)):s.upload(PINS,'17',{q.UPLOAD_SECRETS[0]:base64.b64encode(fake_key).decode()})
                     else:
@@ -460,10 +469,19 @@ class Lifecycle(unittest.TestCase):
                     self.assertFalse(list((private/'private_keys').glob('*.p8')))
                 self.assertNotIn('CANARY',str(printed.call_args_list))
                 self.assertFalse((private/'distribution.p12').exists())
-                self.assertFalse((private/'profile.mobileprovision').exists())
+                self.assertEqual((private/'profile.mobileprovision').exists(),native_cleanup_failure)
+                self.assertEqual((private/s.profile_installation.JOURNAL).exists(),native_cleanup_failure or mutation=='native_journal')
+                if mutation=='native_journal':
+                    self.assertNotIn('upload_ipa',calls);self.assertFalse((work/'upload-attempt.json').exists())
+                    self.assertEqual(secret_reads,[])
+                for relative in s.profile_installation.DIRECTORIES:
+                    self.assertEqual((native_home/relative/(PINS['profile_uuid']+'.mobileprovision')).exists(),native_cleanup_failure)
                 if failure not in {'keychain_restore','keychain_delete'}:
                     self.assertFalse((private/'search-list.json').exists())
                     self.assertFalse((private/'distribution.keychain-db').exists())
+
+    def test_native_profile_cleanup_failure_blocks_receipt_and_keeps_recovery_source(self):
+        self.exercise(native_cleanup_failure=True)
 
     def test_success_and_each_build_command_failure(self):
         stages=['profile_decode','keychain_list','keychain_create','keychain_unlock','keychain_import','keychain_access',
@@ -479,7 +497,7 @@ class Lifecycle(unittest.TestCase):
     def test_upload_lifecycle_and_negatives(self):
         for stage in [None,'source_commit','source_clean','xcode_version','upload_ipa']:
             with self.subTest(stage=stage):self.exercise(failure=stage,uploading=True)
-        for mutation in ('ipa','receipt'):
+        for mutation in ('ipa','receipt','native_journal'):
             with self.subTest(mutation=mutation):self.exercise(mutation=mutation,uploading=True)
 
     def test_bounded_diagnostics_canary_and_environment(self):

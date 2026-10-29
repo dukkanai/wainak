@@ -50,6 +50,8 @@ REASONS |= frozenset('export_'+key for key in p.CUSTOM_EXPORT)
 REASONS |= security.REASONS
 REASONS |= ipa.REASONS
 REASONS |= signing_settings.REASONS
+REASONS |= frozenset({'signed_native_home','signed_native_path','signed_native_collision',
+    'signed_native_pin','signed_native_ownership','signed_native_io','signed_native_cleanup'})
 REASONS |= frozenset('settings_'+key for key in ('PRODUCT_BUNDLE_IDENTIFIER','DEVELOPMENT_TEAM','CONFIGURATION',
     'PLATFORM_NAME','CODE_SIGNING_ALLOWED','CODE_SIGNING_REQUIRED','CODE_SIGN_STYLE','CODE_SIGN_IDENTITY'))
 

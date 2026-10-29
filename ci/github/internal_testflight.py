@@ -22,7 +22,7 @@ from ci.github import internal_policy as q, mac_unsigned as g
 from ci.testflight import policy as p, diagnostics as d
 from ci.testflight.build import safe_unpack, xml_plist, child_environment
 from scripts import security_diagnostics as security
-from ci.github import signing_settings,signing_discovery
+from ci.github import signing_settings,signing_discovery,profile_installation
 from scripts import ipa_diagnostics as ipa_diagnostics
 
 LABELS=frozenset({'keychain_list','keychain_create','keychain_unlock','keychain_import','keychain_access',
@@ -142,11 +142,16 @@ def unpack_signed(ipa, destination):
     return safe_unpack(ipa,destination)
 
 
-def cleanup(run):
-    # Own isolated HOME only. Never delete an owner's login keychain/profile.
+def cleanup(run,pins=None,native_required=False):
+    # Account-home removal requires the run's exact durable ownership journal.
+    # Never delete an owner's login keychain or an unrelated profile.
     p.require(not WORK.is_symlink() and not PRIVATE.is_symlink(),'signed_path')
-    if not PRIVATE.exists():return
-    errors=0
+    if not PRIVATE.exists():
+        p.require(not native_required,'signed_cleanup')
+        return
+    errors=0;native_clean=True
+    try:profile_installation.cleanup(PRIVATE,pins if pins is not None else q.REVIEWED_PINS,required=native_required)
+    except BaseException:errors+=1;native_clean=False
     journal=PRIVATE/'search-list.json'
     if journal.exists():
         try:
@@ -165,6 +170,7 @@ def cleanup(run):
         except BaseException:errors+=1
     # Explicit owned files only, no broad recursive deletion.
     for name in ('distribution.p12','profile.mobileprovision','upload.p8'):
+        if name=='profile.mobileprovision' and not native_clean:continue
         path=PRIVATE/name
         try:
             if path.is_symlink():raise p.PolicyError('signed_path')
@@ -190,7 +196,7 @@ def compile_internal(pins, number, ctx, secret_source):
     keychain=PRIVATE/'distribution.keychain-db'
     export=PRIVATE/'export.plist'
     key_password=secrets.token_hex(32)  # Ephemeral keychain password, NOT an Apple key.
-    candidate=None
+    candidate=None;native_installed=False
     try:
         raw=decode(secret_source[q.SIGNING_SECRETS[2]],36*1024)
         p.require(sha(raw)==pins['profile_sha256'],'signed_profile_hash')
@@ -217,6 +223,10 @@ def compile_internal(pins, number, ctx, secret_source):
         for relative in ('Library/MobileDevice/Provisioning Profiles','Library/Developer/Xcode/UserData/Provisioning Profiles'):
             directory=WORK/'home'/relative;directory.mkdir(mode=0o700,parents=True,exist_ok=False)
             new_file(directory/(pins['profile_uuid']+'.mobileprovision'),raw)
+        # The same pinned bytes, linked without replacement into the actual
+        # Foundation/account home. Journal before link, cleanup even on failure.
+        profile_installation.install(PRIVATE,pins)
+        native_installed=True
         options={**p.CUSTOM_EXPORT,'provisioningProfiles':{p.BUNDLE:pins['profile_uuid']},
                  'signingCertificate':pins['certificate_sha1']}
         p.validate_export(options);new_file(export,plistlib.dumps(options));export_hash=sha(export.read_bytes())
@@ -233,11 +243,13 @@ def compile_internal(pins, number, ctx, secret_source):
         try:observation=signing_discovery.project(json.loads(observed))
         except (ValueError,RecursionError):observation=signing_discovery.project(None)
         print(json.dumps({'event':'GITHUB_SIGNING_DISCOVERY',**observation}),flush=True)
+        profile_installation.verify(PRIVATE,pins)
         try:
             run('build_ipa',['flutter','build','ipa','--release','--no-pub','--build-number',number,
                 '--export-options-plist',export,*p.DEFINES],cwd=mobile,seconds=1200)
         finally:
             print(json.dumps({'event':'GITHUB_IPA_FILES',**signing_discovery.artifact_presence(mobile,WORK)}),flush=True)
+        profile_installation.verify(PRIVATE,pins)
         p.require(sha(regular(export))==export_hash and plistlib.loads(export.read_bytes())==options,'signed_export')
         candidates=list((mobile/'build/ios/ipa').glob('*.ipa'))
         p.require(len(candidates)==1,'signed_no_ipa');candidate=candidates[0]
@@ -259,7 +271,7 @@ def compile_internal(pins, number, ctx, secret_source):
         ctx['overlay'].verify()
     finally:
         # Failure here prevents the receipt/upload even after a successful build.
-        cleanup(cleanup_runner())
+        cleanup(cleanup_runner(),pins,native_required=native_installed)
     IPA.parent.mkdir(mode=0o700)
     candidate.rename(IPA)
     result={'status':'VERIFIED_INTERNAL_IPA','source_commit':os.environ['GITHUB_SHA'],
@@ -294,7 +306,8 @@ def upload(pins, number, secret_source):
     p.require(run('source_commit',['git','rev-parse','HEAD']).strip()==os.environ['GITHUB_SHA'] and
               not run('source_clean',['git','status','--porcelain']).strip(),'signed_source_drift')
     p.require(run('xcode_version',['/usr/bin/xcodebuild','-version']).splitlines()==['Xcode 26.4.1','Build version 17E202'],'signed_settings')
-    p.require(not (PRIVATE/'search-list.json').exists() and not (PRIVATE/'distribution.keychain-db').exists(),'signed_cleanup')
+    p.require(not (PRIVATE/'search-list.json').exists() and not (PRIVATE/'distribution.keychain-db').exists() and
+              not os.path.lexists(PRIVATE/profile_installation.JOURNAL),'signed_cleanup')
     marker=WORK/'upload-attempt.json'
     p.require(not marker.exists() and not marker.is_symlink(),'signed_upload_ambiguous')
     new_file(marker,b'{"state":"attempt_started_no_automatic_retry"}\n')
