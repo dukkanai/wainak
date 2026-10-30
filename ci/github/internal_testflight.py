@@ -307,7 +307,7 @@ def compile_internal(pins, number, ctx, secret_source):
                  'signingCertificate':pins['certificate_sha1']}
         p.validate_export(options);new_file(export,plistlib.dumps(options));export_hash=sha(export.read_bytes())
         config=PRIVATE/'Signing.xcconfig'
-        new_file(config,(p.SIGNING_CONFIG+'PROVISIONING_PROFILE_SPECIFIER = '+pins['profile_uuid']+'\n').encode())
+        new_file(config,signing_settings.scoped_profile_config(pins).encode());config_hash=sha(regular(config))
         env['XCODE_XCCONFIG_FILE']=str(config)
         mobile=ctx['mobile']
         run('ios_config',['flutter','build','ios','--config-only','--release','--no-pub','--no-codesign',
@@ -325,12 +325,14 @@ def compile_internal(pins, number, ctx, secret_source):
         print(json.dumps({'event':'GITHUB_SIGNING_DISCOVERY',**observation}),flush=True)
         profile_installation.verify(PRIVATE,pins)
         require_account_discovery(probe_keychains('BEFORE_ARCHIVE',run,env,ctx,keychain,prior,pins))
+        p.require(sha(regular(config))==config_hash,'signed_settings')
         try:
             run('build_ipa',['flutter','build','ipa','--release','--no-pub','--build-number',number,
                 '--export-options-plist',export,*p.DEFINES],cwd=mobile,seconds=1200)
         finally:
             print(json.dumps({'event':'GITHUB_IPA_FILES',**signing_discovery.artifact_presence(mobile,WORK)}),flush=True)
         profile_installation.verify(PRIVATE,pins)
+        p.require(sha(regular(config))==config_hash,'signed_settings')
         p.require(sha(regular(export))==export_hash and plistlib.loads(export.read_bytes())==options,'signed_export')
         candidates=list((mobile/'build/ios/ipa').glob('*.ipa'))
         p.require(len(candidates)==1,'signed_no_ipa');candidate=candidates[0]

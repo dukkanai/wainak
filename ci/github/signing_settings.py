@@ -1,10 +1,11 @@
 """Strict settings JSON and finite public projections. Never log Xcode's dump."""
 import json
 import math
+import re
 from ci.testflight import policy as p
 
 REASONS=frozenset({'signed_settings_json','signed_settings_duplicate_key','signed_settings_nonfinite',
-    'signed_settings_shape','signed_settings_defines_type','signed_settings_json_bound','signed_settings'})
+    'signed_settings_shape','signed_settings_defines_type','signed_settings_json_bound','signed_settings','signed_nonapp_profile'})
 PUBLIC={
     'PRODUCT_BUNDLE_IDENTIFIER':frozenset({p.BUNDLE}),
     'DEVELOPMENT_TEAM':frozenset({p.TEAM}),
@@ -15,6 +16,15 @@ PUBLIC={
     'CODE_SIGN_STYLE':frozenset({'Manual','Automatic'}),
     'CODE_SIGN_IDENTITY':frozenset({'Apple Distribution','Apple Development',''}),
 }
+
+
+def scoped_profile_config(pins):
+    uuid=pins.get('profile_uuid')
+    p.require(type(uuid) is str and re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',uuid),'signed_settings')
+    # Xcode computes the setting name per target. Undefined target entries
+    # expand empty, so Swift package/framework targets inherit no profile.
+    return (p.SIGNING_CONFIG+'WAINEK_PROFILE_FOR_Runner = '+uuid+'\n'
+        'PROVISIONING_PROFILE_SPECIFIER = $(WAINEK_PROFILE_FOR_$(TARGET_NAME))\n')
 
 
 def project(settings,pins):
@@ -60,6 +70,14 @@ def validate(text,pins,scope='PROJECT'):
         p.require(len(runners)==1,'runner_settings')
         b=runners[0].get('buildSettings');p.require(type(b) is dict,'signed_settings_shape')
         projection=project(b,pins)
+        stage='TARGET_SCOPE'
+        for item in items:
+            if item['target']=='Runner':continue
+            other=item.get('buildSettings',{})
+            p.require(type(other) is dict,'signed_nonapp_profile')
+            for key in ('PROVISIONING_PROFILE_SPECIFIER','PROVISIONING_PROFILE'):
+                value=other.get(key)
+                p.require(value is None or type(value) is str and value=='','signed_nonapp_profile')
         p.require(type(b.get('DART_DEFINES','')) is str,'signed_settings_defines_type')
         stage='POLICY'
         p.validate_settings(items)  # All existing identity, signing and UI checks.

@@ -421,6 +421,7 @@ class Lifecycle(unittest.TestCase):
                         z.writestr('Payload/Runner.app/embedded.mobileprovision',PROFILE_BYTES)
                         z.writestr('Payload/Runner.app/Runner',b'fake executable')
                     if mutation=='export':(private/'export.plist').write_bytes(b'changed')
+                    if mutation=='config':(private/'Signing.xcconfig').write_bytes(b'changed')
                 if label=='extract_certificate':(private/'leaf0').write_bytes(b'other' if mutation=='certificate' else CERT)
                 if label=='upload_ipa':
                     self.assertEqual(argv,['/usr/bin/xcrun','altool','--upload-app','--type','ios','--file',ipa,
@@ -503,7 +504,7 @@ class Lifecycle(unittest.TestCase):
             with self.subTest(stage=stage):self.exercise(failure=stage)
 
     def test_signed_payload_mutations(self):
-        for mutation in ('profile','identity','settings','export','certificate'):
+        for mutation in ('profile','identity','settings','export','config','certificate'):
             with self.subTest(mutation=mutation):self.exercise(mutation=mutation)
 
     def test_upload_lifecycle_and_negatives(self):

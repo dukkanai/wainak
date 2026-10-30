@@ -15,6 +15,22 @@ valid_settings=fixtures.settings
 
 
 class Settings(unittest.TestCase):
+    def test_non_application_targets_cannot_inherit_profile(self):
+        for target in ('FlutterGeneratedPluginSwiftPackage','RunnerTests','CANARY'):
+            values=valid_settings()+[{'target':target,'buildSettings':{'PROVISIONING_PROFILE_SPECIFIER':PINS['profile_uuid']}}]
+            with mock.patch('builtins.print') as printed,self.assertRaisesRegex(p.PolicyError,'signed_nonapp_profile'):
+                settings.validate(json.dumps(values),PINS,scope='WORKSPACE')
+            self.assertNotIn('CANARY',str(printed.call_args_list))
+            values[-1]['buildSettings']['PROVISIONING_PROFILE_SPECIFIER']=''
+            with mock.patch('builtins.print'):settings.validate(json.dumps(values),PINS,scope='WORKSPACE')
+
+    def test_profile_selector_is_target_scoped_and_rejects_injection(self):
+        config=settings.scoped_profile_config(PINS)
+        self.assertIn('WAINEK_PROFILE_FOR_Runner = '+PINS['profile_uuid']+'\n',config)
+        self.assertIn('PROVISIONING_PROFILE_SPECIFIER = $(WAINEK_PROFILE_FOR_$(TARGET_NAME))\n',config)
+        self.assertNotIn('PROVISIONING_PROFILE_SPECIFIER = '+PINS['profile_uuid'],config)
+        for uuid in ('CANARY\nCODE_SIGNING_ALLOWED = NO',None,[],PINS['profile_uuid'].upper()):
+            with self.assertRaises(p.PolicyError):settings.scoped_profile_config({**PINS,'profile_uuid':uuid})
     def test_valid_public_projection_never_echoes_environment_or_defines(self):
         value=valid_settings();value[0]['buildSettings'].update(HOME='/CANARY',TOKEN='CANARY',UNLISTED='CANARY')
         with mock.patch('builtins.print') as printed:settings.validate(json.dumps(value),PINS)
