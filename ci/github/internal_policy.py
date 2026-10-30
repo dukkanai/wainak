@@ -31,7 +31,7 @@ REVIEWED_PINS = {
     'asc_issuer_id': '54a3742f-c62d-468e-a2ae-70e0d8aff797',
 }
 PIN_FIELDS = set(REVIEWED_PINS)
-ACTIVE_WORKFLOW_SHA256 = '7fe340869761683a8c8ad30145015c67cbd23f1dd55448e339cb3cf921c29f31'
+ACTIVE_WORKFLOW_SHA256 = '144d4926051a79b517be0f918093c77eaaccf12f376a5dfb2b7025a1c5ff069e'
 REASONS = frozenset({'signed_disabled','signed_pin_schema','signed_pin_value','signed_context','signed_input',
     'signed_environment','signed_template','signed_profile_hash','signed_profile_identity','signed_certificate',
     'signed_secret_encoding','signed_secret_bound','signed_existing_path','signed_path','signed_export',

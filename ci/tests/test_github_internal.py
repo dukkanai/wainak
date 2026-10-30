@@ -173,14 +173,15 @@ class Policy(unittest.TestCase):
         job=json.loads((q.ROOT/'ci/github/internal-testflight.job.json').read_text());q.validate_job(job)
         source=(q.ROOT/'.github/workflows/ci.yml').read_text()
         candidate=(q.ROOT/'ci/github/internal-testflight.workflow.candidate').read_text()
-        self.assertEqual(source,candidate);q.validate_active_workflow(source)
-        self.assertIn('options: [ci, mac-unsigned, mac-internal]',source)
-        self.assertEqual(source.count("if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' }}"),9)
+        from ci.github import asc_status
+        self.assertEqual(source,asc_status.candidate_workflow(candidate));q.validate_active_workflow(source)
+        self.assertIn('options: [ci, mac-unsigned, mac-internal, asc-status]',source)
+        self.assertEqual(source.count("if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}"),9)
         self.assertIn("cancel-in-progress: ${{ inputs.target != 'mac-internal' }}",source)
         for changed in (source.replace('branches: [main]','branches: [main, dev]'),
                         source.replace('  pull_request:', '  pull_request_target:'),
                         source.replace('contents: read','contents: write'),
-                        source.replace('options: [ci, mac-unsigned, mac-internal]','options: [mac-internal]'),
+                        source.replace('options: [ci, mac-unsigned, mac-internal, asc-status]','options: [mac-internal]'),
                         source.replace("inputs.target != 'mac-internal'",'true'),
                         source.replace('wainek-internal-testflight','other-environment')):
             with self.assertRaisesRegex(p.PolicyError,'signed_active_workflow'):q.validate_active_workflow(changed)

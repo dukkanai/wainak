@@ -22,12 +22,33 @@ SAMPLES={
     'COMPILE_FAILED':b'Swift Compiler Error (Xcode): CANARY',
     'SETTINGS_MISSING':b'No Xcode build settings have been found. CANARY',
     'DESTINATION_UNAVAILABLE':b'Unable to find a destination matching CANARY',
+    'SIGNING_CONFLICT':b'Runner has conflicting provisioning settings CANARY',
+    'PROFILE_UNSUPPORTED_TARGET':b'CANARY does not support provisioning profiles',
+    'FLUTTER_CODESIGN_FAILED':b'Failed to codesign CANARY',
+    'BUNDLE_FORMAT_INVALID':b'bundle format unrecognized CANARY',
+    'SIGNING_REQUIRED':b'Runner requires a development team CANARY',
+    'ACCOUNT_REQUIRED':b'No Accounts: CANARY',
+    'PROFILE_TYPE':b'Provisioning profile CANARY is not a store profile',
+    'ENTITLEMENTS_MISMATCH':b'unsupported entitlement CANARY',
+    'CERTIFICATE_INVALID':b'Signing certificate CANARY is invalid',
+    'RESOURCE_FORK':b'resource fork, Finder information CANARY',
+    'BUILD_INPUT_MISSING':b'Build input file cannot be found CANARY',
+    'LINKER_FAILED':b'Undefined symbols for architecture CANARY',
+    'DUPLICATE_OUTPUT':b'Multiple commands produce CANARY',
+    'SCRIPT_SANDBOX':b'Sandbox: CANARY deny(1)',
+    'XCODE_LICENSE':b'You have not agreed to the Xcode license CANARY',
     'ARCHIVE_FAILED':b'** ARCHIVE FAILED **',
     'EXPORT_FAILED':b'error: exportArchive CANARY',
 }
 
 
 class IPAOutput(unittest.TestCase):
+    def test_error_topics_are_finite_and_ignore_captured_unknown_values(self):
+        result=ipa.classify(b'Error (Xcode): CANARY signing configuration file',True)
+        self.assertEqual(result['error_topics'],['CONFIGURATION','FILE','SIGNING'])
+        self.assertNotIn('CANARY',json.dumps(result))
+        self.assertEqual(ipa.classify(b'CANARY signing configuration file',True)['error_topics'],[])
+        self.assertEqual(ipa.project({**ipa.empty(),'error_topics':['CANARY']})['status'],'CLASSIFIER_FAILED')
     def test_each_category_and_combined_milestones_never_return_values(self):
         self.assertEqual(set(SAMPLES),set(ipa.PATTERNS))
         for name,sample in SAMPLES.items():
