@@ -59,12 +59,15 @@ def validate_workflow():
 
 
 def candidate_workflow(source):
+    from ci.github import asc_internal
     old="inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal'"
     require('asc-status' not in source and source.count(old)==9 and
         source.count('options: [ci, mac-unsigned, mac-internal]')==1,'asc_context')
-    source=source.replace('options: [ci, mac-unsigned, mac-internal]','options: [ci, mac-unsigned, mac-internal, asc-status]')
-    source=source.replace(old,old+" && inputs.target != 'asc-status'")
-    return source+'\n  asc-status: '+json.dumps(job(),ensure_ascii=False)+'\n'
+    source=source.replace('options: [ci, mac-unsigned, mac-internal]','options: [ci, mac-unsigned, mac-internal, asc-status, asc-internal]')
+    source=source.replace(old,old+" && inputs.target != 'asc-status' && inputs.target != 'asc-internal'")
+    source=source.replace("cancel-in-progress: ${{ inputs.target != 'mac-internal' }}",
+        "cancel-in-progress: ${{ inputs.target != 'mac-internal' && inputs.target != 'asc-internal' }}")
+    return source+'\n  asc-status: '+json.dumps(job(),ensure_ascii=False)+'\n\n  asc-internal: '+json.dumps(asc_internal.job(),ensure_ascii=False)+'\n'
 
 
 def preflight(env):
@@ -115,8 +118,14 @@ def upload_request_path(number):
     return '/v1/apps/'+p.ASC_APP_ID+'/buildUploads?'+query
 
 
+def group_request_path():
+    query=urllib.parse.urlencode({'fields[betaGroups]':'name,isInternalGroup,publicLinkEnabled,hasAccessToAllBuilds','limit':'100'})
+    return '/v1/apps/'+p.ASC_APP_ID+'/betaGroups?'+query
+
+
 def validate_request_path(path):
     require(type(path) is str and len(path)<=2048,'asc_context')
+    if path==group_request_path():return
     try:query=urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)
     except ValueError:raise p.PolicyError('asc_context') from None
     candidates=query.get('filter[version]',query.get('filter[cfBundleVersion]',[]))
@@ -130,6 +139,10 @@ def token(path,key,pins):
     header={'alg':'ES256','kid':pins['asc_key_id'],'typ':'JWT'}
     claims={'iss':pins['asc_issuer_id'],'iat':now,'exp':now+120,'aud':'appstoreconnect-v1','scope':['GET '+path]}
     message=b64(json.dumps(header,separators=(',',':')).encode())+'.'+b64(json.dumps(claims,separators=(',',':')).encode())
+    return message+'.'+b64(sign_message(message,key))
+
+
+def sign_message(message,key):
     for name in ('message','signature.der'):
         target=WORK/name;owned_path(target)
         if target.exists():target.unlink()
@@ -137,7 +150,7 @@ def token(path,key,pins):
     run_bounded(['/usr/bin/openssl','dgst','-sha256','-sign',key,'-out',signature,input_file],cwd=WORK,
         env={'PATH':'/usr/bin:/bin','HOME':str(WORK)},seconds=15,maximum=16384,check=True)
     owned_path(signature);require(signature.is_file() and signature.stat().st_size<=72,'asc_signature')
-    return message+'.'+b64(der_signature(signature.read_bytes()))
+    return der_signature(signature.read_bytes())
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -147,6 +160,10 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 def get_builds(path,jwt):
     validate_request_path(path)
     request=urllib.request.Request('https://api.appstoreconnect.apple.com'+path,headers={'Authorization':'Bearer '+jwt,'Accept':'application/json'},method='GET')
+    return json_request(request)
+
+
+def json_request(request):
     try:
         with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
             require(response.status==200,'asc_http');data=response.read(512*1024+1)

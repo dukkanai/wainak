@@ -57,8 +57,8 @@ class UploadStatus(unittest.TestCase):
         result=u.project(value,'1');self.assertEqual(result['uploads'][0]['state'],'OTHER')
         self.assertNotIn('CANARY',json.dumps(result))
 
-    def test_only_two_fixed_app_get_shapes_are_allowed_before_signing_or_http(self):
-        for path in (a.request_path('1'),a.upload_request_path('1')):a.validate_request_path(path)
+    def test_only_fixed_app_get_shapes_are_allowed_before_signing_or_http(self):
+        for path in (a.request_path('1'),a.upload_request_path('1'),a.group_request_path()):a.validate_request_path(path)
         for path in (a.upload_request_path('1').replace(p.ASC_APP_ID,'999'),a.request_path('1')+'&CANARY=1',
             a.request_path('1')+'#CANARY',a.request_path('1')+'\n',a.request_path('1').replace('version%5D=1','version%5D=0'),
             '/v1/certificates?filter%5Bversion%5D=1','https://CANARY'+a.request_path('1')):
