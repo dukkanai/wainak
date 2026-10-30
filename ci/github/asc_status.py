@@ -18,6 +18,7 @@ import urllib.request
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 from ci.github import internal_policy as q
+from ci.github import upload_status
 from ci.testflight import policy as p
 from scripts.ci_process import run_bounded
 
@@ -108,7 +109,23 @@ def request_path(number):
     return '/v1/builds?'+query
 
 
+def upload_request_path(number):
+    query=urllib.parse.urlencode({'filter[cfBundleVersion]':number,'filter[cfBundleShortVersionString]':'0.1.0',
+        'filter[platform]':'IOS','fields[buildUploads]':'cfBundleShortVersionString,cfBundleVersion,platform,state','limit':'10'})
+    return '/v1/apps/'+p.ASC_APP_ID+'/buildUploads?'+query
+
+
+def validate_request_path(path):
+    require(type(path) is str and len(path)<=2048,'asc_context')
+    try:query=urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)
+    except ValueError:raise p.PolicyError('asc_context') from None
+    candidates=query.get('filter[version]',query.get('filter[cfBundleVersion]',[]))
+    require(len(candidates)==1 and re.fullmatch('[1-9][0-9]{0,8}',candidates[0]),'asc_context')
+    require(path in {request_path(candidates[0]),upload_request_path(candidates[0])},'asc_context')
+
+
 def token(path,key,pins):
+    validate_request_path(path)
     now=int(time.time())
     header={'alg':'ES256','kid':pins['asc_key_id'],'typ':'JWT'}
     claims={'iss':pins['asc_issuer_id'],'iat':now,'exp':now+120,'aud':'appstoreconnect-v1','scope':['GET '+path]}
@@ -128,7 +145,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def get_builds(path,jwt):
-    require(path.startswith('/v1/builds?') and '\n' not in path,'asc_context')
+    validate_request_path(path)
     request=urllib.request.Request('https://api.appstoreconnect.apple.com'+path,headers={'Authorization':'Bearer '+jwt,'Accept':'application/json'},method='GET')
     try:
         with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
@@ -209,7 +226,7 @@ def read_status(number,key_file,pins):
     for attempt in range(1,5):
         summary=project(get_builds(path,token(path,key_file,pins)),number)
         print(json.dumps({**summary,'read_attempt':attempt}),flush=True)
-        if summary['found'] or attempt==4:return
+        if summary['found'] or attempt==4:return summary
         time.sleep(30)
 
 
@@ -239,7 +256,10 @@ def main(argv=None):
             except (ValueError,KeyError):raise p.PolicyError('asc_key_shape') from None
             require(0<len(key)<=16384 and key.strip().startswith(b'-----BEGIN '+b'PRIVATE KEY-----'),'asc_key_shape')
             key_file=write('private.p8',key)
-            read_status(number,key_file,pins)
+            summary=read_status(number,key_file,pins)
+            if not summary['found']:
+                path=upload_request_path(number)
+                print(json.dumps(upload_status.project(get_builds(path,token(path,key_file,pins)),number)),flush=True)
         finally:cleanup()
         return 0
     except BaseException as error:
