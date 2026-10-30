@@ -3,6 +3,7 @@ import base64
 import io
 import json
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import tempfile
@@ -25,6 +26,40 @@ def payload():
 
 
 class Status(unittest.TestCase):
+    def test_real_git_preflight_ignores_parent_hook_injection_and_rejects_dirty_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base=Path(directory).resolve();root=base/'repo';root.mkdir()
+            clean=a.git_environment()
+            for command in (['init','-q'],['config','user.name','Synthetic'],['config','user.email','synthetic@example.invalid']):
+                subprocess.run(['/usr/bin/git',*command],cwd=root,env=clean,check=True,capture_output=True)
+            (root/'source').write_text('synthetic')
+            subprocess.run(['/usr/bin/git','add','source'],cwd=root,env=clean,check=True,capture_output=True)
+            subprocess.run(['/usr/bin/git','-c','commit.gpgsign=false','-c','core.hooksPath=/dev/null','commit','-qm','synthetic'],cwd=root,env=clean,check=True,capture_output=True)
+            sha=subprocess.check_output(['/usr/bin/git','rev-parse','HEAD'],cwd=root,env=clean,text=True).strip()
+            marker=base/'unexpected-hook';hook=base/'parent-hook';hook.write_text('#!/bin/sh\n: > '+shlex.quote(str(marker))+'\n');hook.chmod(0o700)
+            context={'GITHUB_REPOSITORY':'dukkanai/wainak','GITHUB_EVENT_NAME':'workflow_dispatch','GITHUB_REF':'refs/heads/'+q.BRANCH,
+                'WAINEK_REPOSITORY_VISIBILITY':'public','GITHUB_RUN_ATTEMPT':'1','GITHUB_WORKSPACE':str(root),
+                'GITHUB_SHA':sha,'WAINEK_EXPECTED_SHA':sha,'WAINEK_BUILD_NUMBER':'2'}
+            with mock.patch.object(a,'ROOT',root),mock.patch.object(a.sys,'platform','linux'), \
+                 mock.patch.dict(os.environ,{q.UPLOAD_SECRETS[0]:'CANARY','GIT_CONFIG_COUNT':'1','GIT_CONFIG_KEY_0':'core.fsmonitor','GIT_CONFIG_VALUE_0':str(hook)}):
+                self.assertEqual(a.preflight(context),'2');self.assertFalse(marker.exists())
+                (root/'source').write_text('modified')
+                with self.assertRaisesRegex(p.PolicyError,'asc_source'):a.preflight(context)
+                self.assertFalse(marker.exists())
+
+    def test_preflight_git_children_never_inherit_credentials_or_git_environment_injection(self):
+        sha='a'*40;env={'GITHUB_REPOSITORY':'dukkanai/wainak','GITHUB_EVENT_NAME':'workflow_dispatch',
+            'GITHUB_REF':'refs/heads/'+q.BRANCH,'WAINEK_REPOSITORY_VISIBILITY':'public','GITHUB_RUN_ATTEMPT':'1',
+            'GITHUB_WORKSPACE':str(a.ROOT),'GITHUB_SHA':sha,'WAINEK_EXPECTED_SHA':sha,'WAINEK_BUILD_NUMBER':'2',
+            q.UPLOAD_SECRETS[0]:'CANARY_PRIVATE','GIT_CONFIG_COUNT':'1'}
+        outputs=[subprocess.CompletedProcess([],0,sha+'\n',''),subprocess.CompletedProcess([],0,'','')]
+        with mock.patch.object(a.sys,'platform','linux'),mock.patch.object(a,'run_bounded',side_effect=outputs) as run:
+            self.assertEqual(a.preflight(env),'2')
+        for call in run.call_args_list:
+            self.assertEqual(call.args[0][0],'/usr/bin/git');self.assertEqual(call.kwargs['env'],a.git_environment())
+            self.assertNotIn('CANARY',str(call.kwargs['env']));self.assertNotIn(q.UPLOAD_SECRETS[0],call.kwargs['env'])
+            self.assertNotIn('GIT_CONFIG_COUNT',call.kwargs['env'])
+
     def test_status_transport_rejects_writes_before_network_even_to_public_build(self):
         request=a.urllib.request.Request('https://api.appstoreconnect.apple.com/v1/builds/11111111-2222-3333-4444-555555555555',
             data=b'{}',headers={'Authorization':'Bearer CANARY'},method='PATCH')

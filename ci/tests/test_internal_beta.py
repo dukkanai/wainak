@@ -1,0 +1,210 @@
+"""Synthetic internal-delivery models only; no Apple calls or real credentials."""
+import base64
+import copy
+import io
+import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+from unittest import mock
+import urllib.error
+from ci.github import internal_beta as b, asc_status as a, internal_policy as q
+from ci.testflight import policy as p
+
+BID='11111111-2222-3333-4444-555555555555'
+GID='22222222-3333-4444-5555-666666666666'
+TID='33333333-4444-5555-6666-777777777777'
+OWNER='canary_owner@example.invalid'
+
+
+def row(kind,identifier,**attributes):return {'type':kind,'id':identifier,'attributes':attributes}
+def owner():return {'data':[row('users',TID,username=OWNER,roles=['ACCOUNT_HOLDER'])]}
+def group():return row('betaGroups',GID,name=b.GROUP_NAME,isInternalGroup=True,publicLinkEnabled=False,hasAccessToAllBuilds=False)
+def tester():return row('betaTesters',TID,email=OWNER,inviteType='EMAIL',state='INVITED')
+
+
+class Model(b.Client):
+    def __init__(self):
+        super().__init__(None,q.REVIEWED_PINS);self.calls=[];self.has_group=False;self.has_tester=False
+        self.member=False;self.build_added=False;self.fail=None;self.after_write=False;self.foreign=False
+    def request(self,operation):
+        method,path,body,expected=self.spec(operation);self.calls.append(operation)
+        if self.fail==operation and not self.after_write:raise p.PolicyError('beta_network')
+        if operation=='OWNER_READ':result=owner()
+        elif operation=='GROUPS_READ':result={'data':[group()] if self.has_group else []}
+        elif operation=='GROUP_CREATE':self.has_group=True;result={'data':group()}
+        elif operation=='TESTER_READ':result={'data':[tester()] if self.has_tester else []}
+        elif operation=='TESTER_CREATE':self.has_tester=True;self.member=True;result={'data':tester()}
+        elif operation=='GROUP_TESTERS_READ':
+            result={'data':[tester()] if self.member else []}
+            if self.foreign:result['data'].append(row('betaTesters',BID,email='other@example.invalid',inviteType='EMAIL',state='INVITED'))
+        elif operation=='GROUP_BUILDS_READ':result={'data':[{'type':'builds','id':BID}] if self.build_added else []}
+        elif operation=='ADD_OWNER':self.member=True;result=None
+        elif operation=='ADD_BUILD':self.build_added=True;result=None
+        else:raise AssertionError('Unexpected operation')
+        if self.fail==operation and self.after_write:raise p.PolicyError('beta_network')
+        return result
+    def build_payload(self,*args):
+        return {'data':[row('builds',BID,version='2',processingState='VALID',buildAudienceType='INTERNAL_ONLY',expired=False,
+            usesNonExemptEncryption=False)|{'relationships':{'app':{'data':{'type':'apps','id':p.ASC_APP_ID}},
+            'preReleaseVersion':{'data':{'type':'preReleaseVersions','id':'v'}},'buildBetaDetail':{'data':{'type':'buildBetaDetails','id':'b'}},
+            'betaGroups':{'data':[{'type':'betaGroups','id':GID}] if self.build_added else []}}}],
+            'included':[row('preReleaseVersions','v',version='0.1.0',platform='IOS'),
+                row('buildBetaDetails','b',internalBuildState='IN_BETA_TESTING' if self.build_added else 'READY_FOR_BETA_TESTING'),group()]}
+
+
+class BetaDelivery(unittest.TestCase):
+    def exercise(self,model,expected_failure=False):
+        with mock.patch.object(b,'BUILD_ID',BID),mock.patch.object(a,'get_builds',side_effect=model.build_payload), \
+             mock.patch.object(a,'token',return_value='CANARY'),mock.patch('builtins.print') as printed:
+            if expected_failure:
+                with self.assertRaises(p.PolicyError):b.complete(model)
+            else:b.complete(model)
+        self.assertNotIn('canary',str(printed.call_args_list).casefold())
+        return printed
+
+    def test_complete_owner_only_delivery_and_idempotent_read_before_every_write(self):
+        model=Model();printed=self.exercise(model)
+        self.assertTrue(model.build_added and model.member)
+        event=json.loads(printed.call_args_list[-2].args[0]);self.assertTrue(event['owner_only'])
+        self.assertTrue(event['internal_availability_verified']);self.assertFalse(event['external_distribution'])
+        first=model.calls[:];self.exercise(model)
+        self.assertFalse(set(model.calls[len(first):])&{'GROUP_CREATE','TESTER_CREATE','ADD_OWNER','ADD_BUILD'})
+
+    def test_existing_tester_is_linked_without_recreation(self):
+        model=Model();model.has_group=True;model.has_tester=True;self.exercise(model)
+        self.assertIn('ADD_OWNER',model.calls);self.assertNotIn('TESTER_CREATE',model.calls)
+
+    def test_every_operation_failure_stops_without_automatic_retry(self):
+        for operation in sorted(b.OPERATIONS):
+            model=Model();model.fail=operation
+            if operation=='ADD_OWNER':model.has_group=True;model.has_tester=True
+            with self.subTest(operation=operation):self.exercise(model,True)
+            self.assertEqual(model.calls.count(operation),1)
+            self.assertEqual(model.calls[-1],operation)
+
+    def test_uncertain_applied_write_is_read_back_on_next_invocation_without_duplication(self):
+        for operation in ('GROUP_CREATE','TESTER_CREATE','ADD_OWNER','ADD_BUILD'):
+            model=Model();model.fail=operation;model.after_write=True
+            if operation=='ADD_OWNER':model.has_group=True;model.has_tester=True
+            self.exercise(model,True);model.fail=None;self.exercise(model)
+            self.assertEqual(model.calls.count(operation),1);self.assertTrue(model.build_added)
+
+    def test_foreign_group_members_prevent_any_invitation_or_build_assignment(self):
+        model=Model();model.has_group=True;model.foreign=True;self.exercise(model,True)
+        self.assertFalse(set(model.calls)&{'TESTER_CREATE','ADD_OWNER','ADD_BUILD'})
+
+    def test_external_public_automatic_duplicate_or_unverified_owner_resources_rejected(self):
+        opaque=owner();opaque['data'][0]['id']='CANARY_OPAQUE_USER_ID'
+        self.assertEqual(b.select_owner(opaque),OWNER)
+        for attribute,value in (('isInternalGroup',False),('publicLinkEnabled',True),('hasAccessToAllBuilds',True)):
+            changed=group();changed['attributes'][attribute]=value
+            with self.assertRaises(p.PolicyError):b.select_group({'data':[changed]})
+        with self.assertRaises(p.PolicyError):b.select_group({'data':[group(),group()]})
+        for changed in ({'data':[]},{'data':owner()['data']*2},{'data':[row('users',TID,username=OWNER,roles=['ADMIN'])]}):
+            with self.assertRaises(p.PolicyError):b.select_owner(changed)
+        for value in ('CANARY\n@example.invalid','wrong','owner@host\0.invalid'):
+            with self.assertRaises(p.PolicyError):b.email(value)
+        with self.assertRaises(p.PolicyError):b.rows({'data':[],'links':{'next':'CANARY'}},'users',2)
+
+    def test_inspection_and_unverified_build_can_never_write_even_with_valid_ids(self):
+        client=b.Client(None,q.REVIEWED_PINS);client.owner=OWNER;client.group=GID;client.tester=TID
+        for operation in ('GROUP_CREATE','TESTER_CREATE','ADD_OWNER','ADD_BUILD',None,[], 'CANARY'):
+            with mock.patch.object(a,'sign_message') as sign,mock.patch.object(b.urllib.request,'build_opener') as http,self.assertRaises(p.PolicyError):client.request(operation)
+            sign.assert_not_called();http.assert_not_called()
+        with mock.patch.object(b,'BUILD_ID',BID),mock.patch('builtins.print'):
+            model=Model();b.inspect(model)
+        self.assertEqual(model.calls,['OWNER_READ','GROUPS_READ'])
+
+    def test_wrong_build_audience_flag_processing_or_id_rejected_before_writes(self):
+        model=Model()
+        for field,value in (('buildAudienceType','APP_STORE_ELIGIBLE'),('processingState','PROCESSING'),('expired',True),('usesNonExemptEncryption',None),('id',GID)):
+            payload=model.build_payload()
+            if field=='id':payload['data'][0]['id']=value
+            else:payload['data'][0]['attributes'][field]=value
+            with mock.patch.object(b,'BUILD_ID',BID),mock.patch.object(a,'get_builds',return_value=payload),mock.patch.object(a,'token',return_value='CANARY'),self.assertRaises(p.PolicyError):b.complete(model)
+        self.assertEqual(model.calls,[])
+
+    def test_http_failure_redacts_owner_headers_and_body_and_closes_response(self):
+        client=b.Client(None,q.REVIEWED_PINS);stream=io.BytesIO(b'{"errors":[{"code":"CANARY","detail":"CANARY_PRIVATE"}]}')
+        opener=mock.Mock();opener.open.side_effect=urllib.error.HTTPError('https://CANARY',403,'CANARY',{},stream)
+        with mock.patch.object(a,'sign_message',return_value=b'\1'*64),mock.patch.object(b.urllib.request,'build_opener',return_value=opener), \
+             mock.patch('builtins.print') as printed,self.assertRaisesRegex(p.PolicyError,'asc_forbidden'):client.request('OWNER_READ')
+        self.assertTrue(stream.closed);self.assertNotIn('CANARY',str(printed.call_args_list))
+        self.assertEqual(json.loads(printed.call_args.args[0])['status_code'],403)
+
+    def test_post_status_and_body_are_exact_and_jwt_is_single_operation_scoped(self):
+        for status,allowed in ((201,True),(200,False),(204,False)):
+            client=b.Client(None,q.REVIEWED_PINS);client.owner=OWNER;client.verified_build=BID
+            response=mock.MagicMock();response.__enter__.return_value=response;response.status=status
+            response.read.return_value=json.dumps({'data':group()}).encode();opener=mock.Mock();opener.open.return_value=response
+            with mock.patch.object(b,'BUILD_ID',BID),mock.patch.object(a,'sign_message',return_value=b'\1'*64), \
+                 mock.patch.object(b.urllib.request,'build_opener',return_value=opener),mock.patch('builtins.print'):
+                if allowed:client.request('GROUP_CREATE')
+                else:
+                    with self.assertRaises(p.PolicyError):client.request('GROUP_CREATE')
+            request=opener.open.call_args.args[0];self.assertEqual(request.get_method(),'POST')
+            body=json.loads(request.data);self.assertTrue(body['data']['attributes']['isInternalGroup'])
+            self.assertFalse(body['data']['attributes']['publicLinkEnabled']);self.assertFalse(body['data']['attributes']['hasAccessToAllBuilds'])
+            self.assertEqual(body['data']['relationships']['app']['data']['id'],p.ASC_APP_ID)
+            jwt=request.get_header('Authorization').split()[1];claims=json.loads(base64.urlsafe_b64decode(jwt.split('.')[1]+'=='))
+            self.assertEqual(claims['scope'],['POST /v1/betaGroups']);self.assertEqual(claims['exp']-claims['iat'],120)
+
+    def test_expired_client_deadline_never_signs_or_opens_network(self):
+        client=b.Client(None,q.REVIEWED_PINS);client.deadline=0
+        with mock.patch.object(a,'sign_message') as sign,mock.patch.object(b.urllib.request,'build_opener') as http,self.assertRaisesRegex(p.PolicyError,'beta_deadline'):client.request('OWNER_READ')
+        sign.assert_not_called();http.assert_not_called()
+
+    def test_membership_post_requires_empty_204_and_exact_owner_id(self):
+        for output,allowed in ((b'',True),(b'CANARY',False)):
+            client=b.Client(None,q.REVIEWED_PINS);client.owner=OWNER;client.group=GID;client.tester=TID;client.verified_build=BID
+            response=mock.MagicMock();response.__enter__.return_value=response;response.status=204;response.read.return_value=output
+            opener=mock.Mock();opener.open.return_value=response
+            with mock.patch.object(b,'BUILD_ID',BID),mock.patch.object(a,'sign_message',return_value=b'\1'*64), \
+                 mock.patch.object(b.urllib.request,'build_opener',return_value=opener),mock.patch('builtins.print') as printed:
+                if allowed:self.assertIsNone(client.request('ADD_OWNER'))
+                else:
+                    with self.assertRaisesRegex(p.PolicyError,'beta_response'):client.request('ADD_OWNER')
+            request=opener.open.call_args.args[0];self.assertEqual(json.loads(request.data),{'data':[{'type':'betaTesters','id':TID}]})
+            self.assertTrue(request.full_url.endswith('/'+GID+'/relationships/betaTesters'))
+            self.assertNotIn('CANARY',str(printed.call_args_list))
+
+    def test_owner_debug_number_app_tree_and_workflow_boundaries(self):
+        value=b.job();self.assertEqual(value['permissions'],{'contents':'read'});self.assertEqual(value['environment'],q.ENVIRONMENT)
+        self.assertIn("github.actor == 'dukkanai'",value['if']);self.assertIn('github.actor_id',value['if'])
+        self.assertEqual(value['runs-on'],'ubuntu-24.04');self.assertEqual(value['timeout-minutes'],8)
+        env={'GITHUB_ACTOR':q.OWNER_LOGIN,'GITHUB_ACTOR_ID':str(q.OWNER_ID),'WAINEK_BETA_TARGET':b.TARGET}
+        result=subprocess.CompletedProcess([],0,b.APP_TREE+'\n','')
+        with mock.patch.object(a,'preflight',return_value='2'),mock.patch.object(a,'run_bounded',return_value=result):
+            b.preflight(env)
+            for key,value in (('GITHUB_ACTOR','CANARY'),('GITHUB_ACTOR_ID','1'),('RUNNER_DEBUG','1'),('WAINEK_BETA_TARGET','other')):
+                with self.assertRaises(p.PolicyError):b.preflight({**env,key:value})
+        with mock.patch.object(a,'preflight',return_value='1'),self.assertRaises(p.PolicyError):b.preflight(env)
+        with mock.patch.object(a,'preflight',return_value='2'),mock.patch.object(a,'run_bounded',return_value=subprocess.CompletedProcess([],0,'CANARY','')),self.assertRaisesRegex(p.PolicyError,'beta_app_tree'):b.preflight(env)
+
+    def test_disabled_plan_never_reads_secret_and_cleanup_always_removes_only_synthetic_material(self):
+        with mock.patch.object(b,'BUILD_ID',None),mock.patch('builtins.print') as printed:
+            self.assertEqual(b.main(['--check']),0);self.assertEqual(b.main(['--complete']),1)
+        self.assertEqual(json.loads(printed.call_args.args[0])['safe_reason'],'beta_plan')
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve();work=root/'owned';other=root/'other';other.write_text('PRESERVE')
+            key=b'-----BEGIN '+b'PRIVATE KEY-----\nCANARY\n'
+            with mock.patch.multiple(a,ROOT=root,WORK=work),mock.patch.object(b,'preflight'),mock.patch.object(b,'read_build',return_value={'found':False}),mock.patch.object(b,'inspect',side_effect=p.PolicyError('beta_owner')), \
+                 mock.patch.dict(os.environ,{q.UPLOAD_SECRETS[0]:base64.b64encode(key).decode()},clear=True),mock.patch('builtins.print') as printed:
+                self.assertEqual(b.main(['--inspect']),1)
+            self.assertFalse(work.exists());self.assertEqual(other.read_text(),'PRESERVE');self.assertNotIn('CANARY',str(printed.call_args_list))
+
+    def test_inspection_observes_build_then_owner_without_any_write_and_cleans_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve();work=root/'owned';model=Model()
+            key=b'-----BEGIN '+b'PRIVATE KEY-----\nCANARY\n'
+            with mock.patch.multiple(a,ROOT=root,WORK=work),mock.patch.object(b,'preflight'),mock.patch.object(b,'Client',return_value=model), \
+                 mock.patch.object(a,'get_builds',side_effect=model.build_payload),mock.patch.object(a,'token',return_value='CANARY'), \
+                 mock.patch.dict(os.environ,{q.UPLOAD_SECRETS[0]:base64.b64encode(key).decode()},clear=True),mock.patch('builtins.print') as printed:
+                self.assertEqual(b.main(['--inspect']),0)
+            self.assertEqual(model.calls,['OWNER_READ','GROUPS_READ']);self.assertFalse(work.exists())
+            events=[json.loads(c.args[0]) for c in printed.call_args_list]
+            self.assertEqual(events[0]['event'],'ASC_BUILD_STATUS');self.assertEqual(events[-1]['event'],'BETA_OWNER_INSPECTION')
+            self.assertNotIn('canary',str(printed.call_args_list).casefold())

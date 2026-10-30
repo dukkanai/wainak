@@ -60,12 +60,20 @@ def validate_workflow():
 
 
 def candidate_workflow(source):
+    from ci.github import internal_beta
     old="inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal'"
     require('asc-status' not in source and source.count(old)==9 and
         source.count('options: [ci, mac-unsigned, mac-internal]')==1,'asc_context')
-    source=source.replace('options: [ci, mac-unsigned, mac-internal]','options: [ci, mac-unsigned, mac-internal, asc-status]')
-    source=source.replace(old,old+" && inputs.target != 'asc-status'")
-    return source+'\n  asc-status: '+json.dumps(job(),ensure_ascii=False)+'\n'
+    source=source.replace('options: [ci, mac-unsigned, mac-internal]','options: [ci, mac-unsigned, mac-internal, asc-status, beta-internal]')
+    source=source.replace(old,old+" && inputs.target != 'asc-status' && inputs.target != 'beta-internal'")
+    source=source.replace("cancel-in-progress: ${{ inputs.target != 'mac-internal' }}",
+        "cancel-in-progress: ${{ inputs.target != 'mac-internal' && inputs.target != 'beta-internal' }}")
+    return source+'\n  asc-status: '+json.dumps(job(),ensure_ascii=False)+'\n\n  beta-internal: '+json.dumps(internal_beta.job(),ensure_ascii=False)+'\n'
+
+
+def git_environment():
+    return {'PATH':'/usr/bin:/bin','LANG':'C','GIT_CONFIG_GLOBAL':'/dev/null',
+            'GIT_CONFIG_NOSYSTEM':'1','GIT_TERMINAL_PROMPT':'0','GIT_OPTIONAL_LOCKS':'0'}
 
 
 def preflight(env):
@@ -75,8 +83,8 @@ def preflight(env):
         Path(env.get('GITHUB_WORKSPACE','/nonexistent')).resolve()==ROOT,'asc_context')
     sha=env.get('GITHUB_SHA','');require(re.fullmatch('[a-f0-9]{40}',sha) and env.get('WAINEK_EXPECTED_SHA')==sha,'asc_context')
     number=env.get('WAINEK_BUILD_NUMBER','');require(type(number) is str and re.fullmatch('[1-9][0-9]{0,8}',number),'asc_context')
-    for args,expected in ((['git','rev-parse','HEAD'],sha),(['git','status','--porcelain'],'')):
-        result=run_bounded(args,cwd=ROOT,check=True,seconds=5,maximum=65536)
+    for args,expected in ((['/usr/bin/git','rev-parse','HEAD'],sha),(['/usr/bin/git','status','--porcelain'],'')):
+        result=run_bounded(args,cwd=ROOT,env=git_environment(),check=True,seconds=5,maximum=65536)
         require(result.stdout.strip()==expected,'asc_source')
     return number
 
