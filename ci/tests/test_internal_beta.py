@@ -36,7 +36,7 @@ class Model(b.Client):
         if operation=='OWNER_READ':result=owner()
         elif operation=='GROUPS_READ':result={'data':[group()] if self.has_group else []}
         elif operation=='GROUP_CREATE':self.has_group=True;result={'data':group()}
-        elif operation=='TESTER_READ':result={'data':[tester()] if self.has_tester else []}
+        elif operation in {'TESTER_READ','TESTER_APP_READ'}:result={'data':[tester()] if self.has_tester else []}
         elif operation=='TESTER_CREATE':self.has_tester=True;self.member=True;result={'data':tester()}
         elif operation=='GROUP_TESTERS_READ':
             result={'data':[tester()] if self.member else []}
@@ -87,7 +87,8 @@ class BetaDelivery(unittest.TestCase):
                 return result
         model=SparseModel();self.exercise(model)
         self.assertTrue(model.build_added);self.assertGreaterEqual(model.calls.count('GROUPS_READ'),2)
-        self.assertGreaterEqual(model.calls.count('TESTER_READ'),2)
+        self.assertGreaterEqual(model.calls.count('GROUP_TESTERS_READ'),2)
+        self.assertEqual(model.calls.count('TESTER_APP_READ'),1)
 
     def test_create_id_type_or_readback_disagreement_blocks_following_mutations(self):
         for operation in ('GROUP_CREATE','TESTER_CREATE'):
@@ -244,6 +245,61 @@ class BetaDelivery(unittest.TestCase):
             with self.assertRaisesRegex(p.PolicyError,'beta_response'):
                 b.rows({'data':[{'type':kind,'id':TID}]},kind,2)
         self.assertEqual(len(b.rows({'data':[{'type':'builds','id':BID}]},'builds',2)),1)
+
+    def test_explicit_null_state_is_only_enrollment_metadata_before_first_build(self):
+        value=tester();value['attributes']['state']=None
+        with mock.patch('builtins.print'):
+            self.assertEqual(b.select_tester({'data':[value]},OWNER,pending_first_build=True),TID)
+            with self.assertRaisesRegex(p.PolicyError,'beta_tester_state'):
+                b.select_tester({'data':[value]},OWNER)
+            for field,bad in (('email','CANARY'),('inviteType','PUBLIC_LINK'),('state','CANARY')):
+                changed=copy.deepcopy(value);changed['attributes'][field]=bad
+                with self.assertRaises(p.PolicyError):b.select_tester({'data':[changed]},OWNER,pending_first_build=True)
+            del value['attributes']['state']
+            with self.assertRaisesRegex(p.PolicyError,'beta_tester_state'):
+                b.select_tester({'data':[value]},OWNER,pending_first_build=True)
+            with self.assertRaisesRegex(p.PolicyError,'beta_context'):
+                b.select_tester({'data':[]},OWNER,pending_first_build='CANARY')
+
+    def test_initial_null_state_resolves_only_in_fixed_app_context_after_assignment(self):
+        class PendingModel(Model):
+            def request(self,operation):
+                result=super().request(operation)
+                if operation in {'TESTER_READ','GROUP_TESTERS_READ'}:
+                    for value in result['data']:value['attributes']['state']=None
+                return result
+        model=PendingModel();self.exercise(model);self.assertTrue(model.build_added)
+        previous=len(model.calls);self.exercise(model)
+        self.assertFalse(set(model.calls[previous:])&{'GROUP_CREATE','TESTER_CREATE','ADD_OWNER','ADD_BUILD'})
+        client=b.Client(None,q.REVIEWED_PINS);client.owner=OWNER;client.group=GID
+        method,path,body,status=client.spec('TESTER_APP_READ')
+        query=b.urllib.parse.parse_qs(b.urllib.parse.urlsplit(path).query)
+        self.assertEqual((method,body,status),('GET',None,200))
+        self.assertEqual(query['filter[apps]'],[p.ASC_APP_ID]);self.assertEqual(query['filter[email]'],[OWNER])
+
+    def test_unknown_missing_null_or_uninvited_app_state_never_claims_delivery_or_repeats_build_write(self):
+        for state in (None,'CANARY','NOT_INVITED','REVOKED','MISSING'):
+            class UninvitedModel(Model):
+                def request(self,operation):
+                    result=super().request(operation)
+                    if operation=='TESTER_APP_READ':
+                        if state=='MISSING':del result['data'][0]['attributes']['state']
+                        else:result['data'][0]['attributes']['state']=state
+                    return result
+            model=UninvitedModel();printed=self.exercise(model,True)
+            self.assertTrue(model.build_added);self.assertNotIn('BETA_DELIVERY_VERIFIED',str(printed.call_args_list))
+            self.exercise(model,True);self.assertEqual(model.calls.count('ADD_BUILD'),1)
+
+    def test_delayed_build_activation_stays_pending_and_next_read_does_not_reassign(self):
+        class ActivatingModel(Model):
+            ready=False
+            def build_payload(self,*args):
+                result=super().build_payload(*args)
+                if not self.ready:result['included'][1]['attributes']['internalBuildState']='READY_FOR_BETA_TESTING'
+                return result
+        model=ActivatingModel();printed=self.exercise(model,True)
+        self.assertNotIn('BETA_DELIVERY_VERIFIED',str(printed.call_args_list));self.assertTrue(model.build_added)
+        model.ready=True;self.exercise(model);self.assertEqual(model.calls.count('ADD_BUILD'),1)
 
     def test_expired_client_deadline_never_signs_or_opens_network(self):
         client=b.Client(None,q.REVIEWED_PINS);client.deadline=0

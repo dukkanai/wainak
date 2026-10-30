@@ -23,10 +23,11 @@ APP_TREE='afe2a6e34a0133e81781095b04bb1bb78c247f21'
 GROUP_NAME='wainek Internal'
 TARGET='beta-internal'
 OPERATIONS=frozenset({'OWNER_READ','GROUPS_READ','GROUP_CREATE','TESTER_READ','TESTER_CREATE',
-    'GROUP_TESTERS_READ','GROUP_BUILDS_READ','ADD_OWNER','ADD_BUILD'})
+    'TESTER_APP_READ','GROUP_TESTERS_READ','GROUP_BUILDS_READ','ADD_OWNER','ADD_BUILD'})
 REASONS=a.REASONS|{'beta_owner','beta_context','beta_plan','beta_app_tree','beta_group','beta_collision',
     'beta_tester','beta_tester_count','beta_tester_email','beta_tester_invite','beta_tester_state','beta_tester_readback',
-    'beta_build','beta_response','beta_http','beta_network','beta_membership','beta_deadline'}
+    'beta_build','beta_response','beta_http','beta_network','beta_membership','beta_deadline',
+    'beta_invitation_pending','beta_build_activation_pending'}
 
 
 def guid(value):
@@ -74,7 +75,8 @@ def select_group(payload):
     return guid(row['id'])
 
 
-def select_tester(payload,owner):
+def select_tester(payload,owner,*,pending_first_build=False):
+    p.require(type(pending_first_build) is bool,'beta_context')
     values=rows(payload,'betaTesters',2)
     attributes=values[0]['attributes'] if len(values)==1 else {}
     def classify(name,allowed):
@@ -91,8 +93,9 @@ def select_tester(payload,owner):
     row=values[0];attributes=row['attributes']
     p.require(matches,'beta_tester_email')
     p.require(attributes.get('inviteType')=='EMAIL','beta_tester_invite')
-    p.require(type(attributes.get('state')) is str and attributes['state'] in {
-        'NOT_INVITED','INVITED','ACCEPTED','INSTALLED','REVOKED'},'beta_tester_state')
+    state=attributes.get('state')
+    p.require((type(state) is str and state in {'NOT_INVITED','INVITED','ACCEPTED','INSTALLED','REVOKED'})
+        or (pending_first_build and 'state' in attributes and state is None),'beta_tester_state')
     return guid(row['id'])
 
 
@@ -123,8 +126,10 @@ class Client:
                 'name':GROUP_NAME,'isInternalGroup':True,'publicLinkEnabled':False,'hasAccessToAllBuilds':False},
                 'relationships':{'app':{'data':{'type':'apps','id':p.ASC_APP_ID}}}}},201
         group=guid(self.group)
-        if operation=='TESTER_READ':
-            return 'GET','/v1/betaTesters'+query({'filter[email]':self.owner,'fields[betaTesters]':'email,inviteType,state','limit':'2'}),None,200
+        if operation in {'TESTER_READ','TESTER_APP_READ'}:
+            filters={'filter[email]':self.owner,'fields[betaTesters]':'email,inviteType,state','limit':'2'}
+            if operation=='TESTER_APP_READ':filters['filter[apps]']=p.ASC_APP_ID
+            return 'GET','/v1/betaTesters'+query(filters),None,200
         if operation=='TESTER_CREATE':
             p.require(self.tester is None,'beta_tester')
             return 'POST','/v1/betaTesters',{'data':{'type':'betaTesters','attributes':{'email':self.owner},
@@ -205,19 +210,23 @@ def complete(client):
     if client.group is None:
         client.group=created_id(client.request('GROUP_CREATE'),'betaGroups')
         p.require(select_group(client.request('GROUPS_READ'))==client.group,'beta_group')
+    builds=rows(client.request('GROUP_BUILDS_READ'),'builds',100)
+    p.require(len(builds)<=1 and all(row['id']==BUILD_ID for row in builds),'beta_collision')
+    pending_first_build=not builds
     members=rows(client.request('GROUP_TESTERS_READ'),'betaTesters',100)
-    p.require(all(email(row['attributes'].get('email'))==client.owner for row in members),'beta_membership')
-    client.tester=select_tester(client.request('TESTER_READ'),client.owner)
+    p.require(len(members)<=1 and all(email(row['attributes'].get('email'))==client.owner for row in members),'beta_membership')
+    lookup=({'data':members} if members else client.request('TESTER_READ')) if pending_first_build \
+        else client.request('TESTER_APP_READ')
+    client.tester=select_tester(lookup,client.owner,pending_first_build=pending_first_build)
     if client.tester is None:
         client.tester=created_id(client.request('TESTER_CREATE'),'betaTesters')
-        p.require(select_tester(client.request('TESTER_READ'),client.owner)==client.tester,'beta_tester_readback')
+        p.require(select_tester(client.request('GROUP_TESTERS_READ'),client.owner,
+            pending_first_build=pending_first_build)==client.tester,'beta_tester_readback')
     members=rows(client.request('GROUP_TESTERS_READ'),'betaTesters',100)
     p.require(all(email(row['attributes'].get('email'))==client.owner for row in members),'beta_membership')
     if not any(row['id']==client.tester for row in members):client.request('ADD_OWNER')
     members=rows(client.request('GROUP_TESTERS_READ'),'betaTesters',100)
     p.require(len(members)==1 and members[0]['id']==client.tester and email(members[0]['attributes'].get('email'))==client.owner,'beta_membership')
-    builds=rows(client.request('GROUP_BUILDS_READ'),'builds',100)
-    p.require(all(row['id']==BUILD_ID for row in builds),'beta_collision')
     if not builds:
         verify_build(client);client.request('ADD_BUILD')
     builds=rows(client.request('GROUP_BUILDS_READ'),'builds',100)
@@ -225,9 +234,16 @@ def complete(client):
     summary=verify_build(client)
     members=rows(client.request('GROUP_TESTERS_READ'),'betaTesters',100)
     p.require(len(members)==1 and members[0]['id']==client.tester and email(members[0]['attributes'].get('email'))==client.owner,'beta_membership')
+    print(json.dumps({'event':'BETA_BUILD_ASSIGNMENT_VERIFIED','build_id':BUILD_ID,'group_id':client.group,
+        'owner_only':True,'internal_available':summary['build']['internal_available']}),flush=True)
+    p.require(summary['build']['internal_available'],'beta_build_activation_pending')
+    # Invitation state is app-specific and must be established after assignment.
+    invited=client.request('TESTER_APP_READ')
+    p.require(select_tester(invited,client.owner)==client.tester,'beta_tester_readback')
+    invitation_state=invited['data'][0]['attributes']['state']
+    p.require(invitation_state in {'INVITED','ACCEPTED','INSTALLED'},'beta_invitation_pending')
     print(json.dumps({'event':'BETA_DELIVERY_VERIFIED','build_id':BUILD_ID,'build_source':BUILD_SOURCE,
-        'group_id':client.group,'owner_only':True,'owner_tester_state':members[0]['attributes'].get('state')
-        if members[0]['attributes'].get('state') in {'NOT_INVITED','INVITED','ACCEPTED','INSTALLED','REVOKED'} else 'OTHER',
+        'group_id':client.group,'owner_only':True,'owner_tester_state':invitation_state,
         'external_distribution':False,'public_link':False,'automatic_write_retry':False,
         'internal_availability_verified':summary['build']['internal_available']}),flush=True)
     print(json.dumps(summary),flush=True)
