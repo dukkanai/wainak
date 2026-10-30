@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-10-30T18:25:35.513280+00:00",
+  "status": "INTERNAL_TESTFLIGHT_OWNER_INVITED",
+  "app": {
+    "name": "wainek",
+    "bundle_identifier": "com.nextaura.wainek",
+    "team": "9G7GPBG7FB",
+    "asc_app_id": "6828249128",
+    "version": "0.1.0",
+    "build_number": "2"
+  },
+  "binary": {
+    "source_SHA": "2ea5df3fa3f440f4c38d6a9265942ca69a577836",
+    "ipa_sha256": "fb3bc0ca74596df5ee819f63535d08cd6d2c0b7ce581160c1e4b8bdb16748feb",
+    "mac_run_id": 41099017645,
+    "archive_export_signature_profile_pins_and_cleanup": "PASS",
+    "apple_upload": "PASS"
+  },
+  "apple": {
+    "build_id": "f6880458-eda7-4720-8576-0b87856e767e",
+    "processing_state": "VALID",
+    "audience": "INTERNAL_ONLY",
+    "internal_state": "IN_BETA_TESTING",
+    "internal_groups": 1,
+    "expired": false,
+    "uses_non_exempt_encryption": false,
+    "internal_available": true,
+    "owner_only": true,
+    "owner_tester_state": "INVITED",
+    "public_link": false,
+    "external_distribution": false,
+    "group_id": "587b024b-14bc-4cdf-b808-3ec3ad1ce002",
+    "verification_run_id": 41106511730,
+    "verification_source_SHA": "ea58eaae04143bda35268dc22c4b076676b65ddb",
+    "no_duplicate_group_tester_or_build_write_in_final_run": true
+  },
+  "verification": {
+    "policy_security_regressions": {
+      "Python3.14": 533,
+      "Python3.12": 533
+    },
+    "script_tests": 26,
+    "native_guard_tests": 68,
+    "artifact_tests": 16,
+    "publication_and_fixed_workflow_contracts": "PASS",
+    "broad_audit_baseline_SHA": "2f74763e09d37db46e8372268cd202abde858731",
+    "backend_tests": 77,
+    "ops_tests": 21,
+    "prototype_tests": 29,
+    "browser_checks": 27,
+    "accessibility_views": 9,
+    "go_tests": 266,
+    "go_race_cli_and_independent_QA": "PASS",
+    "flutter_default_tests_passed": 117,
+    "flutter_intentional_opt_in_skips": 5,
+    "flutter_entrypoints_and_HTTP_driver": "PASS",
+    "isolated_postgres_recovery_negative_and_cleanup": "PASS",
+    "baseline_application_code_change": "Only apps/mobile/ios/Runner/Info.plist; signed binary declaration verified onMac. Backend, Go and Dart application source unchanged from audit baseline."
+  },
+  "limits": {
+    "mode": "fake",
+    "production_accounts_payments_messaging": false,
+    "device_runtime": "NOT_RUN",
+    "VoiceOver_device_acceptance": "NOT_RUN",
+    "public_app_store_release": false,
+    "main_merged": false,
+    "new_credentials_or_security_settings": false
+  },
+  "sources": [
+    "https://github.com/dukkanai/wainak/actions/runs/41099017645",
+    "https://github.com/dukkanai/wainak/actions/runs/41099014361",
+    "https://github.com/dukkanai/wainak/actions/runs/41106511730"
+  ]
+}
