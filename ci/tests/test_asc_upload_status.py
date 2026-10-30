@@ -35,7 +35,11 @@ class UploadStatus(unittest.TestCase):
             'ICON_DIMENSIONS':'icon dimensions are invalid','INVALID_SIGNATURE':'invalid code signature',
             'SDK_UNSUPPORTED':'sdk version is unsupported','PRIVACY_USAGE':'Missing purpose string',
             'PRIVACY_MANIFEST':'privacy manifest is invalid','BUNDLE_METADATA':'CFBundleIdentifier is invalid',
-            'MACHO_INVALID':'invalid Mach-O','ENCRYPTION_METADATA':'export compliance info is missing'}
+            'MACHO_INVALID':'invalid Mach-O','ENCRYPTION_METADATA':'export compliance info is missing',
+            'ENCRYPTION_DECLARATION':'usesNonExemptEncryption','ATTRIBUTE_NOT_EDITABLE':'attribute is not editable',
+            'INVALID_ATTRIBUTE':'invalid attribute','UNSUPPORTED_ATTRIBUTE':'attribute is not supported',
+            'INTERNAL_ONLY_RESTRICTION':'internal-only build','RELATED_RESOURCE_MISSING':'missing relationship',
+            'AGREEMENT_REQUIRED':'agreement required'}
         self.assertEqual(set(examples),set(u.PATTERNS))
         for expected,text in examples.items():
             result=u.details([{'code':'CANARY','description':text+' CANARY'}])

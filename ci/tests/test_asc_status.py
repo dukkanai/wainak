@@ -1,5 +1,6 @@
 """Apple status contract and synthetic crypto/HTTP only; no real Apple key/API."""
 import base64
+import io
 import json
 import os
 from pathlib import Path
@@ -24,6 +25,39 @@ def payload():
 
 
 class Status(unittest.TestCase):
+    def test_api_failure_reports_fixed_status_route_and_categories_without_body_or_token(self):
+        body=json.dumps({'errors':[{'code':'ENTITY_ERROR.ATTRIBUTE.INVALID','title':'Invalid attribute',
+            'detail':'CANARY_TOKEN private values','source':{'pointer':'/data/attributes/usesNonExemptEncryption'}}]}).encode()
+        stream=io.BytesIO(body);opener=mock.Mock()
+        opener.open.side_effect=urllib.error.HTTPError('https://CANARY',409,'CANARY_TOKEN',{},stream)
+        with mock.patch.object(a.urllib.request,'build_opener',return_value=opener),mock.patch('builtins.print') as printed,self.assertRaisesRegex(p.PolicyError,'asc_conflict'):
+            a.get_builds(a.request_path('1'),'CANARY_TOKEN')
+        event=json.loads(printed.call_args.args[0]);self.assertEqual(event['status_code'],409)
+        self.assertEqual(event['route'],'BUILD_LIST');self.assertEqual(event['method'],'GET');self.assertEqual(event['outcome'],'FAILED')
+        self.assertEqual(event['error_summary']['codes'],['ENTITY_ERROR.ATTRIBUTE.INVALID'])
+        self.assertEqual(event['error_summary']['categories'],['ENCRYPTION_DECLARATION','INVALID_ATTRIBUTE'])
+        self.assertNotIn('CANARY',str(printed.call_args_list));self.assertTrue(stream.closed)
+
+    def test_invalid_duplicate_unknown_and_oversized_error_bodies_never_escape_projection(self):
+        for body in (b'CANARY',b'{"errors":[],"errors":"CANARY"}',b'[]',b'CANARY'*4000):
+            result=a.http_error_summary(body);self.assertIsNone(result['count']);self.assertNotIn('CANARY',json.dumps(result))
+        result=a.http_error_summary(json.dumps({'errors':[{'code':'CANARY','detail':'CANARY','source':{'pointer':'/CANARY'}}]}).encode())
+        self.assertEqual(result,{'count':1,'codes':['OTHER'],'categories':['UNCLASSIFIED']})
+
+    def test_success_and_unexpected_success_status_remain_distinct_and_bounded(self):
+        for status,passes in ((200,True),(201,False),(202,False),(204,False)):
+            response=mock.MagicMock();response.__enter__.return_value=response
+            response.status=status;response.read.return_value=b'{"private":"CANARY"}'
+            opener=mock.Mock();opener.open.return_value=response
+            with mock.patch.object(a.urllib.request,'build_opener',return_value=opener),mock.patch('builtins.print') as printed:
+                if passes:self.assertEqual(a.get_builds(a.request_path('1'),'CANARY')['private'],'CANARY')
+                else:
+                    with self.assertRaisesRegex(p.PolicyError,'asc_http'):a.get_builds(a.request_path('1'),'CANARY')
+            event=json.loads(printed.call_args.args[0]);self.assertEqual(event['status_code'],status)
+            self.assertEqual(event['outcome'],'PASS' if passes else 'FAILED');self.assertNotIn('CANARY',str(printed.call_args_list))
+            if passes:response.read.assert_called_once_with(512*1024+1)
+            else:response.read.assert_not_called()
+
     def test_lookup_counts_distinguish_empty_missing_and_unexpected_version_without_values(self):
         empty=a.project({'data':[]},'1');self.assertEqual(empty['lookup']['returned_builds'],0)
         for mode,field in (('missing','missing_prerelease'),('version','other_marketing_version'),('platform','other_platform')):
@@ -110,6 +144,7 @@ class Status(unittest.TestCase):
 
     def test_http_errors_never_expose_body_or_auth(self):
         for code,reason in ((400,'asc_bad_request'),(401,'asc_unauthorized'),(403,'asc_forbidden'),(404,'asc_not_found'),
+                            (405,'asc_method_not_allowed'),(409,'asc_conflict'),(422,'asc_unprocessable'),
                             (302,'asc_http'),(429,'asc_rate_limited'),(500,'asc_server_error')):
             opener=mock.Mock();opener.open.side_effect=urllib.error.HTTPError('https://CANARY',code,'CANARY_TOKEN',{},None)
             with mock.patch.object(a.urllib.request,'build_opener',return_value=opener),self.assertRaisesRegex(p.PolicyError,'^'+reason+'$') as caught:

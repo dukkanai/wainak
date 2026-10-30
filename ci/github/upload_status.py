@@ -5,7 +5,11 @@ from ci.testflight import policy as p
 STATES=frozenset({'AWAITING_UPLOAD','PROCESSING','FAILED','COMPLETE'})
 CODES=frozenset({'90022','90023','90035','90056','90057','90078','90161','90165',
     '90179','90186','90205','90206','90209','90210','90236','90426','90683','90725',
-    '90771','90788','90863','90907','91053','91054','91109'})
+    '90771','90788','90863','90907','91053','91054','91109','STATE_ERROR','ENTITY_ERROR',
+    'ENTITY_ERROR.ATTRIBUTE.INVALID','ENTITY_ERROR.ATTRIBUTE.UNKNOWN','ENTITY_ERROR.ATTRIBUTE.REQUIRED',
+    'ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE','ENTITY_ERROR.RELATIONSHIP.INVALID',
+    'ENTITY_ERROR.RELATIONSHIP.REQUIRED','PARAMETER_ERROR.INVALID','PARAMETER_ERROR.REQUIRED',
+    'FORBIDDEN_ERROR','NOT_FOUND','UNEXPECTED_ERROR'})
 PATTERNS={
     'ICON_MISSING':r'missing required icon|missing app icon',
     'ICON_ALPHA':r'(?:icon|app icon).{0,128}(?:alpha|transparen)|(?:alpha|transparen).{0,128}(?:icon|app icon)',
@@ -17,6 +21,13 @@ PATTERNS={
     'BUNDLE_METADATA':r'Info\.plist|CFBundle|bundle identifier',
     'MACHO_INVALID':r'invalid (?:binary|Mach-O)|unsupported architecture|invalid segment alignment',
     'ENCRYPTION_METADATA':r'encryption info|export compliance|cryptography',
+    'ENCRYPTION_DECLARATION':r'encryption|usesNonExemptEncryption',
+    'ATTRIBUTE_NOT_EDITABLE':r'not editable|read.only|cannot be (?:changed|modified)|no longer.{0,80}(?:modifi|chang|edit)',
+    'INVALID_ATTRIBUTE':r'attribute.{0,128}invalid|invalid.{0,128}attribute',
+    'UNSUPPORTED_ATTRIBUTE':r'(?:attribute|field).{0,100}(?:not allowed|not valid|unknown|not supported|unrecognized)',
+    'INTERNAL_ONLY_RESTRICTION':r'internal.?only',
+    'RELATED_RESOURCE_MISSING':r'relationship.{0,128}(?:missing|not found|required)|(?:missing|required).{0,128}relationship',
+    'AGREEMENT_REQUIRED':r'agreement|contract|accept.{0,50}terms',
 }
 
 

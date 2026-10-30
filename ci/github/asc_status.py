@@ -30,7 +30,8 @@ BETA_STATES={'PROCESSING','PROCESSING_EXCEPTION','MISSING_EXPORT_COMPLIANCE','RE
 AUDIENCES={'INTERNAL_ONLY','APP_STORE_ELIGIBLE'}
 REASONS={'asc_context','asc_path','asc_key_shape','asc_signature','asc_response','asc_http',
          'asc_unauthorized','asc_forbidden','asc_network','asc_cleanup','asc_source',
-         'asc_bad_request','asc_not_found','asc_rate_limited','asc_server_error'}
+         'asc_bad_request','asc_not_found','asc_rate_limited','asc_server_error',
+         'asc_method_not_allowed','asc_conflict','asc_unprocessable'}
 
 
 def require(ok,reason):p.require(ok,reason)
@@ -163,17 +164,7 @@ def get_builds(path,jwt):
     return json_request(request)
 
 
-def json_request(request):
-    try:
-        with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
-            require(response.status==200,'asc_http');data=response.read(512*1024+1)
-    except urllib.error.HTTPError as error:
-        reason={400:'asc_bad_request',401:'asc_unauthorized',403:'asc_forbidden',404:'asc_not_found',
-                429:'asc_rate_limited'}.get(error.code,'asc_server_error' if 500<=error.code<600 else 'asc_http')
-        error.close()
-        raise p.PolicyError(reason) from None
-    except (urllib.error.URLError,TimeoutError):raise p.PolicyError('asc_network') from None
-    require(len(data)<=512*1024,'asc_response')
+def decode_response(data):
     def pairs(items):
         result={}
         for key,value in items:
@@ -182,6 +173,56 @@ def json_request(request):
     def constant(_):raise p.PolicyError('asc_response')
     try:return json.loads(data,object_pairs_hook=pairs,parse_constant=constant)
     except (ValueError,UnicodeError,RecursionError):raise p.PolicyError('asc_response') from None
+
+
+def http_error_summary(data):
+    fallback={'count':None,'codes':[],'categories':['UNCLASSIFIED']}
+    try:
+        if type(data) is not bytes or len(data)>16384:return fallback
+        value=decode_response(data);errors=value.get('errors')
+        if type(errors) is not list or len(errors)>16 or any(type(x) is not dict for x in errors):return fallback
+        rows=[]
+        for error in errors:
+            texts=[]
+            for key in ('title','detail'):
+                text=error.get(key)
+                if type(text) is str and len(text)<=2048:texts.append(text)
+            source=error.get('source')
+            if type(source) is dict and source.get('pointer')=='/data/attributes/usesNonExemptEncryption':texts.append('usesNonExemptEncryption')
+            rows.append({'code':error.get('code'),'description':' '.join(texts)[:4096]})
+        return upload_status.details(rows)
+    except Exception:return fallback
+
+
+def json_request(request):
+    status=None;outcome='FAILED';summary={'count':None,'codes':[],'categories':['UNCLASSIFIED']}
+    route='OTHER';method=request.get_method()
+    if method not in {'GET','PATCH'}:method='OTHER'
+    try:
+        path=urllib.parse.urlsplit(request.full_url).path
+        if path=='/v1/builds':route='BUILD_LIST'
+        elif re.fullmatch('/v1/builds/[a-fA-F0-9-]{36}',path):route='BUILD_RECORD'
+        elif path=='/v1/apps/'+p.ASC_APP_ID+'/buildUploads':route='BUILD_UPLOADS'
+        elif path=='/v1/apps/'+p.ASC_APP_ID+'/betaGroups':route='BETA_GROUPS'
+        try:
+            with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
+                status=response.status;require(status==200,'asc_http');data=response.read(512*1024+1)
+        except urllib.error.HTTPError as error:
+            status=error.code
+            try:summary=http_error_summary(error.read(16385))
+            except Exception:summary={'count':None,'codes':[],'categories':['UNCLASSIFIED']}
+            finally:error.close()
+            reason={400:'asc_bad_request',401:'asc_unauthorized',403:'asc_forbidden',404:'asc_not_found',
+                405:'asc_method_not_allowed',409:'asc_conflict',422:'asc_unprocessable',429:'asc_rate_limited'}.get(
+                    status,'asc_server_error' if 500<=status<600 else 'asc_http')
+            raise p.PolicyError(reason) from None
+        except (urllib.error.URLError,TimeoutError):raise p.PolicyError('asc_network') from None
+        require(len(data)<=512*1024,'asc_response');result=decode_response(data)
+        summary={'count':0,'codes':[],'categories':[]};outcome='PASS';return result
+    finally:
+        print(json.dumps({'event':'ASC_API_REQUEST','route':route,'method':method,'outcome':outcome,
+            'status_code':status if type(status) is int and status in {200,201,202,204,400,401,403,404,405,409,413,415,422,429,500,502,503,504} else 'OTHER',
+            'error_summary':summary}),flush=True)
 
 
 def project(payload,number):
