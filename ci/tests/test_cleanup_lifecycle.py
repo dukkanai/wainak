@@ -16,7 +16,7 @@ CANARY = 'SYNTHETIC_PRIVATE_CLEANUP_CANARY'
 
 class GroupModel:
     def __init__(self, host, *, initial='live', race=None, descendant=None,
-                 denied=False, poll_denied=False):
+                 denied=False, poll_denied=False,exit_during_wait=False):
         self.host = host
         self.state = initial
         self.race = race
@@ -30,6 +30,8 @@ class GroupModel:
         self.events = []
         self.clock = 0
         self.wait_calls = 0
+        self.exit_during_wait=exit_during_wait
+        self.wait_timeouts=[]
 
     def monotonic(self):
         self.clock += .25
@@ -48,9 +50,11 @@ class GroupModel:
         return self.returncode
 
     def wait(self, timeout):
-        assert timeout == 5
+        assert 0<timeout<=15
+        self.wait_timeouts.append(timeout)
         self.wait_calls += 1
         self.events.append(('wait', self.state, self.descendant_alive))
+        if self.state=='live' and self.exit_during_wait and timeout!=5:self.state='zombie'
         if self.state == 'live':
             raise d.subprocess.TimeoutExpired(CANARY, timeout)
         self.state = 'reaped'
@@ -89,7 +93,8 @@ class CleanupLifecycle(unittest.TestCase):
             errors = d.cleanup_process(group, selector)
         self.assertLess(len(group.events), 300)
         self.assertLess(group.clock, 27)
-        self.assertEqual(group.wait_calls, 1)
+        self.assertGreaterEqual(group.wait_calls,1);self.assertLessEqual(group.wait_calls,3)
+        self.assertIn(5,group.wait_timeouts)
         selector.close.assert_called_once()
         group.stdout.close.assert_called_once()
         self.assertNotIn(CANARY, json.dumps(errors))
@@ -105,15 +110,34 @@ class CleanupLifecycle(unittest.TestCase):
                 self.assertFalse(any(op == 'kill' for op, *_ in group.events))
                 self.assertLess(group.clock, 2)
 
-    def test_term_exit_is_collected_during_poll_without_waiting_entire_grace(self):
+    def test_term_exit_is_collected_before_probe_without_waiting_entire_grace(self):
         for host in ('linux', 'darwin'):
             with self.subTest(host=host):
                 group, errors = self.run_model(host)
                 self.assertEqual(errors, [])
-                self.assertIn(('poll', 'zombie', False), group.events)
+                self.assertIn(('wait', 'zombie', False), group.events)
                 self.assertIn(('probe', 'reaped', False), group.events)
                 self.assertFalse(any(op == 'kill' for op, *_ in group.events))
                 self.assertLess(group.clock, 3)
+
+    def test_async_term_exit_is_reaped_before_darwin_probe_race(self):
+        for host in ('linux','darwin'):
+            group,errors=self.run_model(host,race='probe',exit_during_wait=True)
+            self.assertEqual(errors,[]);self.assertEqual(group.state,'reaped')
+            self.assertIn(('wait','live',False),group.events)
+            self.assertIn(('probe','reaped',False),group.events)
+            self.assertFalse(any(op=='kill' for op,*_ in group.events))
+
+    def test_phase_reap_permission_error_is_retained_with_final_group_checks(self):
+        group=GroupModel('darwin');wait=group.wait
+        def denied(timeout):
+            if timeout!=5:raise PermissionError(errno.EACCES,CANARY)
+            return wait(timeout)
+        with patch.object(group,'wait',side_effect=denied),patch.object(d.os,'killpg',side_effect=group.killpg), \
+             patch.object(d.time,'monotonic',side_effect=group.monotonic),patch.object(d.time,'sleep',side_effect=group.sleep):
+            errors=d.cleanup_process(group,Mock())
+        self.assertIn({'operation':'reap_after_term','type':'PermissionError','errno':errno.EACCES},errors)
+        self.assertEqual(group.state,'reaped');self.assertIn(('probe','reaped',False),group.events)
 
     def test_exit_between_poll_and_signal_or_probe_keeps_darwin_eperm(self):
         for host in ('linux', 'darwin'):

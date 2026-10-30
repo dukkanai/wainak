@@ -48,7 +48,8 @@ def emit(event, **fields):
 
 CLEANUP_OPERATIONS = frozenset({'poll_direct_child', 'signal_term', 'signal_kill',
     'probe_after_term', 'probe_after_kill', 'reap_direct_child', 'verify_group_gone',
-    'close_selector', 'close_stdout', 'close_stderr', 'cleanup_process', 'grace_cleanup', 'observer_cleanup'})
+    'close_selector', 'close_stdout', 'close_stderr', 'cleanup_process', 'grace_cleanup', 'observer_cleanup',
+    'reap_after_term','reap_after_kill'})
 CLEANUP_TYPES = frozenset(ERROR_TYPES) | {'UnverifiedProcessGroup', 'Exception', 'RuntimeError'}
 
 
@@ -107,16 +108,31 @@ def cleanup_process(process, selector):
     if process is not None:
         for sig, delay, label in ((signal.SIGTERM, 15, 'term'), (signal.SIGKILL, 2, 'kill')):
             reap_ready_child()
+            sent=False
             try:
                 os.killpg(process.pid, sig)
+                sent=True
             except ProcessLookupError:
                 group_gone = True
                 break
             except BaseException as error:
                 record('signal_' + label, error)
             end = time.monotonic() + delay
-            while time.monotonic() < end:
+            if sent:
+                # A successful signal starts asynchronous exit. Collect the
+                # direct child within this SAME phase budget before probing a
+                # potentially zombie-only Darwin group. Reaping never proves
+                # the group or descendants absent; all probes remain below.
+                try:
+                    process.wait(timeout=max(.01,end-time.monotonic()))
+                except subprocess.TimeoutExpired:
+                    pass  # Phase expired with a live leader; still probe/kill.
+                except BaseException as error:
+                    record('reap_after_'+label,error)
+            while True:
                 if probe('probe_after_' + label) is not True:
+                    break
+                if time.monotonic()>=end:
                     break
                 time.sleep(.05)
             if group_gone:
