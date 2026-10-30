@@ -24,6 +24,46 @@ def payload():
 
 
 class Status(unittest.TestCase):
+    def test_lookup_counts_distinguish_empty_missing_and_unexpected_version_without_values(self):
+        empty=a.project({'data':[]},'1');self.assertEqual(empty['lookup']['returned_builds'],0)
+        for mode,field in (('missing','missing_prerelease'),('version','other_marketing_version'),('platform','other_platform')):
+            changed=payload()
+            if mode=='missing':changed['included']=changed['included'][1:]
+            else:changed['included'][0]['attributes']['version' if mode=='version' else 'platform']='CANARY'
+            result=a.project(changed,'1');self.assertFalse(result['found'])
+            self.assertEqual(result['lookup']['returned_builds'],1);self.assertEqual(result['lookup'][field],1)
+            self.assertEqual(result['lookup']['expected_ios_version'],0);self.assertNotIn('CANARY',json.dumps(result))
+        self.assertEqual(a.project(payload(),'1')['lookup']['expected_ios_version'],1)
+
+    def test_read_polling_is_bounded_and_refreshes_only_fixed_get_tokens(self):
+        with mock.patch.object(a,'get_builds',return_value={'data':[]}) as query, \
+             mock.patch.object(a,'token',return_value='CANARY_TOKEN') as token, \
+             mock.patch.object(a.time,'sleep') as pause,mock.patch('builtins.print') as printed:
+            a.read_status('1',Path('/synthetic/private.p8'),q.REVIEWED_PINS)
+        self.assertEqual(query.call_count,4);self.assertEqual(token.call_count,4)
+        self.assertEqual(pause.call_args_list,[mock.call(30)]*3)
+        self.assertTrue(all(c.args==(a.request_path('1'),'CANARY_TOKEN') for c in query.call_args_list))
+        self.assertNotIn('CANARY',str(printed.call_args_list))
+        self.assertEqual([json.loads(c.args[0])['read_attempt'] for c in printed.call_args_list],[1,2,3,4])
+
+    def test_read_stops_on_first_matching_build_without_claiming_processing_complete(self):
+        processing=payload();processing['data'][0]['attributes']['processingState']='PROCESSING'
+        with mock.patch.object(a,'get_builds',side_effect=[{'data':[]},processing]) as query, \
+             mock.patch.object(a,'token',return_value='CANARY_TOKEN'), \
+             mock.patch.object(a.time,'sleep') as pause,mock.patch('builtins.print') as printed:
+            a.read_status('1',Path('/synthetic/private.p8'),q.REVIEWED_PINS)
+        self.assertEqual(query.call_count,2);pause.assert_called_once_with(30)
+        result=json.loads(printed.call_args.args[0]);self.assertTrue(result['found'])
+        self.assertFalse(result['build']['internal_available'])
+
+    def test_read_does_not_retry_http_or_projection_failure(self):
+        for effect in (p.PolicyError('asc_unauthorized'),{'data':'CANARY'}):
+            with mock.patch.object(a,'get_builds',side_effect=effect if isinstance(effect,Exception) else None,return_value=effect) as query, \
+                 mock.patch.object(a,'token',return_value='CANARY_TOKEN'), \
+                 mock.patch.object(a.time,'sleep') as pause,mock.patch('builtins.print') as printed,self.assertRaises(p.PolicyError):
+                a.read_status('1',Path('/synthetic/private.p8'),q.REVIEWED_PINS)
+            self.assertEqual(query.call_count,1);pause.assert_not_called();printed.assert_not_called()
+
     def test_contract_uses_only_existing_environment_p8_and_fixed_branch(self):
         a.validate_workflow();job=a.job();self.assertEqual(job['permissions'],{'contents':'read'})
         self.assertEqual(job['environment'],q.ENVIRONMENT);self.assertEqual(job['runs-on'],'ubuntu-24.04')

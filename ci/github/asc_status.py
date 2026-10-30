@@ -156,6 +156,8 @@ def project(payload,number):
     require(all(type(x.get('attributes',{})) is dict for x in included),'asc_response')
     related={(x.get('type'),x.get('id')):x for x in included if type(x.get('type')) is str and type(x.get('id')) is str}
     found=[]
+    lookup={'returned_builds':len(payload['data']),'missing_prerelease':0,
+            'other_marketing_version':0,'other_platform':0,'expected_ios_version':0}
     def relation(relationships,name):
         value=relationships.get(name,{})
         require(type(value) is dict,'asc_response')
@@ -171,7 +173,13 @@ def project(payload,number):
         prerelease=relation(relationships,'preReleaseVersion')
         require(prerelease.get('id') is None or type(prerelease['id']) is str,'asc_response')
         version=related.get(('preReleaseVersions',prerelease.get('id')),{}).get('attributes',{})
+        if not version:
+            lookup['missing_prerelease']+=1
+            continue
+        if version.get('version')!='0.1.0':lookup['other_marketing_version']+=1
+        if version.get('platform')!='IOS':lookup['other_platform']+=1
         if version.get('version')!='0.1.0' or version.get('platform')!='IOS':continue
+        lookup['expected_ios_version']+=1
         identifier=build.get('id');require(type(identifier) is str and re.fullmatch('[A-Fa-f0-9]{8}(?:-[A-Fa-f0-9]{4}){3}-[A-Fa-f0-9]{12}',identifier),'asc_response')
         processing=attributes.get('processingState');audience=attributes.get('buildAudienceType')
         beta=relation(relationships,'buildBetaDetail')
@@ -190,7 +198,19 @@ def project(payload,number):
             'internal_groups':count,'expired':expired,'uses_non_exempt_encryption':encryption,
             'internal_available':processing=='VALID' and audience=='INTERNAL_ONLY' and internal=='IN_BETA_TESTING' and count>0 and not expired})
     require(len(found)<=1,'asc_response')
-    return {'event':'ASC_BUILD_STATUS','app_id':p.ASC_APP_ID,'build_number':number,'version':'0.1.0','found':bool(found),'build':found[0] if found else None}
+    return {'event':'ASC_BUILD_STATUS','app_id':p.ASC_APP_ID,'build_number':number,'version':'0.1.0',
+            'found':bool(found),'build':found[0] if found else None,'lookup':lookup}
+
+
+def read_status(number,key_file,pins):
+    path=request_path(number)
+    # Apple may not expose a just-uploaded build immediately. Only retry a
+    # validated successful GET with no matching build; errors still fail closed.
+    for attempt in range(1,5):
+        summary=project(get_builds(path,token(path,key_file,pins)),number)
+        print(json.dumps({**summary,'read_attempt':attempt}),flush=True)
+        if summary['found'] or attempt==4:return
+        time.sleep(30)
 
 
 def cleanup():
@@ -218,8 +238,8 @@ def main(argv=None):
             try:key=base64.b64decode(os.environ[q.UPLOAD_SECRETS[0]],validate=True)
             except (ValueError,KeyError):raise p.PolicyError('asc_key_shape') from None
             require(0<len(key)<=16384 and key.strip().startswith(b'-----BEGIN '+b'PRIVATE KEY-----'),'asc_key_shape')
-            key_file=write('private.p8',key);path=request_path(number)
-            summary=project(get_builds(path,token(path,key_file,pins)),number);print(json.dumps(summary),flush=True)
+            key_file=write('private.p8',key)
+            read_status(number,key_file,pins)
         finally:cleanup()
         return 0
     except BaseException as error:
