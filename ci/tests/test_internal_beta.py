@@ -215,6 +215,36 @@ class BetaDelivery(unittest.TestCase):
                 changed=copy.deepcopy(value);del changed['attributes'][missing]
                 with self.assertRaises(p.PolicyError):b.select_group({'data':[changed]})
 
+    def test_tester_shape_diagnostics_are_finite_and_unknown_values_still_fail_closed(self):
+        for field,value,reason in (('email','CANARY_PRIVATE','beta_tester_email'),
+                ('inviteType',None,'beta_tester_invite'),('inviteType','CANARY','beta_tester_invite'),
+                ('inviteType',{},'beta_tester_invite'),('state',None,'beta_tester_state'),
+                ('state','CANARY','beta_tester_state'),('state',[],'beta_tester_state')):
+            value_row=tester();value_row['attributes'][field]=value
+            with mock.patch('builtins.print') as printed,self.assertRaisesRegex(p.PolicyError,reason):
+                b.select_tester({'data':[value_row]},OWNER)
+            event=json.loads(printed.call_args.args[0]);self.assertEqual(event['event'],'BETA_TESTER_SHAPE')
+            self.assertEqual(event['count'],1);self.assertNotIn('canary',json.dumps(event).casefold())
+            self.assertIn(event['invite_type'],{'EMAIL','PUBLIC_LINK','MISSING','NULL','OTHER'})
+            self.assertIn(event['state'],{'NOT_INVITED','INVITED','ACCEPTED','INSTALLED','REVOKED','MISSING','NULL','OTHER'})
+
+    def test_empty_multiple_and_missing_tester_fields_have_distinct_safe_diagnostics(self):
+        with mock.patch('builtins.print') as printed:
+            self.assertIsNone(b.select_tester({'data':[]},OWNER))
+        self.assertEqual(json.loads(printed.call_args.args[0])['count'],0)
+        with mock.patch('builtins.print') as printed,self.assertRaisesRegex(p.PolicyError,'beta_tester_count'):
+            b.select_tester({'data':[tester(),tester()]},OWNER)
+        self.assertEqual(json.loads(printed.call_args.args[0])['count'],2)
+        for field,reason in (('email','beta_tester_email'),('inviteType','beta_tester_invite'),('state','beta_tester_state')):
+            value=tester();del value['attributes'][field]
+            with mock.patch('builtins.print') as printed,self.assertRaisesRegex(p.PolicyError,reason):
+                b.select_tester({'data':[value]},OWNER)
+            self.assertNotIn('canary',str(printed.call_args_list).casefold())
+        for kind in ('users','betaGroups','betaTesters'):
+            with self.assertRaisesRegex(p.PolicyError,'beta_response'):
+                b.rows({'data':[{'type':kind,'id':TID}]},kind,2)
+        self.assertEqual(len(b.rows({'data':[{'type':'builds','id':BID}]},'builds',2)),1)
+
     def test_expired_client_deadline_never_signs_or_opens_network(self):
         client=b.Client(None,q.REVIEWED_PINS);client.deadline=0
         with mock.patch.object(a,'sign_message') as sign,mock.patch.object(b.urllib.request,'build_opener') as http,self.assertRaisesRegex(p.PolicyError,'beta_deadline'):client.request('OWNER_READ')

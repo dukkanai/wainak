@@ -25,7 +25,8 @@ TARGET='beta-internal'
 OPERATIONS=frozenset({'OWNER_READ','GROUPS_READ','GROUP_CREATE','TESTER_READ','TESTER_CREATE',
     'GROUP_TESTERS_READ','GROUP_BUILDS_READ','ADD_OWNER','ADD_BUILD'})
 REASONS=a.REASONS|{'beta_owner','beta_context','beta_plan','beta_app_tree','beta_group','beta_collision',
-    'beta_tester','beta_build','beta_response','beta_http','beta_network','beta_membership','beta_deadline'}
+    'beta_tester','beta_tester_count','beta_tester_email','beta_tester_invite','beta_tester_state','beta_tester_readback',
+    'beta_build','beta_response','beta_http','beta_network','beta_membership','beta_deadline'}
 
 
 def guid(value):
@@ -44,6 +45,7 @@ def rows(payload,kind,maximum):
     links=payload.get('links',{});p.require(type(links) is dict and links.get('next') is None,'beta_response')
     for row in payload['data']:
         p.require(type(row) is dict and row.get('type')==kind and type(row.get('attributes',{})) is dict,'beta_response')
+        p.require(kind=='builds' or 'attributes' in row,'beta_response')
         if kind=='users':
             # Apple's user ID is opaque and never used in a mutation or log.
             p.require(type(row.get('id')) is str and 0<len(row['id'])<=256,'beta_response')
@@ -73,11 +75,24 @@ def select_group(payload):
 
 
 def select_tester(payload,owner):
-    values=rows(payload,'betaTesters',2);p.require(len(values)<=1,'beta_tester')
+    values=rows(payload,'betaTesters',2)
+    attributes=values[0]['attributes'] if len(values)==1 else {}
+    def classify(name,allowed):
+        if name not in attributes:return 'MISSING'
+        value=attributes[name]
+        return 'NULL' if value is None else value if type(value) is str and value in allowed else 'OTHER'
+    try:matches=email(attributes.get('email'))==owner if len(values)==1 else None
+    except p.PolicyError:matches=False
+    print(json.dumps({'event':'BETA_TESTER_SHAPE','count':len(values),'owner_email_matches':matches,
+        'invite_type':classify('inviteType',{'EMAIL','PUBLIC_LINK'}),
+        'state':classify('state',{'NOT_INVITED','INVITED','ACCEPTED','INSTALLED','REVOKED'})}),flush=True)
+    p.require(len(values)<=1,'beta_tester_count')
     if not values:return None
     row=values[0];attributes=row['attributes']
-    p.require(email(attributes.get('email'))==owner and attributes.get('inviteType')=='EMAIL','beta_tester')
-    p.require(attributes.get('state') in {'NOT_INVITED','INVITED','ACCEPTED','INSTALLED','REVOKED'},'beta_tester')
+    p.require(matches,'beta_tester_email')
+    p.require(attributes.get('inviteType')=='EMAIL','beta_tester_invite')
+    p.require(type(attributes.get('state')) is str and attributes['state'] in {
+        'NOT_INVITED','INVITED','ACCEPTED','INSTALLED','REVOKED'},'beta_tester_state')
     return guid(row['id'])
 
 
@@ -195,7 +210,7 @@ def complete(client):
     client.tester=select_tester(client.request('TESTER_READ'),client.owner)
     if client.tester is None:
         client.tester=created_id(client.request('TESTER_CREATE'),'betaTesters')
-        p.require(select_tester(client.request('TESTER_READ'),client.owner)==client.tester,'beta_tester')
+        p.require(select_tester(client.request('TESTER_READ'),client.owner)==client.tester,'beta_tester_readback')
     members=rows(client.request('GROUP_TESTERS_READ'),'betaTesters',100)
     p.require(all(email(row['attributes'].get('email'))==client.owner for row in members),'beta_membership')
     if not any(row['id']==client.tester for row in members):client.request('ADD_OWNER')
