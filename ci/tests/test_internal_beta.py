@@ -185,7 +185,8 @@ class BetaDelivery(unittest.TestCase):
         with mock.patch.object(a,'preflight',return_value='2'),mock.patch.object(a,'run_bounded',return_value=subprocess.CompletedProcess([],0,'CANARY','')),self.assertRaisesRegex(p.PolicyError,'beta_app_tree'):b.preflight(env)
 
     def test_disabled_plan_never_reads_secret_and_cleanup_always_removes_only_synthetic_material(self):
-        with mock.patch.object(b,'BUILD_ID',None),mock.patch('builtins.print') as printed:
+        reviewed_job=b.job()
+        with mock.patch.object(b,'BUILD_ID',None),mock.patch.object(b,'job',return_value=reviewed_job),mock.patch('builtins.print') as printed:
             self.assertEqual(b.main(['--check']),0);self.assertEqual(b.main(['--complete']),1)
         self.assertEqual(json.loads(printed.call_args.args[0])['safe_reason'],'beta_plan')
         with tempfile.TemporaryDirectory() as directory:

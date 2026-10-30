@@ -17,7 +17,7 @@ sys.path.insert(0,str(ROOT))
 from ci.github import asc_status as a, internal_policy as q
 from ci.testflight import policy as p
 
-BUILD_ID=None  # Set only after Apple's build2 ID is independently verified.
+BUILD_ID='f6880458-eda7-4720-8576-0b87856e767e'  # Apple readback: run 41102022775, build2.
 BUILD_SOURCE='2ea5df3fa3f440f4c38d6a9265942ca69a577836'
 APP_TREE='afe2a6e34a0133e81781095b04bb1bb78c247f21'
 GROUP_NAME='wainek Internal'
