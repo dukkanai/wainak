@@ -9,6 +9,7 @@ from ci.github import keychain_diagnostics as k,internal_testflight as s,signing
 from ci.tests.test_github_internal import PINS,settings as fixture_settings
 from ci.testflight import policy as p
 from scripts import ipa_diagnostics as ipa
+import os
 
 
 class Projections(unittest.TestCase):
@@ -72,6 +73,16 @@ class Projections(unittest.TestCase):
 
 
 class Routing(unittest.TestCase):
+    def test_missing_or_unknown_account_discovery_fails_before_archive(self):
+        good={'search':{'status':'OBSERVED','owned_present':True,'matches_expected':True},
+              'identities':{'status':'OBSERVED','pinned_present':True}}
+        s.require_account_discovery({'ACCOUNT':good})
+        for section,key,value in (('search','owned_present',False),('search','matches_expected',False),
+                                  ('identities','pinned_present',False),('identities','status','UNCLASSIFIED')):
+            import copy
+            changed=copy.deepcopy(good);changed[section][key]=value
+            with self.assertRaisesRegex(p.PolicyError,'signed_keychain_discovery'):s.require_account_discovery({'ACCOUNT':changed})
+
     def test_only_exact_readonly_probe_commands_and_all_process_guards(self):
         for label,command in k.COMMANDS.items():
             with mock.patch.object(s.g,'run_checked') as checked:
@@ -90,7 +101,9 @@ class Routing(unittest.TestCase):
                 calls.append((label,tuple(command)));return '' if label.startswith('keychain') else '0 valid identities found'
             with mock.patch.object(s.profile_installation,'native_home',return_value=home),mock.patch.object(s,'runner',return_value=query) as factory,mock.patch('builtins.print') as printed:
                 s.probe_keychains('BEFORE_ARCHIVE',query,env,ctx,Path('/owned'),[],PINS)
-            self.assertEqual(env,actual);self.assertEqual(factory.call_args.args[0],{**env,'HOME':str(home)})
+            self.assertEqual(env,actual)
+            self.assertEqual(factory.call_args_list[0].args[0],{**env,'HOME':str(home)})
+            self.assertEqual(factory.call_args_list[1].args[0],{**env,'HOME':str(s.WORK/'home')})
             self.assertEqual(calls,list(k.COMMANDS.items()));self.assertNotIn(str(home),str(printed.call_args_list))
 
     def test_failure_in_each_query_stops_probes_without_mutations(self):
@@ -104,3 +117,64 @@ class Routing(unittest.TestCase):
                 with mock.patch.object(s.profile_installation,'native_home',return_value=Path(tmp).resolve()),mock.patch.object(s,'runner',return_value=query),mock.patch('builtins.print'),self.assertRaises(RuntimeError):
                     s.probe_keychains('AFTER_SELECT',query,{}, {'deadline':9999,'overlay':None},Path('/owned'),[],PINS)
                 self.assertEqual(calls,list(k.COMMANDS)[:list(k.COMMANDS).index(failure)+1])
+
+
+class AccountRestoration(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name).resolve();self.home=self.root/'account';self.home.mkdir(mode=0o700)
+        self.work=self.root/'work';self.work.mkdir(mode=0o700);self.private=self.work/'signing';self.private.mkdir(mode=0o700)
+        self.keychain=self.private/'distribution.keychain-db';self.keychain.write_bytes(b'SYNTHETIC')
+        self.prior=['/CANARY/original.keychain-db'];self.current=[str(self.keychain),*self.prior];self.calls=[]
+        patch=mock.patch.multiple(s,WORK=self.work,PRIVATE=self.private);patch.start();self.addCleanup(patch.stop)
+        patch=mock.patch.object(s.profile_installation,'native_home',return_value=self.home);patch.start();self.addCleanup(patch.stop)
+        _,identity=s.account_context();self.journal=self.private/'search-list.json'
+        self.journal.write_text(json.dumps({**identity,'paths':self.prior}));self.journal.chmod(0o600)
+
+    def command(self,label,command):
+        self.calls.append((label,command))
+        if label=='keychain_restore_readback':return ''.join('"'+x+'"\n' for x in self.current)
+        if label=='keychain_restore':
+            self.assertEqual(command,['/usr/bin/security','list-keychains','-d','user','-s',*self.prior]);self.current=list(self.prior)
+        elif label=='keychain_delete':self.keychain.unlink()
+        else:self.fail('Unexpected cleanup command')
+
+    def test_exact_context_snapshot_is_restored_and_verified(self):
+        with mock.patch.object(s,'cleanup_runner',return_value=self.command) as factory:s.cleanup(self.command)
+        self.assertEqual(factory.call_args.kwargs,{'account_home':self.home})
+        self.assertEqual([label for label,_ in self.calls],['keychain_restore_readback','keychain_restore','keychain_restore_readback','keychain_delete'])
+        self.assertEqual(self.current,self.prior);self.assertFalse(self.journal.exists());self.assertFalse(self.keychain.exists())
+
+    def test_concurrent_unrelated_list_change_is_preserved_and_blocks_cleanup(self):
+        self.current.append('/CANARY/unrelated.keychain-db');before=list(self.current)
+        with mock.patch.object(s,'cleanup_runner',return_value=self.command),self.assertRaisesRegex(p.PolicyError,'signed_cleanup'):s.cleanup(self.command)
+        self.assertEqual(self.current,before);self.assertNotIn('keychain_restore',[label for label,_ in self.calls])
+        self.assertTrue(self.journal.exists());self.assertFalse(self.keychain.exists())
+
+    def test_owned_auto_append_before_selection_can_restore_prior_order(self):
+        self.current=[*self.prior,str(self.keychain)]
+        with mock.patch.object(s,'cleanup_runner',return_value=self.command):s.cleanup(self.command)
+        self.assertEqual(self.current,self.prior);self.assertFalse(self.journal.exists())
+
+    def test_mismatched_account_identity_never_mutates_search_list(self):
+        saved=json.loads(self.journal.read_text());saved['uid']=os.getuid()+1;self.journal.write_text(json.dumps(saved))
+        with mock.patch.object(s,'cleanup_runner',return_value=self.command) as factory,self.assertRaises(p.PolicyError):s.cleanup(self.command)
+        factory.assert_not_called();self.assertEqual([label for label,_ in self.calls],['keychain_delete']);self.assertTrue(self.journal.exists())
+
+    def test_interrupted_restore_is_retryable_without_losing_journal(self):
+        def interrupted(label,command):
+            result=self.command(label,command)
+            if label=='keychain_restore':raise KeyboardInterrupt('CANARY')
+            return result
+        with mock.patch.object(s,'cleanup_runner',return_value=interrupted),self.assertRaises(p.PolicyError):s.cleanup(self.command)
+        self.assertEqual(self.current,self.prior);self.assertTrue(self.journal.exists())
+        with mock.patch.object(s,'cleanup_runner',return_value=self.command):s.cleanup(self.command)
+        self.assertFalse(self.journal.exists())
+
+    def test_failed_post_restore_verification_keeps_recovery_journal(self):
+        def changed(label,command):
+            result=self.command(label,command)
+            if label=='keychain_restore':self.current.append('/CANARY/new.keychain-db')
+            return result
+        with mock.patch.object(s,'cleanup_runner',return_value=changed),self.assertRaises(p.PolicyError):s.cleanup(self.command)
+        self.assertTrue(self.journal.exists());self.assertFalse(self.keychain.exists())

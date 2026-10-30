@@ -342,7 +342,7 @@ class Lifecycle(unittest.TestCase):
             commands=['keychain_list','keychain_create','keychain_unlock','profile_decode','keychain_import','keychain_access',
                 'keychain_select',*s.keychain_diagnostics.COMMANDS,'signing_identity','ios_config','build_settings','workspace_settings','signing_discovery',
                 *s.keychain_diagnostics.COMMANDS,'build_ipa','verify_signature','read_entitlements',
-                'read_profile','extract_certificate','architecture','source_clean','keychain_restore','keychain_delete']
+                'read_profile','extract_certificate','architecture','source_clean','keychain_restore_readback','keychain_restore','keychain_restore_readback','keychain_delete']
             outputs={'profile_decode':plistlib.dumps(PROFILE).decode(),'keychain_list':'"/original/login.keychain-db"\n',
                 'signing_identity':f'  1) {PINS["certificate_sha1"]} "Apple Distribution: NEXTAURA LLC ({p.TEAM})"\n 1 valid identities found\n',
                 'build_settings':json.dumps(settings()),'workspace_settings':json.dumps(settings()),'read_entitlements':plistlib.dumps(ENT).decode(),
@@ -369,6 +369,7 @@ class Lifecycle(unittest.TestCase):
                 'keychain_access':['/usr/bin/security','set-key-partition-list','-S','apple-tool:,apple:,codesign:','-s','-k','synthetic-password',keychain],
                 'keychain_select':['/usr/bin/security','list-keychains','-d','user','-s',keychain,'/original/login.keychain-db'],
                 'keychain_restore':['/usr/bin/security','list-keychains','-d','user','-s','/original/login.keychain-db'],
+                'keychain_restore_readback':['/usr/bin/security','list-keychains','-d','user'],
                 'keychain_delete':['/usr/bin/security','delete-keychain',keychain],
                 'signing_identity':['/usr/bin/security','find-identity','-v','-p','codesigning',keychain],
                 'ios_config':['flutter','build','ios','--config-only','--release','--no-pub','--no-codesign','--build-number','17',*p.DEFINES],
@@ -391,11 +392,13 @@ class Lifecycle(unittest.TestCase):
                 nonlocal failed,unlocked
                 self.assertIn(label,s.LABELS,'unexpected command')
                 self.assertEqual(argv,expected_commands[label],'unexpected argv')
-                if label not in {'keychain_restore','keychain_delete'}:
+                if label not in {'keychain_restore','keychain_delete','keychain_restore_readback'}:
                     self.assertFalse(failed,'continued after failure')
-                    if not uploading:self.assertEqual(label,commands[len([x for x in calls if x not in {'keychain_restore','keychain_delete'}])])
+                    if not uploading:self.assertEqual(label,commands[len([x for x in calls if x not in {'keychain_restore','keychain_delete','keychain_restore_readback'}])])
                 calls.append(label)
                 if failure==label:failed=True;raise RuntimeError('CANARY_SECRET_OUTPUT')
+                if label=='keychain_restore_readback':
+                    return '"/original/login.keychain-db"\n' if 'keychain_restore' in calls else outputs['keychain_search_account']
                 if label=='keychain_create':(private/'distribution.keychain-db').write_bytes(b'synthetic-keychain')
                 if label=='keychain_unlock':
                     self.assertTrue(keychain.is_file());unlocked=True
@@ -436,7 +439,7 @@ class Lifecycle(unittest.TestCase):
             with mock.patch.multiple(s,ROOT=root,WORK=work,PRIVATE=private,IPA=ipa,RECEIPT=receipt), \
                  mock.patch.object(s.profile_installation,'native_home',return_value=native_home), \
                  mock.patch.object(s.profile_installation,'cleanup',side_effect=clean_native), \
-                 mock.patch.object(s,'runner',return_value=run),mock.patch.object(s,'cleanup_runner',return_value=run), \
+                 mock.patch.object(s,'runner',return_value=run) as runner_factory,mock.patch.object(s,'cleanup_runner',return_value=run), \
                  mock.patch.object(s.secrets,'token_hex',return_value='synthetic-password'), \
                  mock.patch.dict(s.os.environ,{'GITHUB_SHA':'a'*40},clear=True),mock.patch('builtins.print') as printed:
                 if not uploading:
@@ -473,6 +476,9 @@ class Lifecycle(unittest.TestCase):
                             s.upload(PINS,'17',{})
                     self.assertFalse(list((private/'private_keys').glob('*.p8')))
                 self.assertNotIn('CANARY',str(printed.call_args_list))
+                if not uploading:
+                    self.assertEqual(runner_factory.call_args_list[0].args[0]['HOME'],str(native_home))
+                    self.assertEqual(ctx['env']['HOME'],str(work/'home'))
                 self.assertFalse((private/'distribution.p12').exists())
                 self.assertEqual((private/'profile.mobileprovision').exists(),native_cleanup_failure)
                 self.assertEqual((private/s.profile_installation.JOURNAL).exists(),native_cleanup_failure or mutation=='native_journal')
@@ -481,7 +487,7 @@ class Lifecycle(unittest.TestCase):
                     self.assertEqual(secret_reads,[])
                 for relative in s.profile_installation.DIRECTORIES:
                     self.assertEqual((native_home/relative/(PINS['profile_uuid']+'.mobileprovision')).exists(),native_cleanup_failure)
-                if failure not in {'keychain_restore','keychain_delete'}:
+                if failure not in {'keychain_restore','keychain_delete','keychain_restore_readback'}:
                     self.assertFalse((private/'search-list.json').exists())
                     self.assertFalse((private/'distribution.keychain-db').exists())
 
@@ -491,7 +497,7 @@ class Lifecycle(unittest.TestCase):
     def test_success_and_each_build_command_failure(self):
         stages=['profile_decode','keychain_list','keychain_create','keychain_unlock','keychain_import','keychain_access',
             'keychain_select',*s.keychain_diagnostics.COMMANDS,'signing_identity','ios_config','build_settings','workspace_settings','signing_discovery','build_ipa','verify_signature','read_entitlements',
-            'read_profile','extract_certificate','architecture','source_clean','keychain_restore','keychain_delete']
+            'read_profile','extract_certificate','architecture','source_clean','keychain_restore_readback','keychain_restore','keychain_delete']
         for stage in [None,*stages]:
             with self.subTest(stage=stage):self.exercise(failure=stage)
 

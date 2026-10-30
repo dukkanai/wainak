@@ -19,16 +19,22 @@ def lines(text):
     return result
 
 
-def search_list(text,owned,expected):
-    unknown={'status':'UNCLASSIFIED','count':None,'owned_present':None,'matches_expected':None}
+def parse_search_list(text):
     rows=lines(text)
-    if rows is None or len(rows)>32:return unknown
+    if rows is None or len(rows)>32:return None
     paths=[]
     for line in rows:
         match=re.fullmatch(r'"(/[^"\x00-\x1f]{0,4095})"',line)
-        if not match:return unknown
+        if not match:return None
         paths.append(match[1])
-    if len(set(paths))!=len(paths):return unknown
+    if len(set(paths))!=len(paths):return None
+    return paths
+
+
+def search_list(text,owned,expected):
+    unknown={'status':'UNCLASSIFIED','count':None,'owned_present':None,'matches_expected':None}
+    paths=parse_search_list(text)
+    if paths is None:return unknown
     return {'status':'OBSERVED','count':len(paths),'owned_present':str(owned) in paths,
             'matches_expected':paths==list(expected)}
 

@@ -10,7 +10,6 @@ import platform
 import plistlib
 import re
 import secrets
-import shlex
 import sys
 import time
 import unicodedata
@@ -29,7 +28,8 @@ from scripts import ipa_diagnostics as ipa_diagnostics
 LABELS=frozenset({'keychain_list','keychain_create','keychain_unlock','keychain_import','keychain_access',
     'keychain_select','keychain_restore','keychain_delete','signing_identity','profile_decode','ios_config',
     'build_settings','build_ipa','verify_signature','read_entitlements','read_profile','extract_certificate',
-    'architecture','source_commit','source_clean','upload_ipa','xcode_version','signing_discovery','workspace_settings'}) | frozenset(keychain_diagnostics.COMMANDS)
+    'architecture','source_commit','source_clean','upload_ipa','xcode_version','signing_discovery','workspace_settings',
+    'keychain_restore_readback'}) | frozenset(keychain_diagnostics.COMMANDS)
 WORK=ROOT/'.ci-github'
 PRIVATE=WORK/'signing'
 IPA=WORK/'verified/wainek-internal.ipa'
@@ -77,7 +77,7 @@ def runner(env, deadline, overlay=None):
             guard=lambda:g.resource_guard(WORK,ROOT/'apps/mobile',deadline),overlay=overlay,seconds=seconds,
             allowed_labels=LABELS,safe_reasons=g.SAFE_POLICY_REASONS|q.REASONS,
             **({'stdout_only':True} if (label in {'build_settings','workspace_settings'} and command[0]=='/usr/bin/xcodebuild') or
-                label=='signing_discovery' or label in keychain_diagnostics.COMMANDS else {}),
+                label in {'signing_discovery','keychain_list'} or label in keychain_diagnostics.COMMANDS else {}),
             **({'output_profile':ipa_diagnostics.PROFILE} if label=='build_ipa' and list(command[:3])==['flutter','build','ipa'] else {}),
             **({'output_profile':security.PROFILE} if label=='keychain_import' and
                list(command[:2])==['/usr/bin/security','import'] else {}))
@@ -92,25 +92,53 @@ def probe_keychains(phase,run,env,ctx,keychain,prior,pins):
     with ExitStack() as stack:profile_installation.open_path(stack,home)
     account_env={**env,'HOME':str(home)}
     account_run=runner(account_env,ctx['deadline'],ctx['overlay'])
+    isolated_run=runner({**env,'HOME':str(WORK/'home')},ctx['deadline'],ctx['overlay'])
     expected=[str(keychain),*prior]
-    for context,query_run,suffix in (('ISOLATED',run,'isolated'),('ACCOUNT',account_run,'account')):
+    results={}
+    for context,query_run,suffix in (('ISOLATED',isolated_run,'isolated'),('ACCOUNT',account_run,'account')):
         label='keychain_search_'+suffix
         text=query_run(label,list(keychain_diagnostics.COMMANDS[label]),seconds=30)
-        keychain_diagnostics.emit(phase,context,'SEARCH_LIST',keychain_diagnostics.search_list(text,keychain,expected))
+        search=keychain_diagnostics.search_list(text,keychain,expected)
+        keychain_diagnostics.emit(phase,context,'SEARCH_LIST',search)
         label='identity_search_'+suffix
         text=query_run(label,list(keychain_diagnostics.COMMANDS[label]),seconds=30)
-        keychain_diagnostics.emit(phase,context,'IDENTITIES',keychain_diagnostics.identities(text,pins['certificate_sha1']))
+        identities=keychain_diagnostics.identities(text,pins['certificate_sha1'])
+        keychain_diagnostics.emit(phase,context,'IDENTITIES',identities)
+        results[context]={'search':search,'identities':identities}
+    return results
 
 
-def cleanup_runner():
+def account_context():
+    try:
+        home=profile_installation.native_home()
+        with ExitStack() as stack:
+            fd=profile_installation.open_path(stack,home)
+            info=os.fstat(fd)
+    except OSError:raise p.PolicyError('signed_keychain_context') from None
+    return home,{'version':2,'uid':os.getuid(),'home_identity':[info.st_dev,info.st_ino]}
+
+
+def require_account_discovery(results):
+    result=results['ACCOUNT']
+    p.require(result['search']['status']=='OBSERVED' and result['search']['owned_present'] is True and
+        result['search']['matches_expected'] is True and result['identities']['status']=='OBSERVED' and
+        result['identities']['pinned_present'] is True,'signed_keychain_discovery')
+
+
+def cleanup_runner(account_home=None):
     # Cleanup must remain possible after disk/deadline/SDK verification failure.
     # It still requires bounded processes and verified group cleanup.
-    env={'PATH':'/usr/bin:/bin:/usr/sbin:/sbin','HOME':str(WORK/'home')}
+    if account_home is not None:
+        verified,_=account_context();p.require(verified==account_home,'signed_keychain_context')
+    env={'PATH':'/usr/bin:/bin:/usr/sbin:/sbin','HOME':str(account_home if account_home is not None else WORK/'home')}
     deadline=time.monotonic()+60
     def run(label, command):
+        if label=='keychain_restore_readback':
+            p.require(list(command)==['/usr/bin/security','list-keychains','-d','user'],'signed_keychain_probe_command')
         return g.run_checked(label,command,cwd=ROOT,env=env,deadline=deadline,
             guard=lambda:None,overlay=None,seconds=25,
-            allowed_labels=frozenset({'keychain_restore','keychain_delete'}),safe_reasons=q.REASONS)
+            allowed_labels=frozenset({'keychain_restore','keychain_delete','keychain_restore_readback'}),safe_reasons=q.REASONS,
+            **({'stdout_only':True} if label=='keychain_restore_readback' else {}))
     return run
 
 
@@ -175,12 +203,29 @@ def cleanup(run,pins=None,native_required=False):
     try:profile_installation.cleanup(PRIVATE,pins if pins is not None else q.REVIEWED_PINS,required=native_required)
     except BaseException:errors+=1;native_clean=False
     journal=PRIVATE/'search-list.json'
-    if journal.exists():
+    if os.path.lexists(journal):
         try:
-            paths=json.loads(regular(journal))
+            saved=json.loads(regular(journal));restore_run=run
+            if type(saved) is dict:
+                home,identity=account_context()
+                p.require(set(saved)==set(identity)|{'paths'} and all(type(saved[k]) is type(v) and saved[k]==v for k,v in identity.items()),'signed_keychain_context')
+                p.require(len(saved['home_identity'])==2 and all(type(x) is int for x in saved['home_identity']),'signed_keychain_context')
+                restore_run=cleanup_runner(account_home=home);paths=saved['paths']
+            else:paths=saved  # Historical isolated-HOME recovery journal only.
             p.require(type(paths) is list and len(paths)<=32 and all(type(x) is str and x.startswith('/') and
                 '\n' not in x and '\0' not in x for x in paths),'signed_path')
-            run('keychain_restore',['/usr/bin/security','list-keychains','-d','user','-s',*paths])
+            if type(saved) is dict:
+                current=keychain_diagnostics.parse_search_list(restore_run('keychain_restore_readback',['/usr/bin/security','list-keychains','-d','user']))
+                owned=str(PRIVATE/'distribution.keychain-db')
+                # create-keychain may append its file before our explicit set.
+                # Accept only our one extra entry, preserving every prior entry
+                # and its order; unrelated additions/reordering remain errors.
+                p.require(current==paths or (current is not None and current.count(owned)==1 and
+                    [path for path in current if path!=owned]==paths),'signed_keychain_context_changed')
+            restore_run('keychain_restore',['/usr/bin/security','list-keychains','-d','user','-s',*paths])
+            if type(saved) is dict:
+                restored=keychain_diagnostics.parse_search_list(restore_run('keychain_restore_readback',['/usr/bin/security','list-keychains','-d','user']))
+                p.require(restored==paths,'signed_keychain_context_changed')
             journal.unlink()
         except BaseException:errors+=1
     keychain=PRIVATE/'distribution.keychain-db'
@@ -212,6 +257,8 @@ def cleanup(run,pins=None,native_required=False):
 
 def compile_internal(pins, number, ctx, secret_source):
     env=dict(ctx['env']);env.pop('XCODE_XCCONFIG_FILE',None)
+    home,home_identity=account_context()
+    env['HOME']=str(home)  # Signing tools and archive share the verified account context.
     run=runner(env,ctx['deadline'],ctx['overlay'])
     p.require(not PRIVATE.exists() and not PRIVATE.is_symlink(),'signed_existing_path')
     PRIVATE.mkdir(mode=0o700)
@@ -223,9 +270,15 @@ def compile_internal(pins, number, ctx, secret_source):
         raw=decode(secret_source[q.SIGNING_SECRETS[2]],36*1024)
         p.require(sha(raw)==pins['profile_sha256'],'signed_profile_hash')
         profile_path=PRIVATE/'profile.mobileprovision';new_file(profile_path,raw)
-        prior=shlex.split(run('keychain_list',['/usr/bin/security','list-keychains','-d','user']))
-        p.require(len(prior)<=32 and all(x.startswith('/') and '\n' not in x and '\0' not in x for x in prior),'signed_path')
-        new_file(PRIVATE/'search-list.json',json.dumps(prior).encode())
+        prior=keychain_diagnostics.parse_search_list(run('keychain_list',['/usr/bin/security','list-keychains','-d','user']))
+        p.require(prior is not None and len(prior)<32 and str(keychain) not in prior,'signed_path')
+        new_file(PRIVATE/'search-list.json',json.dumps({**home_identity,'paths':prior}).encode())
+        # Persist the exact pre-mutation snapshot for the always() recovery step.
+        for path,flags in ((PRIVATE/'search-list.json',os.O_RDONLY|os.O_NOFOLLOW),
+                           (PRIVATE,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)):
+            fd=os.open(path,flags)
+            try:os.fsync(fd)
+            finally:os.close(fd)
         run('keychain_create',['/usr/bin/security','create-keychain','-p',key_password,keychain])
         run('keychain_unlock',['/usr/bin/security','unlock-keychain','-p',key_password,keychain])
         profile=decode_profile(run,'profile_decode',profile_path,keychain,pins)
@@ -237,7 +290,7 @@ def compile_internal(pins, number, ctx, secret_source):
         run('keychain_import',['/usr/bin/security','import',p12,'-k',keychain,'-P',password,'-T','/usr/bin/codesign','-T','/usr/bin/security'])
         run('keychain_access',['/usr/bin/security','set-key-partition-list','-S','apple-tool:,apple:,codesign:','-s','-k',key_password,keychain])
         run('keychain_select',['/usr/bin/security','list-keychains','-d','user','-s',keychain,*prior])
-        probe_keychains('AFTER_SELECT',run,env,ctx,keychain,prior,pins)
+        require_account_discovery(probe_keychains('AFTER_SELECT',run,env,ctx,keychain,prior,pins))
         identities=run('signing_identity',['/usr/bin/security','find-identity','-v','-p','codesigning',keychain])
         found=re.findall(r'\) ([A-F0-9]{40}) "(Apple Distribution: [^"\n]+)"',identities)
         p.require(len(found)==1 and found[0][0]==pins['certificate_sha1'] and
@@ -271,7 +324,7 @@ def compile_internal(pins, number, ctx, secret_source):
         except (ValueError,RecursionError):observation=signing_discovery.project(None)
         print(json.dumps({'event':'GITHUB_SIGNING_DISCOVERY',**observation}),flush=True)
         profile_installation.verify(PRIVATE,pins)
-        probe_keychains('BEFORE_ARCHIVE',run,env,ctx,keychain,prior,pins)
+        require_account_discovery(probe_keychains('BEFORE_ARCHIVE',run,env,ctx,keychain,prior,pins))
         try:
             run('build_ipa',['flutter','build','ipa','--release','--no-pub','--build-number',number,
                 '--export-options-plist',export,*p.DEFINES],cwd=mobile,seconds=1200)
@@ -334,7 +387,7 @@ def upload(pins, number, secret_source):
     p.require(run('source_commit',['git','rev-parse','HEAD']).strip()==os.environ['GITHUB_SHA'] and
               not run('source_clean',['git','status','--porcelain']).strip(),'signed_source_drift')
     p.require(run('xcode_version',['/usr/bin/xcodebuild','-version']).splitlines()==['Xcode 26.4.1','Build version 17E202'],'signed_settings')
-    p.require(not (PRIVATE/'search-list.json').exists() and not (PRIVATE/'distribution.keychain-db').exists() and
+    p.require(not os.path.lexists(PRIVATE/'search-list.json') and not (PRIVATE/'distribution.keychain-db').exists() and
               not os.path.lexists(PRIVATE/profile_installation.JOURNAL),'signed_cleanup')
     marker=WORK/'upload-attempt.json'
     p.require(not marker.exists() and not marker.is_symlink(),'signed_upload_ambiguous')
