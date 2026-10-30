@@ -39,6 +39,12 @@ RECEIPT=WORK/'verified/result.json'
 def sha(data):return hashlib.sha256(data).hexdigest()
 
 
+def certificate_extraction_command(prefix,app):
+    # codesign uses getopt_long's optional argument: a separate prefix is a
+    # second code operand, not the option value. Attach it explicitly.
+    return ['/usr/bin/codesign','-d','--extract-certificates='+str(prefix),app]
+
+
 def regular(path, limit=1024*1024):
     p.require(not WORK.is_symlink() and path.resolve().is_relative_to(WORK.resolve()) and
               not any(x.is_symlink() for x in (path,*path.parents) if x.is_relative_to(WORK)) and
@@ -347,7 +353,7 @@ def compile_internal(pins, number, ctx, secret_source):
         p.validate_profile(embedded_profile,entitlements,info,number)
         p.require(info.get('CFBundleExecutable')=='Runner','signed_settings')
         prefix=PRIVATE/'leaf'
-        run('extract_certificate',['/usr/bin/codesign','-d','--extract-certificates',prefix,app])
+        run('extract_certificate',certificate_extraction_command(prefix,app))
         p.require(sha(regular(PRIVATE/'leaf0'))==pins['certificate_sha256'],'signed_certificate')
         p.require(run('architecture',['/usr/bin/lipo','-archs',app/'Runner']).strip()=='arm64','signed_settings')
         p.require(not run('source_clean',['git','status','--porcelain']).strip(),'signed_source_drift')

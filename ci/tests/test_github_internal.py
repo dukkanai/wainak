@@ -1,6 +1,7 @@
 """Synthetic-only tests. Never read Apple keys or invoke security/altool."""
 import base64
 import copy
+import ctypes
 import datetime
 import hashlib
 import io
@@ -8,6 +9,7 @@ import json
 from pathlib import Path
 import plistlib
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -28,6 +30,41 @@ ENT={'application-identifier':p.TEAM+'.'+p.BUNDLE,'com.apple.developer.team-iden
 PROFILE={'UUID':PINS['profile_uuid'],'Name':PINS['profile_name'],'TeamIdentifier':[p.TEAM],
          'ExpirationDate':datetime.datetime(2099,1,1),'Entitlements':ENT,'DeveloperCertificates':[CERT]}
 INFO={'CFBundleIdentifier':p.BUNDLE,'CFBundleVersion':'17','DTPlatformName':'iphoneos','CFBundleExecutable':'Runner'}
+
+
+class CertificateArguments(unittest.TestCase):
+    def test_native_optional_argument_parser_requires_attached_prefix(self):
+        # Independently exercise the libc option contract used by codesign,
+        # rather than accepting a mock that repeats a malformed argv.
+        class Option(ctypes.Structure):
+            _fields_=[('name',ctypes.c_char_p),('has_arg',ctypes.c_int),
+                      ('flag',ctypes.POINTER(ctypes.c_int)),('val',ctypes.c_int)]
+        library=ctypes.CDLL(None);parse=library.getopt_long
+        parse.argtypes=[ctypes.c_int,ctypes.POINTER(ctypes.c_char_p),ctypes.c_char_p,
+                        ctypes.POINTER(Option),ctypes.POINTER(ctypes.c_int)]
+        parse.restype=ctypes.c_int
+        prefix=Path('/synthetic space/شهادة/leaf');app=Path('/synthetic space/Runner.app')
+        correct=s.certificate_extraction_command(prefix,app)
+        incorrect=['/usr/bin/codesign','-d','--extract-certificates',prefix,app]
+        saved={name:ctypes.c_int.in_dll(library,name).value for name in ('optind','opterr','optopt')}
+        try:
+            for command,expected_prefix,expected_operands in (
+                (correct,str(prefix).encode(),[str(app).encode()]),
+                (incorrect,None,[str(prefix).encode(),str(app).encode()])):
+                ctypes.c_int.in_dll(library,'optind').value=0 if sys.platform=='linux' else 1
+                if sys.platform=='darwin':ctypes.c_int.in_dll(library,'optreset').value=1
+                values=(ctypes.c_char_p*(len(command)+1))(*(str(x).encode() for x in command),None)
+                options=(Option*2)(Option(b'extract-certificates',2,None,256),Option())
+                extracted=[]
+                while (value:=parse(len(command),values,b'd',options,None))!=-1:
+                    self.assertIn(value,(ord('d'),256))
+                    if value==256:extracted.append(ctypes.c_char_p.in_dll(library,'optarg').value)
+                offset=ctypes.c_int.in_dll(library,'optind').value
+                self.assertEqual(extracted,[expected_prefix])
+                self.assertEqual([values[i] for i in range(offset,len(command))],expected_operands)
+        finally:
+            for name,value in saved.items():ctypes.c_int.in_dll(library,name).value=value
+            ctypes.c_void_p.in_dll(library,'optarg').value=None
 
 
 def settings():
@@ -381,7 +418,7 @@ class Lifecycle(unittest.TestCase):
                 'verify_signature':['/usr/bin/codesign','--verify','--deep','--strict',app],
                 'read_entitlements':['/usr/bin/codesign','-d','--entitlements',':-',app],
                 'read_profile':['/usr/bin/security','cms','-D','-k',keychain,'-i',app/'embedded.mobileprovision'],
-                'extract_certificate':['/usr/bin/codesign','-d','--extract-certificates',private/'leaf',app],
+                'extract_certificate':['/usr/bin/codesign','-d','--extract-certificates='+str(private/'leaf'),app],
                 'architecture':['/usr/bin/lipo','-archs',app/'Runner'],
                 'source_clean':['git','status','--porcelain'],
                 'source_commit':['git','rev-parse','HEAD'],
@@ -422,7 +459,9 @@ class Lifecycle(unittest.TestCase):
                         z.writestr('Payload/Runner.app/Runner',b'fake executable')
                     if mutation=='export':(private/'export.plist').write_bytes(b'changed')
                     if mutation=='config':(private/'Signing.xcconfig').write_bytes(b'changed')
-                if label=='extract_certificate':(private/'leaf0').write_bytes(b'other' if mutation=='certificate' else CERT)
+                if label=='extract_certificate' and mutation!='certificate_missing':
+                    if mutation=='certificate_symlink':(private/'leaf0').symlink_to(private/'profile.mobileprovision')
+                    else:(private/'leaf0').write_bytes(b'other' if mutation=='certificate' else CERT)
                 if label=='upload_ipa':
                     self.assertEqual(argv,['/usr/bin/xcrun','altool','--upload-app','--type','ios','--file',ipa,
                         '--apiKey',PINS['asc_key_id'],'--apiIssuer',PINS['asc_issuer_id']])
@@ -504,7 +543,7 @@ class Lifecycle(unittest.TestCase):
             with self.subTest(stage=stage):self.exercise(failure=stage)
 
     def test_signed_payload_mutations(self):
-        for mutation in ('profile','identity','settings','export','config','certificate'):
+        for mutation in ('profile','identity','settings','export','config','certificate','certificate_missing','certificate_symlink'):
             with self.subTest(mutation=mutation):self.exercise(mutation=mutation)
 
     def test_upload_lifecycle_and_negatives(self):
