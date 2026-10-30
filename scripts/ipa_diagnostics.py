@@ -23,21 +23,33 @@ MILESTONES={
     'export_started':rb'^Building App Store(?: Connect)? IPA',
     'ipa_built':rb'Built IPA to ',
 }
+CERTIFICATE_NAMES={
+    b'Apple Distribution':'APPLE_DISTRIBUTION',b'iOS Distribution':'IOS_DISTRIBUTION',
+    b'iPhone Distribution':'IPHONE_DISTRIBUTION',b'Apple Development':'APPLE_DEVELOPMENT',
+    b'iOS Development':'IOS_DEVELOPMENT',b'iPhone Developer':'IPHONE_DEVELOPER',
+}
+CERTIFICATE_TYPES=frozenset(CERTIFICATE_NAMES.values())|{'OTHER','DEVELOPMENT_UNSPECIFIED'}
+TARGETS=frozenset({'RUNNER','RUNNER_TESTS','OTHER'})
 REASONS=frozenset('build_ipa_'+x.lower() for x in (*PATTERNS,'UNCLASSIFIED','CLASSIFIER_FAILED'))
 
 
 def empty(status='UNCLASSIFIED',complete=False):
-    return {'status':status,'categories':[],'milestones':{x:False for x in MILESTONES},'complete_output':complete}
+    return {'status':status,'categories':[],'milestones':{x:False for x in MILESTONES},'complete_output':complete,
+        'requested_certificate_types':[],'failure_targets':[]}
 
 
 def project(value):
-    if type(value) is not dict or set(value)!={'status','categories','milestones','complete_output'}:return empty('CLASSIFIER_FAILED')
+    if type(value) is not dict or set(value)!={'status','categories','milestones','complete_output','requested_certificate_types','failure_targets'}:return empty('CLASSIFIER_FAILED')
     if type(value['status']) is not str or value['status'] not in {'RECOGNIZED','UNCLASSIFIED','CLASSIFIER_FAILED'}:return empty('CLASSIFIER_FAILED')
     categories=value['categories'];marks=value['milestones']
     if type(categories) is not list or len(categories)>len(PATTERNS) or any(type(c) is not str or c not in PATTERNS for c in categories):return empty('CLASSIFIER_FAILED')
     if type(marks) is not dict or set(marks)!=set(MILESTONES) or any(type(v) is not bool for v in marks.values()) or type(value['complete_output']) is not bool:return empty('CLASSIFIER_FAILED')
     if (value['status']=='RECOGNIZED')!=bool(categories):return empty('CLASSIFIER_FAILED')
-    return {'status':value['status'],'categories':sorted(set(categories)),'milestones':dict(marks),'complete_output':value['complete_output']}
+    for field,allowed in (('requested_certificate_types',CERTIFICATE_TYPES),('failure_targets',TARGETS)):
+        if type(value[field]) is not list or len(value[field])>len(allowed) or any(type(x) is not str or x not in allowed for x in value[field]):return empty('CLASSIFIER_FAILED')
+    return {'status':value['status'],'categories':sorted(set(categories)),'milestones':dict(marks),'complete_output':value['complete_output'],
+        'requested_certificate_types':sorted(set(value['requested_certificate_types'])),
+        'failure_targets':sorted(set(value['failure_targets']))}
 
 
 def classify(output,complete):
@@ -46,8 +58,22 @@ def classify(output,complete):
     for line in bytes(output).splitlines():
         if len(line)>4096:continue
         line=line.strip()
+        recognized=False
         for name,patterns in PATTERNS.items():
-            if name not in result['categories'] and any(re.search(p,line) for p in patterns):result['categories'].append(name)
+            if any(re.search(p,line) for p in patterns):
+                recognized=True
+                if name not in result['categories']:result['categories'].append(name)
+        if recognized:
+            certificate=re.search(rb'No signing certificate ["\x27]([^"\x27]{1,1024})["\x27] found',line)
+            if certificate:
+                kind=CERTIFICATE_NAMES.get(certificate[1],'OTHER')
+                if kind not in result['requested_certificate_types']:result['requested_certificate_types'].append(kind)
+            if b'No development certificates available to code sign' in line:
+                if 'DEVELOPMENT_UNSPECIFIED' not in result['requested_certificate_types']:result['requested_certificate_types'].append('DEVELOPMENT_UNSPECIFIED')
+            target=re.search(rb'\(in target ["\x27]([^"\x27]{1,128})["\x27] from project ["\x27][^"\x27]{1,128}["\x27]\)',line)
+            if target:
+                kind={b'Runner':'RUNNER',b'RunnerTests':'RUNNER_TESTS'}.get(target[1],'OTHER')
+                if kind not in result['failure_targets']:result['failure_targets'].append(kind)
         for name,pattern in MILESTONES.items():
             if re.search(pattern,line):result['milestones'][name]=True
     if result['categories']:result['status']='RECOGNIZED'

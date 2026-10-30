@@ -15,6 +15,7 @@ import sys
 import time
 import unicodedata
 import zipfile
+from contextlib import ExitStack
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
@@ -22,13 +23,13 @@ from ci.github import internal_policy as q, mac_unsigned as g
 from ci.testflight import policy as p, diagnostics as d
 from ci.testflight.build import safe_unpack, xml_plist, child_environment
 from scripts import security_diagnostics as security
-from ci.github import signing_settings,signing_discovery,profile_installation
+from ci.github import signing_settings,signing_discovery,profile_installation,keychain_diagnostics
 from scripts import ipa_diagnostics as ipa_diagnostics
 
 LABELS=frozenset({'keychain_list','keychain_create','keychain_unlock','keychain_import','keychain_access',
     'keychain_select','keychain_restore','keychain_delete','signing_identity','profile_decode','ios_config',
     'build_settings','build_ipa','verify_signature','read_entitlements','read_profile','extract_certificate',
-    'architecture','source_commit','source_clean','upload_ipa','xcode_version','signing_discovery'})
+    'architecture','source_commit','source_clean','upload_ipa','xcode_version','signing_discovery','workspace_settings'}) | frozenset(keychain_diagnostics.COMMANDS)
 WORK=ROOT/'.ci-github'
 PRIVATE=WORK/'signing'
 IPA=WORK/'verified/wainek-internal.ipa'
@@ -70,14 +71,35 @@ def preflight(env, pins):
 
 def runner(env, deadline, overlay=None):
     def run(label, command, cwd=ROOT, seconds=300):
+        if label in keychain_diagnostics.COMMANDS:
+            p.require(tuple(command)==keychain_diagnostics.COMMANDS[label],'signed_keychain_probe_command')
         return g.run_checked(label,command,cwd=cwd,env=env,deadline=deadline,
             guard=lambda:g.resource_guard(WORK,ROOT/'apps/mobile',deadline),overlay=overlay,seconds=seconds,
             allowed_labels=LABELS,safe_reasons=g.SAFE_POLICY_REASONS|q.REASONS,
-            **({'stdout_only':True} if (label=='build_settings' and command[0]=='/usr/bin/xcodebuild') or label=='signing_discovery' else {}),
+            **({'stdout_only':True} if (label in {'build_settings','workspace_settings'} and command[0]=='/usr/bin/xcodebuild') or
+                label=='signing_discovery' or label in keychain_diagnostics.COMMANDS else {}),
             **({'output_profile':ipa_diagnostics.PROFILE} if label=='build_ipa' and list(command[:3])==['flutter','build','ipa'] else {}),
             **({'output_profile':security.PROFILE} if label=='keychain_import' and
                list(command[:2])==['/usr/bin/security','import'] else {}))
     return run
+
+
+def probe_keychains(phase,run,env,ctx,keychain,prior,pins):
+    p.require(phase in keychain_diagnostics.PHASES,'signed_keychain_probe_command')
+    # Only two exact read-only commands use this alternate HOME. No mutation,
+    # default selection, trust, ACL or credential import uses this context.
+    home=profile_installation.native_home()
+    with ExitStack() as stack:profile_installation.open_path(stack,home)
+    account_env={**env,'HOME':str(home)}
+    account_run=runner(account_env,ctx['deadline'],ctx['overlay'])
+    expected=[str(keychain),*prior]
+    for context,query_run,suffix in (('ISOLATED',run,'isolated'),('ACCOUNT',account_run,'account')):
+        label='keychain_search_'+suffix
+        text=query_run(label,list(keychain_diagnostics.COMMANDS[label]),seconds=30)
+        keychain_diagnostics.emit(phase,context,'SEARCH_LIST',keychain_diagnostics.search_list(text,keychain,expected))
+        label='identity_search_'+suffix
+        text=query_run(label,list(keychain_diagnostics.COMMANDS[label]),seconds=30)
+        keychain_diagnostics.emit(phase,context,'IDENTITIES',keychain_diagnostics.identities(text,pins['certificate_sha1']))
 
 
 def cleanup_runner():
@@ -215,6 +237,7 @@ def compile_internal(pins, number, ctx, secret_source):
         run('keychain_import',['/usr/bin/security','import',p12,'-k',keychain,'-P',password,'-T','/usr/bin/codesign','-T','/usr/bin/security'])
         run('keychain_access',['/usr/bin/security','set-key-partition-list','-S','apple-tool:,apple:,codesign:','-s','-k',key_password,keychain])
         run('keychain_select',['/usr/bin/security','list-keychains','-d','user','-s',keychain,*prior])
+        probe_keychains('AFTER_SELECT',run,env,ctx,keychain,prior,pins)
         identities=run('signing_identity',['/usr/bin/security','find-identity','-v','-p','codesigning',keychain])
         found=re.findall(r'\) ([A-F0-9]{40}) "(Apple Distribution: [^"\n]+)"',identities)
         p.require(len(found)==1 and found[0][0]==pins['certificate_sha1'] and
@@ -239,11 +262,16 @@ def compile_internal(pins, number, ctx, secret_source):
         settings=run('build_settings',['/usr/bin/xcodebuild','-project',mobile/'ios/Runner.xcodeproj',
             '-scheme','Runner','-configuration','Release','-sdk','iphoneos','-showBuildSettings','-json'])
         signing_settings.validate(settings,pins)
+        workspace_settings=run('workspace_settings',['/usr/bin/xcodebuild','-workspace',mobile/'ios/Runner.xcworkspace',
+            '-scheme','Runner','-configuration','Release','-sdk','iphoneos','-destination','generic/platform=iOS',
+            '-showBuildSettings','-json'])
+        signing_settings.validate(workspace_settings,pins,scope='WORKSPACE')
         observed=run('signing_discovery',[sys.executable,ROOT/'ci/github/signing_discovery.py'],seconds=30)
         try:observation=signing_discovery.project(json.loads(observed))
         except (ValueError,RecursionError):observation=signing_discovery.project(None)
         print(json.dumps({'event':'GITHUB_SIGNING_DISCOVERY',**observation}),flush=True)
         profile_installation.verify(PRIVATE,pins)
+        probe_keychains('BEFORE_ARCHIVE',run,env,ctx,keychain,prior,pins)
         try:
             run('build_ipa',['flutter','build','ipa','--release','--no-pub','--build-number',number,
                 '--export-options-plist',export,*p.DEFINES],cwd=mobile,seconds=1200)

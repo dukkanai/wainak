@@ -20,7 +20,7 @@ class Settings(unittest.TestCase):
         with mock.patch('builtins.print') as printed:settings.validate(json.dumps(value),PINS)
         row=json.loads(printed.call_args.args[0]);self.assertEqual(row['outcome'],'PASS')
         self.assertEqual(row['public_settings']['PROVISIONING_PROFILE_SPECIFIER'],'REVIEWED_UUID')
-        self.assertEqual(set(row['public_settings']),set(settings.PUBLIC)|{'PROVISIONING_PROFILE_SPECIFIER'})
+        self.assertEqual(set(row['public_settings']),set(settings.PUBLIC)|{'PROVISIONING_PROFILE_SPECIFIER','EXPANDED_CODE_SIGN_IDENTITY'})
         self.assertNotIn('CANARY',str(printed.call_args_list));self.assertNotIn('DART_DEFINES',str(printed.call_args_list))
 
     def test_syntax_shape_duplicates_and_unexpected_types_have_fixed_reasons(self):

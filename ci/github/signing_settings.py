@@ -27,10 +27,14 @@ def project(settings,pins):
     result['PROVISIONING_PROFILE_SPECIFIER']=('MISSING' if value is None else 'WRONG_TYPE' if type(value) is not str
         else 'REVIEWED_UUID' if value==pins['profile_uuid'] else 'REVIEWED_NAME' if value==pins['profile_name']
         else 'EMPTY' if not value else 'OTHER')
+    value=settings.get('EXPANDED_CODE_SIGN_IDENTITY')
+    result['EXPANDED_CODE_SIGN_IDENTITY']=('MISSING' if value is None else 'WRONG_TYPE' if type(value) is not str
+        else 'EMPTY' if not value else 'REVIEWED_PIN' if value.upper()==pins['certificate_sha1'] else 'OTHER')
     return result
 
 
-def validate(text,pins):
+def validate(text,pins,scope='PROJECT'):
+    p.require(scope in {'PROJECT','WORKSPACE'},'signed_settings')
     stage='JSON';reason='NONE';outcome='FAILED';projection={}
     def pairs(items):
         result={}
@@ -70,5 +74,5 @@ def validate(text,pins):
         reason=error.args[0] if error.args and type(error.args[0]) is str and error.args[0] in allowed else 'OTHER'
         raise
     finally:
-        print(json.dumps({'event':'GITHUB_SIGNING_SETTINGS','outcome':outcome,'stage':stage,
+        print(json.dumps({'event':'GITHUB_SIGNING_SETTINGS','scope':scope,'outcome':outcome,'stage':stage,
             'safe_reason':reason,'public_settings':projection}),flush=True)
