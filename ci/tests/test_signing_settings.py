@@ -91,9 +91,18 @@ class Channels(unittest.TestCase):
     def assert_command_rejected(self,source,maximum,seconds,kind):
         detail={}
         exception=TimeoutError if kind=='TIMEOUT' else RuntimeError
-        with self.assertRaises(exception) as caught:
-            run_bounded([sys.executable,'-c',source],cwd=Path.cwd(),seconds=seconds,maximum=maximum,
-                check=True,stdout_only=True,diagnostic=detail)
+        try:
+            with self.assertRaises(exception) as caught:
+                run_bounded([sys.executable,'-c',source],cwd=Path.cwd(),seconds=seconds,maximum=maximum,
+                    check=True,stdout_only=True,diagnostic=detail)
+        finally:
+            if detail.get('failure_kind')!=kind or detail.get('cleanup_failed'):
+                from scripts import regression_diagnostics as diagnostics
+                row=diagnostics.checkpoint({'test':self.id().removeprefix('ci.tests.'),
+                    'expected_kind':kind,'actual_kind':detail.get('failure_kind','OTHER'),
+                    'cleanup_failed':detail.get('cleanup_failed',False),'cleanup_errors':detail.get('cleanup_errors',[])},
+                    diagnostics.catalogue())
+                if row is not None:print(diagnostics.CHECKPOINT_PREFIX+json.dumps(row),flush=True)
         self.assertEqual(detail['failure_kind'],kind);self.assertFalse(detail['cleanup_failed'])
         self.assertEqual(detail['cleanup_errors'],[])
         if kind=='NONZERO_EXIT':self.assertEqual(detail['exit_code'],2)

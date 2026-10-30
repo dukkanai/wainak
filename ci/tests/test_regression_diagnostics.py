@@ -11,6 +11,19 @@ from ci.testflight import policy as p
 
 
 class SafeRegressionDiagnostics(unittest.TestCase):
+    def test_controlled_checkpoint_drops_canaries_and_preserves_permission_failures(self):
+        allowed=r.catalogue();name='test_signing_settings.Channels.test_persistent_child_times_out_and_is_cleaned'
+        row={'test':name,'expected_kind':'TIMEOUT','actual_kind':'TIMEOUT','cleanup_failed':True,
+            'cleanup_errors':[{'operation':'probe_after_term','type':'PermissionError','errno':1,'message':'CANARY'},
+                              {'operation':'CANARY','type':'CANARY','path':'CANARY'}],'argv':'CANARY'}
+        text=(r.CHECKPOINT_PREFIX+json.dumps(row)+'\nFAIL: '+name.rsplit('.',1)[-1]+' ('+name+')\n').encode()
+        result=r.classify(text,allowed);self.assertNotIn('CANARY',json.dumps(result))
+        self.assertTrue(result['checkpoints'][0]['cleanup_failed'])
+        self.assertEqual(result['checkpoints'][0]['cleanup_errors'][0],{'operation':'probe_after_term','type':'PermissionError','errno':1})
+        self.assertEqual(r.project(result,allowed),result)
+        for change in ({'test':'CANARY'},{'expected_kind':'CANARY'},{'cleanup_failed':'CANARY'}):
+            self.assertIsNone(r.checkpoint({**row,**change},allowed))
+        self.assertNotIn('checkpoints',r.classify((r.CHECKPOINT_PREFIX+'CANARY').encode(),allowed))
     def test_canary_failures_and_errors_are_only_public_ids(self):
         allowed=r.catalogue();name='test_regression_diagnostics.SafeRegressionDiagnostics.test_canary_failures_and_errors_are_only_public_ids'
         self.assertIn(name,allowed)
