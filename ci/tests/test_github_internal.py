@@ -29,7 +29,8 @@ ENT={'application-identifier':p.TEAM+'.'+p.BUNDLE,'com.apple.developer.team-iden
      'get-task-allow':False,'beta-reports-active':True}
 PROFILE={'UUID':PINS['profile_uuid'],'Name':PINS['profile_name'],'TeamIdentifier':[p.TEAM],
          'ExpirationDate':datetime.datetime(2099,1,1),'Entitlements':ENT,'DeveloperCertificates':[CERT]}
-INFO={'CFBundleIdentifier':p.BUNDLE,'CFBundleVersion':'17','DTPlatformName':'iphoneos','CFBundleExecutable':'Runner'}
+INFO={'CFBundleIdentifier':p.BUNDLE,'CFBundleVersion':'17','DTPlatformName':'iphoneos','CFBundleExecutable':'Runner',
+      'CFBundleShortVersionString':'0.1.0','ITSAppUsesNonExemptEncryption':False}
 
 
 class CertificateArguments(unittest.TestCase):
@@ -212,13 +213,13 @@ class Policy(unittest.TestCase):
         candidate=(q.ROOT/'ci/github/internal-testflight.workflow.candidate').read_text()
         from ci.github import asc_status
         self.assertEqual(source,asc_status.candidate_workflow(candidate));q.validate_active_workflow(source)
-        self.assertIn('options: [ci, mac-unsigned, mac-internal, asc-status, asc-internal]',source)
-        self.assertEqual(source.count("if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' && inputs.target != 'asc-internal' }}"),9)
-        self.assertIn("cancel-in-progress: ${{ inputs.target != 'mac-internal' && inputs.target != 'asc-internal' }}",source)
+        self.assertIn('options: [ci, mac-unsigned, mac-internal, asc-status]',source)
+        self.assertEqual(source.count("if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}"),9)
+        self.assertIn("cancel-in-progress: ${{ inputs.target != 'mac-internal' }}",source)
         for changed in (source.replace('branches: [main]','branches: [main, dev]'),
                         source.replace('  pull_request:', '  pull_request_target:'),
                         source.replace('contents: read','contents: write'),
-                        source.replace('options: [ci, mac-unsigned, mac-internal, asc-status, asc-internal]','options: [mac-internal]'),
+                        source.replace('options: [ci, mac-unsigned, mac-internal, asc-status]','options: [mac-internal]'),
                         source.replace("inputs.target != 'mac-internal'",'true'),
                         source.replace('wainek-internal-testflight','other-environment')):
             with self.assertRaisesRegex(p.PolicyError,'signed_active_workflow'):q.validate_active_workflow(changed)
@@ -453,8 +454,12 @@ class Lifecycle(unittest.TestCase):
                     self.assertIn('--no-pub',argv);self.assertTrue(all(x in argv for x in p.DEFINES))
                     options=plistlib.loads((private/'export.plist').read_bytes());p.validate_export(options)
                     dest=mobile/'build/ios/ipa';dest.mkdir(parents=True)
+                    info=dict(INFO)
+                    if mutation=='ui_encryption_missing':info.pop('ITSAppUsesNonExemptEncryption')
+                    if mutation=='ui_encryption_true':info['ITSAppUsesNonExemptEncryption']=True
+                    if mutation=='ui_marketing_version':info['CFBundleShortVersionString']='CANARY'
                     with zipfile.ZipFile(dest/'test.ipa','w') as z:
-                        z.writestr('Payload/Runner.app/Info.plist',plistlib.dumps(INFO))
+                        z.writestr('Payload/Runner.app/Info.plist',plistlib.dumps(info))
                         z.writestr('Payload/Runner.app/embedded.mobileprovision',PROFILE_BYTES)
                         z.writestr('Payload/Runner.app/Runner',b'fake executable')
                     if mutation=='export':(private/'export.plist').write_bytes(b'changed')
@@ -487,6 +492,7 @@ class Lifecycle(unittest.TestCase):
                     if failure or mutation or native_cleanup_failure:
                         with self.assertRaises((RuntimeError,p.PolicyError)):s.compile_internal(PINS,'17',ctx,fake_secrets)
                         self.assertFalse(receipt.exists())
+                        if mutation and mutation.startswith('ui_'):self.assertNotIn('extract_certificate',calls)
                         if failure in {'keychain_list','keychain_create','keychain_unlock','profile_decode'} or mutation=='profile':
                             self.assertNotIn(q.SIGNING_SECRETS[0],secret_reads)
                             self.assertNotIn(q.SIGNING_SECRETS[1],secret_reads)
@@ -543,7 +549,8 @@ class Lifecycle(unittest.TestCase):
             with self.subTest(stage=stage):self.exercise(failure=stage)
 
     def test_signed_payload_mutations(self):
-        for mutation in ('profile','identity','settings','export','config','certificate','certificate_missing','certificate_symlink'):
+        for mutation in ('profile','identity','settings','export','config','certificate','certificate_missing','certificate_symlink',
+                         'ui_encryption_missing','ui_encryption_true','ui_marketing_version'):
             with self.subTest(mutation=mutation):self.exercise(mutation=mutation)
 
     def test_upload_lifecycle_and_negatives(self):

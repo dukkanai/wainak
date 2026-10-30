@@ -174,7 +174,7 @@ class GithubMacPolicy(unittest.TestCase):
             # Branch name contains testflight; it does not invoke the signed driver.
             if forbidden=='testflight':self.assertNotIn('ci/testflight/build.py',section)
             else:self.assertNotIn(forbidden,section)
-        self.assertEqual(text.count("if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' && inputs.target != 'asc-internal' }}"),9)
+        self.assertEqual(text.count("if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}"),9)
 
     def test_initial_policy_reasons_are_finite_and_never_print_exception_messages(self):
         for error,expected in [(p.PolicyError('github_initial_disk'),'github_initial_disk'),

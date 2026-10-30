@@ -1,4 +1,4 @@
-"""Synthetic Apple import records only, no credential files or network calls."""
+"""Synthetic Apple diagnostics only, no credential files or network calls."""
 import json
 import unittest
 from unittest import mock
@@ -6,28 +6,23 @@ from ci.github import asc_status as a, upload_status as u
 from ci.testflight import policy as p
 
 
-def payload():
-    return {'data':[{'type':'buildUploads','id':'CANARY_IDENTIFIER','attributes':{
-        'cfBundleShortVersionString':'0.1.0','cfBundleVersion':'1','platform':'IOS',
-        'state':{'state':'PROCESSING','errors':[],'warnings':[],'infos':[]},'unexpected':'CANARY'}}]}
-
-
 class UploadStatus(unittest.TestCase):
-    def test_all_states_and_empty_uploads_are_distinct_from_build_availability(self):
-        for state in sorted(u.STATES):
-            value=payload();value['data'][0]['attributes']['state']['state']=state
-            result=u.project(value,'1');self.assertEqual(result['uploads'][0]['state'],state)
-            self.assertNotIn('internal_available',json.dumps(result));self.assertNotIn('CANARY',json.dumps(result))
-        self.assertEqual(u.project({'data':[]},'1')['returned_uploads'],0)
+    def test_group_observation_never_echoes_unexpected_names_or_external_ids(self):
+        internal={'type':'betaGroups','id':'11111111-2222-3333-4444-555555555555','attributes':{'isInternalGroup':True,
+            'name':'CANARY','publicLinkEnabled':False,'hasAccessToAllBuilds':False}}
+        external={'type':'betaGroups','id':'CANARY','attributes':{'isInternalGroup':False}}
+        result=u.project_groups({'data':[internal,external]})
+        self.assertEqual(result['external_group_count'],1);self.assertEqual(result['internal_groups'][0]['name_class'],'OTHER')
+        self.assertNotIn('CANARY',json.dumps(result))
+        for value in ({'data':[internal]*101},{'data':'CANARY'},{'data':[{'type':'CANARY'}]}):
+            with self.assertRaises(p.PolicyError):u.project_groups(value)
 
     def test_error_codes_and_categories_never_include_descriptions_or_unknown_values(self):
-        value=payload();state=value['data'][0]['attributes']['state'];state['state']='FAILED'
-        state['errors']=[{'code':'ITMS-90022','description':'Missing required icon file CANARY at /private/CANARY'},
+        errors=[{'code':'ITMS-90022','description':'Missing required icon file CANARY at /private/CANARY'},
             {'code':'CANARY_CODE','description':'CANARY_TOKEN'},{'code':None,'description':['CANARY']}]
-        state['warnings']=[{'code':'CANARY','description':'App icon contains an alpha channel CANARY'}]
-        result=u.project(value,'1');self.assertEqual(result['uploads'][0]['errors']['codes'],['90022','OTHER'])
-        self.assertEqual(result['uploads'][0]['errors']['categories'],['ICON_MISSING','UNCLASSIFIED'])
-        self.assertEqual(result['uploads'][0]['warnings']['categories'],['ICON_ALPHA'])
+        result=u.details(errors);self.assertEqual(result['codes'],['90022','OTHER'])
+        self.assertEqual(result['categories'],['ICON_MISSING','UNCLASSIFIED'])
+        self.assertEqual(u.details([{'code':'CANARY','description':'App icon contains an alpha channel CANARY'}])['categories'],['ICON_ALPHA'])
         self.assertNotIn('CANARY',json.dumps(result));self.assertNotIn('/private',json.dumps(result))
 
     def test_each_diagnostic_pattern_is_finite_and_long_text_is_not_scanned_or_echoed(self):
@@ -47,23 +42,13 @@ class UploadStatus(unittest.TestCase):
         self.assertEqual(u.details([{'description':'icon '+('CANARY'*1000)}])['categories'],['UNCLASSIFIED'])
         self.assertEqual(u.details(None),{'count':None,'codes':[],'categories':[]})
 
-    def test_wrong_version_platform_shape_or_overbound_response_fails_closed(self):
-        for field,bad in (('cfBundleVersion','2'),('cfBundleShortVersionString','CANARY'),('platform','CANARY'),('state',[])):
-            value=payload();value['data'][0]['attributes'][field]=bad
-            with self.assertRaises(p.PolicyError):u.project(value,'1')
-        for value in ({'data':'CANARY'},{'data':payload()['data']*11},{'data':[{'type':'CANARY'}]}):
-            with self.assertRaises(p.PolicyError):u.project(value,'1')
+    def test_diagnostic_shape_and_bound_remain_strict(self):
         for bad in ('CANARY',[None],[{}]*101):
             with self.assertRaises(p.PolicyError):u.details(bad)
 
-    def test_unknown_upload_state_is_other_and_never_a_success(self):
-        value=payload();value['data'][0]['attributes']['state']['state']='CANARY'
-        result=u.project(value,'1');self.assertEqual(result['uploads'][0]['state'],'OTHER')
-        self.assertNotIn('CANARY',json.dumps(result))
-
     def test_only_fixed_app_get_shapes_are_allowed_before_signing_or_http(self):
-        for path in (a.request_path('1'),a.upload_request_path('1'),a.group_request_path()):a.validate_request_path(path)
-        for path in (a.upload_request_path('1').replace(p.ASC_APP_ID,'999'),a.request_path('1')+'&CANARY=1',
+        for path in (a.request_path('1'),a.group_request_path()):a.validate_request_path(path)
+        for path in (a.group_request_path().replace(p.ASC_APP_ID,'999'),a.request_path('1')+'&CANARY=1',
             a.request_path('1')+'#CANARY',a.request_path('1')+'\n',a.request_path('1').replace('version%5D=1','version%5D=0'),
             '/v1/certificates?filter%5Bversion%5D=1','https://CANARY'+a.request_path('1')):
             with mock.patch.object(a,'run_bounded') as process,mock.patch.object(a.urllib.request,'build_opener') as http:

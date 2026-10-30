@@ -160,6 +160,7 @@ def execute():
         profile = xml_plist(run('read_profile', ['security', 'cms', '-D', '-i', app / 'embedded.mobileprovision']))
         info = plistlib.loads((app / 'Info.plist').read_bytes())
         p.validate_profile(profile, entitlements, info, number)
+        p.validate_ui_info(info)
         p.require(info.get('CFBundleExecutable') == 'Runner', 'executable_name')
         p.require(run('architecture', ['lipo', '-archs', app / 'Runner']).strip() == 'arm64', 'device_architecture')
         report = {'status': 'VERIFIED_INTERNAL_IPA', 'source_commit': commit, 'build_number': number,

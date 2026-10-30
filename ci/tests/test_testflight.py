@@ -38,7 +38,8 @@ def signed_values():
            'get-task-allow': False, 'beta-reports-active': True}
     return ({'TeamIdentifier': [p.TEAM], 'ExpirationDate': dt.datetime(2099, 1, 1),
              'Entitlements': copy.deepcopy(ent)}, ent,
-            {'CFBundleIdentifier': p.BUNDLE, 'CFBundleVersion': '7', 'DTPlatformName': 'iphoneos'})
+            {'CFBundleIdentifier': p.BUNDLE, 'CFBundleVersion': '7', 'DTPlatformName': 'iphoneos',
+             'CFBundleShortVersionString':'0.1.0','ITSAppUsesNonExemptEncryption':False})
 
 
 class TestFlightWorkflow(unittest.TestCase):
@@ -93,6 +94,17 @@ class TestFlightWorkflow(unittest.TestCase):
 
 
 class ExportAndSettings(unittest.TestCase):
+    def test_ui_payload_requires_exact_marketing_version_and_boolean_exemption(self):
+        info={'CFBundleShortVersionString':'0.1.0','ITSAppUsesNonExemptEncryption':False}
+        p.validate_ui_info(info)
+        for value in (None,True,0,'false',[],{}):
+            changed=dict(info)
+            if value is None:changed.pop('ITSAppUsesNonExemptEncryption')
+            else:changed['ITSAppUsesNonExemptEncryption']=value
+            with self.assertRaisesRegex(p.PolicyError,'ui_encryption_declaration'):p.validate_ui_info(changed)
+        for value in (None,'1.0','CANARY',False):
+            with self.assertRaisesRegex(p.PolicyError,'ui_marketing_version'):p.validate_ui_info({**info,'CFBundleShortVersionString':value})
+
     def test_accept_known_export(self):p.validate_export(export())
 
     def test_export_scope_negative_matrix(self):
@@ -244,7 +256,7 @@ class DriverGuards(unittest.TestCase):
                 with self.assertRaises(p.PolicyError):b.safe_unpack(ipa,root/'too-large')
 
     def test_complete_driver_and_failed_verification_never_publish(self):
-        for via_alias, failure in product((False, True), (None, 'profile', 'codesign', 'export', 'architecture')):
+        for via_alias, failure in product((False, True), (None, 'profile', 'codesign', 'export', 'architecture','encryption','marketing')):
             with self.subTest(via_alias=via_alias, failure=failure):
                 self.exercise_driver(via_alias, failure)
 
@@ -275,6 +287,8 @@ class DriverGuards(unittest.TestCase):
             info['CFBundleExecutable'] = 'Runner'
             if failure == 'profile':
                 profile['TeamIdentifier'] = ['OTHER']
+            if failure=='encryption':info.pop('ITSAppUsesNonExemptEncryption')
+            if failure=='marketing':info['CFBundleShortVersionString']='CANARY'
             mobile = root/'apps/mobile'
             export_path = root/'.ci-work/testflight/export.plist'
             app = root/'.ci-work/testflight/inspect/Payload/Runner.app'
@@ -396,7 +410,7 @@ class DriverGuards(unittest.TestCase):
                     self.assertEqual(caught.exception.returncode, 1)
                 else:
                     reason = {'profile': 'profile_team', 'export': 'export_testFlightInternalTestingOnly',
-                              'architecture': 'device_architecture'}[failure]
+                              'architecture': 'device_architecture','encryption':'ui_encryption_declaration','marketing':'ui_marketing_version'}[failure]
                     with self.assertRaisesRegex(p.PolicyError, '^'+reason+'$'):b.execute()
             rows = [json.loads(call.args[0]) for call in printed.call_args_list]
             self.assertNotIn(canary, json.dumps(rows))
@@ -430,7 +444,7 @@ class DriverGuards(unittest.TestCase):
                 self.assertEqual(rows[-1], {'status': 'FAILED_CLOSED', 'artifact_eligible': False,
                     'stage': 'profiles_and_export_policy' if failure == 'export' else 'verify_signed_payload'})
                 expected_last = {'export': 'use_profiles', 'codesign': 'verify_signature',
-                                 'profile': 'read_profile', 'architecture': 'architecture'}[failure]
+                                 'profile': 'read_profile', 'architecture': 'architecture','encryption':'read_profile','marketing':'read_profile'}[failure]
                 self.assertEqual(events[-1]['command'], expected_last)
             self.assertFalse(any('app-store-connect' in c or '--create' in c for c in calls))
 

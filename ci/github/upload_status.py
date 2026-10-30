@@ -1,8 +1,7 @@
-"""Finite import-state diagnostics. Never return Apple descriptions or paths."""
+"""Finite Apple error/group diagnostics. Never return descriptions or paths."""
 import re
 from ci.testflight import policy as p
 
-STATES=frozenset({'AWAITING_UPLOAD','PROCESSING','FAILED','COMPLETE'})
 CODES=frozenset({'90022','90023','90035','90056','90057','90078','90161','90165',
     '90179','90186','90205','90206','90209','90210','90236','90426','90683','90725',
     '90771','90788','90863','90907','91053','91054','91109','STATE_ERROR','ENTITY_ERROR',
@@ -49,18 +48,19 @@ def details(values):
     return {'count':len(values),'codes':sorted(codes),'categories':sorted(categories)}
 
 
-def project(payload,number):
-    p.require(type(payload) is dict and type(payload.get('data')) is list and len(payload['data'])<=10,'asc_response')
-    uploads=[]
-    for item in payload['data']:
-        p.require(type(item) is dict and item.get('type')=='buildUploads','asc_response')
-        attributes=item.get('attributes');p.require(type(attributes) is dict,'asc_response')
-        p.require(attributes.get('cfBundleVersion')==number and attributes.get('cfBundleShortVersionString')=='0.1.0'
-                  and attributes.get('platform')=='IOS','asc_response')
-        state=attributes.get('state');p.require(type(state) is dict,'asc_response')
-        value=state.get('state')
-        uploads.append({'state':value if type(value) is str and value in STATES else 'OTHER',
-            'errors':details(state.get('errors',[])),'warnings':details(state.get('warnings',[])),
-            'info_count':details(state.get('infos',[]))['count']})
-    return {'event':'ASC_UPLOAD_STATUS','app_id':p.ASC_APP_ID,'build_number':number,
-            'version':'0.1.0','returned_uploads':len(uploads),'uploads':uploads}
+def project_groups(payload):
+    p.require(type(payload) is dict and type(payload.get('data')) is list and len(payload['data'])<=100,'asc_response')
+    groups=[];external=0
+    for row in payload['data']:
+        p.require(type(row) is dict and row.get('type')=='betaGroups' and type(row.get('attributes')) is dict,'asc_response')
+        values=row['attributes'];internal=values.get('isInternalGroup')
+        p.require(type(internal) is bool,'asc_response')
+        if not internal:external+=1;continue
+        identifier=row.get('id')
+        p.require(type(identifier) is str and re.fullmatch('[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}',identifier),'asc_response')
+        name=values.get('name')
+        group={'group_id':identifier,'name_class':{'App Store Connect Users':'DEFAULT','wainek Internal':'WAINEK_INTERNAL'}.get(name,'OTHER') if type(name) is str else 'OTHER'}
+        for source,target in (('publicLinkEnabled','public_link_enabled'),('hasAccessToAllBuilds','all_builds')):
+            value=values.get(source);p.require(value is None or type(value) is bool,'asc_response');group[target]=value
+        groups.append(group)
+    return {'event':'ASC_INTERNAL_GROUPS','app_id':p.ASC_APP_ID,'internal_groups':groups,'external_group_count':external}

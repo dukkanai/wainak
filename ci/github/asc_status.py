@@ -60,15 +60,12 @@ def validate_workflow():
 
 
 def candidate_workflow(source):
-    from ci.github import asc_internal
     old="inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal'"
     require('asc-status' not in source and source.count(old)==9 and
         source.count('options: [ci, mac-unsigned, mac-internal]')==1,'asc_context')
-    source=source.replace('options: [ci, mac-unsigned, mac-internal]','options: [ci, mac-unsigned, mac-internal, asc-status, asc-internal]')
-    source=source.replace(old,old+" && inputs.target != 'asc-status' && inputs.target != 'asc-internal'")
-    source=source.replace("cancel-in-progress: ${{ inputs.target != 'mac-internal' }}",
-        "cancel-in-progress: ${{ inputs.target != 'mac-internal' && inputs.target != 'asc-internal' }}")
-    return source+'\n  asc-status: '+json.dumps(job(),ensure_ascii=False)+'\n\n  asc-internal: '+json.dumps(asc_internal.job(),ensure_ascii=False)+'\n'
+    source=source.replace('options: [ci, mac-unsigned, mac-internal]','options: [ci, mac-unsigned, mac-internal, asc-status]')
+    source=source.replace(old,old+" && inputs.target != 'asc-status'")
+    return source+'\n  asc-status: '+json.dumps(job(),ensure_ascii=False)+'\n'
 
 
 def preflight(env):
@@ -113,12 +110,6 @@ def request_path(number):
     return '/v1/builds?'+query
 
 
-def upload_request_path(number):
-    query=urllib.parse.urlencode({'filter[cfBundleVersion]':number,'filter[cfBundleShortVersionString]':'0.1.0',
-        'filter[platform]':'IOS','fields[buildUploads]':'cfBundleShortVersionString,cfBundleVersion,platform,state','limit':'10'})
-    return '/v1/apps/'+p.ASC_APP_ID+'/buildUploads?'+query
-
-
 def group_request_path():
     query=urllib.parse.urlencode({'fields[betaGroups]':'name,isInternalGroup,publicLinkEnabled,hasAccessToAllBuilds','limit':'100'})
     return '/v1/apps/'+p.ASC_APP_ID+'/betaGroups?'+query
@@ -129,9 +120,9 @@ def validate_request_path(path):
     if path==group_request_path():return
     try:query=urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)
     except ValueError:raise p.PolicyError('asc_context') from None
-    candidates=query.get('filter[version]',query.get('filter[cfBundleVersion]',[]))
+    candidates=query.get('filter[version]',[])
     require(len(candidates)==1 and re.fullmatch('[1-9][0-9]{0,8}',candidates[0]),'asc_context')
-    require(path in {request_path(candidates[0]),upload_request_path(candidates[0])},'asc_context')
+    require(path==request_path(candidates[0]),'asc_context')
 
 
 def token(path,key,pins):
@@ -200,9 +191,9 @@ def json_request(request):
     if method not in {'GET','PATCH'}:method='OTHER'
     try:
         path=urllib.parse.urlsplit(request.full_url).path
+        require(method=='GET' and request.full_url.startswith('https://api.appstoreconnect.apple.com/'),'asc_context')
+        validate_request_path(request.full_url.removeprefix('https://api.appstoreconnect.apple.com'))
         if path=='/v1/builds':route='BUILD_LIST'
-        elif re.fullmatch('/v1/builds/[a-fA-F0-9-]{36}',path):route='BUILD_RECORD'
-        elif path=='/v1/apps/'+p.ASC_APP_ID+'/buildUploads':route='BUILD_UPLOADS'
         elif path=='/v1/apps/'+p.ASC_APP_ID+'/betaGroups':route='BETA_GROUPS'
         try:
             with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
@@ -315,9 +306,9 @@ def main(argv=None):
             require(0<len(key)<=16384 and key.strip().startswith(b'-----BEGIN '+b'PRIVATE KEY-----'),'asc_key_shape')
             key_file=write('private.p8',key)
             summary=read_status(number,key_file,pins)
-            if not summary['found']:
-                path=upload_request_path(number)
-                print(json.dumps(upload_status.project(get_builds(path,token(path,key_file,pins)),number)),flush=True)
+            if summary['found'] and not summary['build']['internal_available']:
+                path=group_request_path()
+                print(json.dumps(upload_status.project_groups(get_builds(path,token(path,key_file,pins)))),flush=True)
         finally:cleanup()
         return 0
     except BaseException as error:

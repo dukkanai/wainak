@@ -25,6 +25,13 @@ def payload():
 
 
 class Status(unittest.TestCase):
+    def test_status_transport_rejects_writes_before_network_even_to_public_build(self):
+        request=a.urllib.request.Request('https://api.appstoreconnect.apple.com/v1/builds/11111111-2222-3333-4444-555555555555',
+            data=b'{}',headers={'Authorization':'Bearer CANARY'},method='PATCH')
+        with mock.patch.object(a.urllib.request,'build_opener') as network,mock.patch('builtins.print') as printed,self.assertRaisesRegex(p.PolicyError,'asc_context'):
+            a.json_request(request)
+        network.assert_not_called();self.assertNotIn('CANARY',str(printed.call_args_list))
+
     def test_api_failure_reports_fixed_status_route_and_categories_without_body_or_token(self):
         body=json.dumps({'errors':[{'code':'ENTITY_ERROR.ATTRIBUTE.INVALID','title':'Invalid attribute',
             'detail':'CANARY_TOKEN private values','source':{'pointer':'/data/attributes/usesNonExemptEncryption'}}]}).encode()

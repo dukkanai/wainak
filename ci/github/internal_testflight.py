@@ -351,6 +351,7 @@ def compile_internal(pins, number, ctx, secret_source):
         profile_check(embedded_profile,pins,number)
         info=plistlib.loads(regular(app/'Info.plist'))
         p.validate_profile(embedded_profile,entitlements,info,number)
+        p.validate_ui_info(info)
         p.require(info.get('CFBundleExecutable')=='Runner','signed_settings')
         prefix=PRIVATE/'leaf'
         run('extract_certificate',certificate_extraction_command(prefix,app))

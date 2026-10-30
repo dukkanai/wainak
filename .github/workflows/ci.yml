@@ -9,7 +9,7 @@ on:
       target:
         description: Explicit manual target
         type: choice
-        options: [ci, mac-unsigned, mac-internal, asc-status, asc-internal]
+        options: [ci, mac-unsigned, mac-internal, asc-status]
         default: ci
       expected_sha:
         description: Full reviewed commit SHA required for Mac targets
@@ -25,11 +25,11 @@ permissions:
 
 concurrency:
   group: ci-${{ inputs.target }}-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ inputs.target != 'mac-internal' && inputs.target != 'asc-internal' }}
+  cancel-in-progress: ${{ inputs.target != 'mac-internal' }}
 
 jobs:
   source:
-    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' && inputs.target != 'asc-internal' }}
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}
     name: Source checks
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -48,7 +48,7 @@ jobs:
         run: node --check prototype/dist/app.js
 
   unit:
-    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' && inputs.target != 'asc-internal' }}
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}
     name: Operations unit tests
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -64,7 +64,7 @@ jobs:
         run: python3 -m unittest discover -s prototype -p test_package_preview.py -v
 
   recovery:
-    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' && inputs.target != 'asc-internal' }}
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}
     name: Isolated database recovery
     runs-on: ubuntu-24.04
     timeout-minutes: 12
@@ -79,7 +79,7 @@ jobs:
         run: python3 ops/test_recovery.py
 
   browser:
-    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' && inputs.target != 'asc-internal' }}
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}
     name: Prototype browser tests
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -103,7 +103,7 @@ jobs:
         run: npm test
 
   backend:
-    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' && inputs.target != 'asc-internal' }}
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}
     name: Backend contracts and tests
     runs-on: ubuntu-24.04
     timeout-minutes: 8
@@ -126,7 +126,7 @@ jobs:
         run: node --test backend/tests/test_web_deletion_script.mjs
 
   matching:
-    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' && inputs.target != 'asc-internal' }}
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}
     name: Authenticated matching integration
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -150,7 +150,7 @@ jobs:
           --run-disposable-identity --include-existing-qa
 
   mobile:
-    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' && inputs.target != 'asc-internal' }}
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}
     name: Flutter development tests
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -175,7 +175,7 @@ jobs:
           --identity-python "$RUNNER_TEMP/identity-venv/bin/python"
 
   archive:
-    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' && inputs.target != 'asc-internal' }}
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}
     name: Archive and bridge tests
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -193,7 +193,7 @@ jobs:
         run: git diff --exit-code -- archive/go.mod archive/go.sum archivebridge/go.mod archivebridge/go.sum qa/phase5_archive/go.mod qa/phase5_archive/go.sum
 
   native-guards:
-    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' && inputs.target != 'asc-internal' }}
+    if: ${{ inputs.target != 'mac-unsigned' && inputs.target != 'mac-internal' && inputs.target != 'asc-status' }}
     name: Native build guard tests
     runs-on: ubuntu-24.04
     timeout-minutes: 12
@@ -244,5 +244,3 @@ jobs:
   mac-internal: {"name": "Manual internal TestFlight — protected environment required", "if": "github.event_name == 'workflow_dispatch' && inputs.target == 'mac-internal' && github.repository == 'dukkanai/wainak' && github.event.repository.private == false && github.ref == 'refs/heads/dev/ios-testflight-internal-20261029' && inputs.expected_sha == github.sha && github.run_attempt == 1", "runs-on": "macos-26", "timeout-minutes": 45, "permissions": {"contents": "read"}, "environment": "wainek-internal-testflight", "concurrency": {"group": "wainek-internal-testflight", "cancel-in-progress": false}, "env": {"WAINEK_REPOSITORY_VISIBILITY": "${{ github.event.repository.visibility }}", "WAINEK_RUNNER_LABEL": "macos-26", "WAINEK_EXPECTED_SHA": "${{ inputs.expected_sha }}", "WAINEK_BUILD_NUMBER": "${{ inputs.build_number }}", "WAINEK_SIGNED_TARGET": "mac-internal", "WAINEK_SIGNED_ENVIRONMENT": "wainek-internal-testflight"}, "steps": [{"uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "with": {"persist-credentials": false, "ref": "${{ github.sha }}"}}, {"uses": "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0", "with": {"python-version": "3.12.7"}}, {"name": "Check inactive or reviewed configuration", "run": "python3 ci/github/internal_testflight.py --check"}, {"name": "Verify source, SDK, compile and sign internal UI", "env": {"WAINEK_DISTRIBUTION_P12_B64": "${{ secrets.WAINEK_DISTRIBUTION_P12_B64 }}", "WAINEK_DISTRIBUTION_P12_PASSWORD": "${{ secrets.WAINEK_DISTRIBUTION_P12_PASSWORD }}", "WAINEK_APP_STORE_PROFILE_B64": "${{ secrets.WAINEK_APP_STORE_PROFILE_B64 }}"}, "run": "python3 ci/github/internal_testflight.py --build"}, {"name": "Upload verified internal-only IPA to Apple", "env": {"WAINEK_ASC_PRIVATE_KEY_B64": "${{ secrets.WAINEK_ASC_PRIVATE_KEY_B64 }}"}, "run": "python3 ci/github/internal_testflight.py --upload"}, {"name": "Remove owned signing material", "if": "${{ always() }}", "run": "python3 ci/github/internal_testflight.py --cleanup"}]}
 
   asc-status: {"name": "Read internal Apple build status — protected environment", "if": "github.event_name == 'workflow_dispatch' && inputs.target == 'asc-status' && github.repository == 'dukkanai/wainak' && github.event.repository.private == false && github.ref == 'refs/heads/dev/ios-testflight-internal-20261029' && inputs.expected_sha == github.sha && github.run_attempt == 1", "runs-on": "ubuntu-24.04", "timeout-minutes": 8, "permissions": {"contents": "read"}, "environment": "wainek-internal-testflight", "concurrency": {"group": "wainek-asc-status", "cancel-in-progress": false}, "env": {"WAINEK_REPOSITORY_VISIBILITY": "${{ github.event.repository.visibility }}", "WAINEK_EXPECTED_SHA": "${{ inputs.expected_sha }}", "WAINEK_BUILD_NUMBER": "${{ inputs.build_number }}"}, "steps": [{"uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "with": {"persist-credentials": false, "ref": "${{ github.sha }}"}}, {"uses": "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0", "with": {"python-version": "3.12.7"}}, {"name": "Check fixed read-only Apple status contract", "run": "python3 ci/github/asc_status.py --check"}, {"name": "Read fixed application build state", "env": {"WAINEK_ASC_PRIVATE_KEY_B64": "${{ secrets.WAINEK_ASC_PRIVATE_KEY_B64 }}"}, "run": "python3 ci/github/asc_status.py --read"}, {"name": "Remove owned status key material", "if": "${{ always() }}", "run": "python3 ci/github/asc_status.py --cleanup"}]}
-
-  asc-internal: {"name": "Complete reviewed internal build metadata — owner only", "if": "github.event_name == 'workflow_dispatch' && inputs.target == 'asc-internal' && github.repository == 'dukkanai/wainak' && github.event.repository.private == false && github.ref == 'refs/heads/dev/ios-testflight-internal-20261029' && inputs.expected_sha == github.sha && github.run_attempt == 1 && github.actor == 'dukkanai' && github.actor_id == '255427171'", "runs-on": "ubuntu-24.04", "timeout-minutes": 8, "permissions": {"contents": "read"}, "environment": "wainek-internal-testflight", "concurrency": {"group": "wainek-internal-testflight", "cancel-in-progress": false}, "env": {"WAINEK_REPOSITORY_VISIBILITY": "${{ github.event.repository.visibility }}", "WAINEK_EXPECTED_SHA": "${{ inputs.expected_sha }}", "WAINEK_BUILD_NUMBER": "${{ inputs.build_number }}", "WAINEK_ASC_INTERNAL_TARGET": "asc-internal"}, "steps": [{"uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "with": {"persist-credentials": false, "ref": "${{ github.sha }}"}}, {"uses": "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0", "with": {"python-version": "3.12.7"}}, {"name": "Check one-build-only internal metadata plan", "run": "python3 ci/github/asc_internal.py --check"}, {"name": "Complete reviewed fake UI encryption metadata only", "env": {"WAINEK_ASC_PRIVATE_KEY_B64": "${{ secrets.WAINEK_ASC_PRIVATE_KEY_B64 }}"}, "run": "python3 ci/github/asc_internal.py --complete"}, {"name": "Remove owned Apple API material", "if": "${{ always() }}", "run": "python3 ci/github/asc_internal.py --cleanup"}]}

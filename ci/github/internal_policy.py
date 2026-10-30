@@ -31,7 +31,7 @@ REVIEWED_PINS = {
     'asc_issuer_id': '54a3742f-c62d-468e-a2ae-70e0d8aff797',
 }
 PIN_FIELDS = set(REVIEWED_PINS)
-ACTIVE_WORKFLOW_SHA256 = '126add8fc54127b01a9bc67b846d018f6abd256f9a1085480a66781767a8debf'
+ACTIVE_WORKFLOW_SHA256 = '144d4926051a79b517be0f918093c77eaaccf12f376a5dfb2b7025a1c5ff069e'
 REASONS = frozenset({'signed_disabled','signed_pin_schema','signed_pin_value','signed_context','signed_input',
     'signed_environment','signed_template','signed_profile_hash','signed_profile_identity','signed_certificate',
     'signed_secret_encoding','signed_secret_bound','signed_existing_path','signed_path','signed_export',
@@ -51,6 +51,7 @@ REASONS |= security.REASONS
 REASONS |= ipa.REASONS
 REASONS |= signing_settings.REASONS
 REASONS |= frozenset({'signed_keychain_probe_command'})
+REASONS |= frozenset({'ui_marketing_version','ui_encryption_declaration'})
 REASONS |= frozenset({'signed_keychain_context','signed_keychain_context_changed','signed_keychain_discovery'})
 REASONS |= frozenset({'signed_native_home','signed_native_path','signed_native_collision',
     'signed_native_pin','signed_native_ownership','signed_native_io','signed_native_cleanup'})

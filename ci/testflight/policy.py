@@ -114,3 +114,10 @@ def validate_profile(profile, entitlements, info, number, now=None):
         require(values.get('com.apple.developer.team-identifier') == TEAM, 'entitlement_team')
         require(values.get('get-task-allow') is False, 'debug_entitlement')
         require(values.get('beta-reports-active') is True, 'not_beta_distribution')
+
+
+def validate_ui_info(info):
+    # Applies only to this fake UI publication path. Native archive/production
+    # publication requires a separately reviewed policy and encryption decision.
+    require(info.get('CFBundleShortVersionString')=='0.1.0','ui_marketing_version')
+    require(info.get('ITSAppUsesNonExemptEncryption') is False,'ui_encryption_declaration')
