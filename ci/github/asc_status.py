@@ -119,7 +119,7 @@ def request_path(number):
 
 
 def group_request_path():
-    query=urllib.parse.urlencode({'fields[betaGroups]':'name,isInternalGroup,publicLinkEnabled,hasAccessToAllBuilds','limit':'100'})
+    query=urllib.parse.urlencode({'fields[betaGroups]':'name,isInternalGroup,publicLinkEnabled,publicLink,publicLinkId,hasAccessToAllBuilds','limit':'100'})
     return '/v1/apps/'+p.ASC_APP_ID+'/betaGroups?'+query
 
 

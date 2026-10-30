@@ -64,7 +64,10 @@ def select_group(payload):
     p.require(len(matches)<=1,'beta_collision')
     if not matches:return None
     row=matches[0];attributes=row['attributes']
-    p.require(attributes.get('isInternalGroup') is True and attributes.get('publicLinkEnabled') is False
+    # Apple returns null for public-link fields that do not apply to internal groups.
+    p.require(attributes.get('isInternalGroup') is True and 'publicLinkEnabled' in attributes
+        and (attributes['publicLinkEnabled'] is False or attributes['publicLinkEnabled'] is None)
+        and all(key in attributes and attributes[key] is None for key in ('publicLink','publicLinkId'))
         and attributes.get('hasAccessToAllBuilds') is False,'beta_group')
     return guid(row['id'])
 
@@ -76,6 +79,12 @@ def select_tester(payload,owner):
     p.require(email(attributes.get('email'))==owner and attributes.get('inviteType')=='EMAIL','beta_tester')
     p.require(attributes.get('state') in {'NOT_INVITED','INVITED','ACCEPTED','INSTALLED','REVOKED'},'beta_tester')
     return guid(row['id'])
+
+
+def created_id(payload,kind):
+    row=payload.get('data') if type(payload) is dict else None
+    p.require(type(row) is dict and row.get('type')==kind,'beta_response')
+    return guid(row.get('id'))
 
 
 class Client:
@@ -118,7 +127,11 @@ class Client:
         p.require(time.monotonic()<self.deadline,'beta_deadline')
         method,path,body,expected=self.spec(operation)
         now=int(time.time());header={'alg':'ES256','kid':self.pins['asc_key_id'],'typ':'JWT'}
-        claims={'iss':self.pins['asc_issuer_id'],'iat':now,'exp':now+120,'aud':'appstoreconnect-v1','scope':[method+' '+path]}
+        p.require(method in {'GET','POST'},'beta_context')
+        # Apple supports scope entries for GET only. Writes use its documented
+        # unscoped form, existing key role, a 60s lifetime and spec's fixed operations.
+        claims={'iss':self.pins['asc_issuer_id'],'iat':now,'exp':now+(120 if method=='GET' else 60),'aud':'appstoreconnect-v1'}
+        if method=='GET':claims['scope']=['GET '+path]
         message=a.b64(json.dumps(header,separators=(',',':')).encode())+'.'+a.b64(json.dumps(claims,separators=(',',':')).encode())
         jwt=message+'.'+a.b64(a.sign_message(message,self.key))
         p.require(time.monotonic()<self.deadline,'beta_deadline')
@@ -175,17 +188,14 @@ def verify_build(client):
 def complete(client):
     verify_build(client);inspect(client)
     if client.group is None:
-        result=client.request('GROUP_CREATE');row=result.get('data') if type(result) is dict else None
-        client.group=select_group({'data':[row]})
-        p.require(client.group is not None,'beta_group')
+        client.group=created_id(client.request('GROUP_CREATE'),'betaGroups')
         p.require(select_group(client.request('GROUPS_READ'))==client.group,'beta_group')
     members=rows(client.request('GROUP_TESTERS_READ'),'betaTesters',100)
     p.require(all(email(row['attributes'].get('email'))==client.owner for row in members),'beta_membership')
     client.tester=select_tester(client.request('TESTER_READ'),client.owner)
     if client.tester is None:
-        result=client.request('TESTER_CREATE');row=result.get('data') if type(result) is dict else None
-        client.tester=select_tester({'data':[row]},client.owner)
-        p.require(client.tester is not None,'beta_tester')
+        client.tester=created_id(client.request('TESTER_CREATE'),'betaTesters')
+        p.require(select_tester(client.request('TESTER_READ'),client.owner)==client.tester,'beta_tester')
     members=rows(client.request('GROUP_TESTERS_READ'),'betaTesters',100)
     p.require(all(email(row['attributes'].get('email'))==client.owner for row in members),'beta_membership')
     if not any(row['id']==client.tester for row in members):client.request('ADD_OWNER')

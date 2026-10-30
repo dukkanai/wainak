@@ -34,7 +34,7 @@ class UploadStatus(unittest.TestCase):
             'ENCRYPTION_DECLARATION':'usesNonExemptEncryption','ATTRIBUTE_NOT_EDITABLE':'attribute is not editable',
             'INVALID_ATTRIBUTE':'invalid attribute','UNSUPPORTED_ATTRIBUTE':'attribute is not supported',
             'INTERNAL_ONLY_RESTRICTION':'internal-only build','RELATED_RESOURCE_MISSING':'missing relationship',
-            'AGREEMENT_REQUIRED':'agreement required'}
+            'AGREEMENT_REQUIRED':'agreement required','METHOD_NOT_ALLOWED':'The request method is not valid for the resource path'}
         self.assertEqual(set(examples),set(u.PATTERNS))
         for expected,text in examples.items():
             result=u.details([{'code':'CANARY','description':text+' CANARY'}])
@@ -45,6 +45,13 @@ class UploadStatus(unittest.TestCase):
     def test_diagnostic_shape_and_bound_remain_strict(self):
         for bad in ('CANARY',[None],[{}]*101):
             with self.assertRaises(p.PolicyError):u.details(bad)
+
+    def test_method_rejection_is_classified_without_captured_error_text(self):
+        result=a.http_error_summary(json.dumps({'errors':[{'code':'METHOD_NOT_ALLOWED',
+            'title':'The request method is not valid for the resource path. CANARY',
+            'detail':'CANARY_PRIVATE'}]}).encode())
+        self.assertEqual(result,{'count':1,'codes':['METHOD_NOT_ALLOWED'],'categories':['METHOD_NOT_ALLOWED']})
+        self.assertNotIn('CANARY',json.dumps(result))
 
     def test_only_fixed_app_get_shapes_are_allowed_before_signing_or_http(self):
         for path in (a.request_path('1'),a.group_request_path()):a.validate_request_path(path)

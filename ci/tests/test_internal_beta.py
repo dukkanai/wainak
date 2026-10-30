@@ -21,7 +21,8 @@ OWNER='canary_owner@example.invalid'
 
 def row(kind,identifier,**attributes):return {'type':kind,'id':identifier,'attributes':attributes}
 def owner():return {'data':[row('users',TID,username=OWNER,roles=['ACCOUNT_HOLDER'])]}
-def group():return row('betaGroups',GID,name=b.GROUP_NAME,isInternalGroup=True,publicLinkEnabled=False,hasAccessToAllBuilds=False)
+def group():return row('betaGroups',GID,name=b.GROUP_NAME,isInternalGroup=True,publicLinkEnabled=False,
+    publicLink=None,publicLinkId=None,hasAccessToAllBuilds=False)
 def tester():return row('betaTesters',TID,email=OWNER,inviteType='EMAIL',state='INVITED')
 
 
@@ -76,6 +77,29 @@ class BetaDelivery(unittest.TestCase):
     def test_existing_tester_is_linked_without_recreation(self):
         model=Model();model.has_group=True;model.has_tester=True;self.exercise(model)
         self.assertIn('ADD_OWNER',model.calls);self.assertNotIn('TESTER_CREATE',model.calls)
+
+    def test_sparse_create_responses_require_full_independent_readback(self):
+        class SparseModel(Model):
+            def request(self,operation):
+                result=super().request(operation)
+                if operation in {'GROUP_CREATE','TESTER_CREATE'}:
+                    result={'data':{key:result['data'][key] for key in ('type','id')}}
+                return result
+        model=SparseModel();self.exercise(model)
+        self.assertTrue(model.build_added);self.assertGreaterEqual(model.calls.count('GROUPS_READ'),2)
+        self.assertGreaterEqual(model.calls.count('TESTER_READ'),2)
+
+    def test_create_id_type_or_readback_disagreement_blocks_following_mutations(self):
+        for operation in ('GROUP_CREATE','TESTER_CREATE'):
+            class Mismatch(Model):
+                def request(self,name):
+                    result=super().request(name)
+                    if name==operation:result=copy.deepcopy(result);result['data']['id']=BID
+                    return result
+            model=Mismatch();self.exercise(model,True);self.assertNotIn('ADD_BUILD',model.calls)
+            if operation=='GROUP_CREATE':self.assertNotIn('TESTER_CREATE',model.calls)
+        for bad in (None,{'data':None},{'data':{'type':'CANARY','id':GID}},{'data':{'type':'betaGroups','id':'CANARY'}}):
+            with self.assertRaises(p.PolicyError):b.created_id(bad,'betaGroups')
 
     def test_every_operation_failure_stops_without_automatic_retry(self):
         for operation in sorted(b.OPERATIONS):
@@ -135,7 +159,7 @@ class BetaDelivery(unittest.TestCase):
         self.assertTrue(stream.closed);self.assertNotIn('CANARY',str(printed.call_args_list))
         self.assertEqual(json.loads(printed.call_args.args[0])['status_code'],403)
 
-    def test_post_status_and_body_are_exact_and_jwt_is_single_operation_scoped(self):
+    def test_post_status_and_body_are_exact_and_jwt_uses_documented_short_lived_write_form(self):
         for status,allowed in ((201,True),(200,False),(204,False)):
             client=b.Client(None,q.REVIEWED_PINS);client.owner=OWNER;client.verified_build=BID
             response=mock.MagicMock();response.__enter__.return_value=response;response.status=status
@@ -150,7 +174,46 @@ class BetaDelivery(unittest.TestCase):
             self.assertFalse(body['data']['attributes']['publicLinkEnabled']);self.assertFalse(body['data']['attributes']['hasAccessToAllBuilds'])
             self.assertEqual(body['data']['relationships']['app']['data']['id'],p.ASC_APP_ID)
             jwt=request.get_header('Authorization').split()[1];claims=json.loads(base64.urlsafe_b64decode(jwt.split('.')[1]+'=='))
-            self.assertEqual(claims['scope'],['POST /v1/betaGroups']);self.assertEqual(claims['exp']-claims['iat'],120)
+            self.assertNotIn('scope',claims);self.assertEqual(claims['exp']-claims['iat'],60)
+
+    def test_each_read_remains_scoped_and_each_fixed_write_uses_sixty_second_jwt(self):
+        for operation in sorted(b.OPERATIONS):
+            client=b.Client(None,q.REVIEWED_PINS);client.owner=OWNER;client.verified_build=BID
+            client.group=None if operation=='GROUP_CREATE' else GID
+            client.tester=None if operation=='TESTER_CREATE' else TID
+            with mock.patch.object(b,'BUILD_ID',BID):method,path,body,expected=client.spec(operation)
+            response=mock.MagicMock();response.__enter__.return_value=response;response.status=expected
+            response.read.return_value=b'' if expected==204 else b'{"data":[]}'
+            opener=mock.Mock();opener.open.return_value=response
+            with mock.patch.object(b,'BUILD_ID',BID),mock.patch.object(a,'sign_message',return_value=b'\1'*64), \
+                 mock.patch.object(b.urllib.request,'build_opener',return_value=opener),mock.patch('builtins.print') as printed:
+                client.request(operation)
+            request=opener.open.call_args.args[0]
+            self.assertEqual(request.get_method(),method)
+            self.assertEqual(request.full_url,'https://api.appstoreconnect.apple.com'+path)
+            jwt=request.get_header('Authorization').split()[1]
+            claims=json.loads(base64.urlsafe_b64decode(jwt.split('.')[1]+'=='))
+            self.assertEqual(claims['iss'],q.REVIEWED_PINS['asc_issuer_id'])
+            self.assertEqual(claims['aud'],'appstoreconnect-v1')
+            if method=='GET':
+                self.assertEqual(claims['scope'],['GET '+path]);self.assertEqual(claims['exp']-claims['iat'],120)
+            else:
+                self.assertNotIn('scope',claims);self.assertEqual(claims['exp']-claims['iat'],60)
+                self.assertIn(operation,{'GROUP_CREATE','TESTER_CREATE','ADD_OWNER','ADD_BUILD'})
+                self.assertEqual(json.loads(request.data),body)
+            self.assertNotIn('canary',str(printed.call_args_list).casefold())
+
+    def test_documented_null_internal_link_fields_require_explicit_no_link_and_no_automatic_builds(self):
+        for enabled in (False,None):
+            value=group();value['attributes']['publicLinkEnabled']=enabled
+            self.assertEqual(b.select_group({'data':[value]}),GID)
+            for field,bad in (('publicLinkEnabled',True),('publicLinkEnabled',0),('publicLink','CANARY'),
+                    ('publicLinkId','CANARY'),('isInternalGroup',False),('hasAccessToAllBuilds',True)):
+                changed=copy.deepcopy(value);changed['attributes'][field]=bad
+                with self.assertRaises(p.PolicyError):b.select_group({'data':[changed]})
+            for missing in ('publicLinkEnabled','publicLink','publicLinkId','hasAccessToAllBuilds','isInternalGroup'):
+                changed=copy.deepcopy(value);del changed['attributes'][missing]
+                with self.assertRaises(p.PolicyError):b.select_group({'data':[changed]})
 
     def test_expired_client_deadline_never_signs_or_opens_network(self):
         client=b.Client(None,q.REVIEWED_PINS);client.deadline=0
